@@ -2,6 +2,8 @@
 
 用户已明确要求：上传项目更新时同步更新 APK 版本并上传安装包，保留以前的 APK，并在每个 APK 对应的发布页面写明该版本的实际改动。
 
+从 `1.0.33` 起，用户实际使用的版本按 GitHub 正式发行版发布，设置 `prerelease = false`，并将新版本设为 Latest。Debug 构建类型在说明中如实注明，不因此自动改成预发布。已授权的源码与 APK 发布直接执行，不重复询问发布确认。
+
 - 后续用户要求上传或覆盖项目版本时，同步递增 `android-app/app/build.gradle.kts` 的 `versionCode` 和 `versionName`，重新构建、检查 APK，然后随源码更新发布到 `zhangsanfeng25/huimeng`。
 - APK 使用带版本号的文件名，如 `huimeng-1.0.34.apk`，作为独立 GitHub Release 的附件上传；标签使用 `android-v1.0.34`，绑定该 APK 对应的源码提交。
 - 每个 Release 都写清版本号、相对上一版的实际改动、APK 构建类型、使用方式、验证范围与已知限制。不能把源码压缩包当作 APK，不能把历史测试结果说成本次重新验证。

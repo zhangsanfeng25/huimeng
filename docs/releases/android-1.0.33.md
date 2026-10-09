@@ -1,8 +1,10 @@
-# 绘梦书城 Android 1.0.33（Debug）
+# 绘梦书城 Android 1.0.33
 
 安装包：`huimeng-1.0.33.apk`。Android `versionName = 1.0.33`，`versionCode = 23`，包名 `com.huimeng.bookshop`。最低 Android 8.0（API 26）。
 
 [下载 huimeng-1.0.33.apk](https://github.com/zhangsanfeng25/huimeng/releases/download/android-v1.0.33/huimeng-1.0.33.apk)（约 29 MB）。私有仓库需要登录有访问权限的 GitHub 账号。
+
+此版作为用户实际使用的正式发行版发布，并设为 GitHub Latest。发行版标记调整不改变 APK 文件、内部版本、Debug 签名或原有验证范围。
 
 ## 本版本改动
 

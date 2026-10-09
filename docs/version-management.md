@@ -45,6 +45,8 @@ git push origin main
 
 用户已要求：后续上传或覆盖项目版本时，同步递增 Android 的 `versionCode` 和 `versionName`，重新构建并上传对应 APK，不删除以前的 APK。每次新版本另存安装包、创建独立 Release，在该版本附件所在页面写明实际改动。
 
+从 `1.0.33` 开始作为用户实际使用的正式发行版管理，GitHub 设置 `prerelease = false`，新版本设为 Latest。用户已授权直接执行后续版本上传；APK 的 Debug/Release 构建类型、验证范围和已知问题继续如实写入说明。最新正式版入口为 [releases/latest](https://github.com/zhangsanfeng25/huimeng/releases/latest)。
+
 同步更新 `android-app/BUILD_NOTES.md`、`docs/CHANGELOG.md`、`docs/releases/android-版本号.md` 和 README 中的 APK 信息。
 
 修复通常递增补丁号，新增兼容功能递增次版本号，破坏性变化递增主版本号。例如下一次 Android 修复版可使用 `1.0.34` 和 `versionCode = 24`，这只是规则示例。
