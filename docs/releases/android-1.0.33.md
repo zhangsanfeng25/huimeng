@@ -2,6 +2,8 @@
 
 安装包：`huimeng-1.0.33.apk`。Android `versionName = 1.0.33`，`versionCode = 23`，包名 `com.huimeng.bookshop`。最低 Android 8.0（API 26）。
 
+[下载 huimeng-1.0.33.apk](https://github.com/zhangsanfeng25/huimeng/releases/download/android-v1.0.33/huimeng-1.0.33.apk)（约 29 MB）。私有仓库需要登录有访问权限的 GitHub 账号。
+
 ## 本版本改动
 
 - 新增独立搜索页和分类页：支持最近八条搜索历史、清空历史、综合/最新/价格排序、分页、空态与失败重试；分类选择可进入对应商品结果。
