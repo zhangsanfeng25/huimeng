@@ -1,0 +1,46 @@
+# Dependencies and generated builds
+node_modules/
+.npm-cache/
+.huimeng-deps-ready
+build/
+dist/
+*.tsbuildinfo
+output/
+*.apk
+*.aab
+
+# Local environment, IDE settings and signing material
+.env
+.env.*
+!.env.example
+!.env.*.example
+.idea/
+.gradle/
+.vscode/
+local.properties
+android-app/config.ini
+*.jks
+*.keystore
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime state, business data, backups and user uploads
+*.log
+*.pid
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+server/data/*
+!server/data/.gitkeep
+html/server/data/*
+!html/server/data/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
+
+# OS-generated files
+Thumbs.db
+.DS_Store

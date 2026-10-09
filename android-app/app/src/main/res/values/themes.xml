@@ -1,0 +1,40 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.HuiMeng.ForestLogin" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/auth_green</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorOnSurface">@color/auth_ink</item>
+        <item name="colorOnSurfaceVariant">@color/auth_muted</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:statusBarColor">@color/auth_cream</item>
+        <item name="android:navigationBarColor">@color/auth_cream</item>
+    </style>
+    <style name="Theme.HuiMeng" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/cool_green</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">@color/mist_purple</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/page_background</item>
+        <item name="android:navigationBarColor">@color/surface_card</item>
+    </style>
+    <style name="Theme.HuiMeng.Welcome" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item><item name="android:windowActionModeOverlay">true</item><item name="android:fontFamily">sans</item><item name="android:navigationBarColor">#182A4B</item><item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+    </style>
+    <style name="ProfileShortcut">
+        <item name="android:layout_width">0dp</item><item name="android:layout_height">match_parent</item><item name="android:layout_weight">1</item><item name="android:gravity">center</item><item name="android:drawableTint">@color/cool_green_dark</item><item name="android:textColor">@color/ink</item><item name="android:textSize">14sp</item>
+    </style>
+    <style name="HomeAgeChoice">
+        <item name="android:layout_width">0dp</item><item name="android:layout_height">wrap_content</item><item name="android:minHeight">56dp</item><item name="android:layout_weight">1</item><item name="android:layout_marginHorizontal">3dp</item><item name="android:paddingVertical">6dp</item><item name="android:gravity">center</item><item name="android:background">@drawable/bg_home_choice</item><item name="android:drawableTint">@color/cool_green_dark</item><item name="android:drawablePadding">4dp</item><item name="android:textSize">12sp</item><item name="android:textColor">@color/ink</item><item name="android:clickable">true</item><item name="android:focusable">true</item>
+    </style>
+    <style name="HomeThemeChoice" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">0dp</item><item name="android:layout_height">48dp</item><item name="android:layout_weight">1</item><item name="android:layout_marginHorizontal">3dp</item>
+        <item name="android:minWidth">0dp</item><item name="android:minHeight">48dp</item><item name="android:paddingHorizontal">6dp</item><item name="android:paddingVertical">6dp</item><item name="android:insetTop">0dp</item><item name="android:insetBottom">0dp</item>
+        <item name="android:gravity">center</item><item name="android:background">@drawable/bg_home_choice</item><item name="backgroundTint">@null</item><item name="android:textSize">12sp</item><item name="android:textColor">@color/ink</item><item name="android:textStyle">normal</item><item name="android:singleLine">true</item>
+        <item name="iconGravity">textStart</item><item name="iconSize">20dp</item><item name="iconPadding">6dp</item><item name="iconTint">@color/cool_green_dark</item>
+    </style>
+    <style name="ProfileMenu">
+        <item name="android:layout_width">match_parent</item><item name="android:layout_height">58dp</item><item name="android:gravity">center_vertical</item><item name="android:drawableTint">@color/cool_green_dark</item><item name="android:textColor">@color/ink</item><item name="android:textSize">15sp</item><item name="android:drawableEnd">@drawable/ic_chevron</item><item name="android:drawablePadding">8dp</item>
+    </style>
+</resources>

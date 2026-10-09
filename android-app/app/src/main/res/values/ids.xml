@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="wallpaper_surface_tag" type="id" />
+    <item name="nav_first" type="id" />
+    <item name="nav_second" type="id" />
+    <item name="nav_third" type="id" />
+    <item name="nav_fourth" type="id" />
+    <item name="nav_fifth" type="id" />
+</resources>

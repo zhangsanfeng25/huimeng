@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.huimeng.bookshop.ui.PullRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/page_background">
+  <androidx.core.widget.NestedScrollView android:id="@+id/scroll" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="12dp" android:paddingBottom="24dp">
+      <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:gravity="center_vertical">
+        <com.huimeng.bookshop.ui.RoundedBrandImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/app_icon" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:orientation="vertical">
+          <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="绘梦书城" android:textColor="@color/ink" android:textSize="24sp" android:textStyle="bold" />
+          <TextView android:id="@+id/greeting" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/muted" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+        <FrameLayout android:layout_width="52dp" android:layout_height="52dp">
+          <ImageButton android:id="@+id/cartButton" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="打开购物车" android:padding="12dp" android:src="@drawable/ic_cart" app:tint="@color/ink" />
+          <TextView android:id="@+id/cartBadge" android:layout_width="wrap_content" android:layout_height="20dp" android:minWidth="20dp" android:layout_gravity="top|end" android:gravity="center" android:background="@drawable/bg_count_badge" android:paddingHorizontal="4dp" android:textColor="#FFFFFF" android:textSize="11sp" android:visibility="gone" android:importantForAccessibility="no" />
+        </FrameLayout>
+      </LinearLayout>
+      <LinearLayout android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/bg_search" android:gravity="center_vertical" android:paddingStart="12dp">
+          <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_search" app:tint="@color/muted" android:importantForAccessibility="no" />
+          <AutoCompleteTextView android:id="@+id/searchInput" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:paddingHorizontal="8dp" android:background="@null" android:hint="搜索绘本或主题" android:contentDescription="绘本搜索关键词" android:imeOptions="actionSearch" android:inputType="text" android:singleLine="true" android:textColor="@color/ink" android:textColorHint="@color/muted" android:textSize="14sp" android:completionThreshold="1" />
+        </LinearLayout>
+        <com.google.android.material.button.MaterialButton android:id="@+id/searchButton" android:layout_width="72dp" android:layout_height="52dp" android:layout_marginStart="8dp" android:insetTop="0dp" android:insetBottom="0dp" android:minWidth="0dp" android:paddingHorizontal="8dp" android:singleLine="true" android:text="搜索" android:textSize="14sp" app:cornerRadius="14dp" />
+      </LinearLayout>
+      <com.huimeng.bookshop.ui.BannerCarouselView android:id="@+id/bannerCarousel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:background="@drawable/bg_banner" />
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="分类" android:textColor="@color/ink" android:textSize="16sp" android:textStyle="bold" />
+        <TextView android:id="@+id/allCategories" android:layout_width="wrap_content" android:layout_height="48dp" android:paddingHorizontal="8dp" android:gravity="center" android:text="全部分类 ›" android:textColor="@color/cool_green_dark" android:textSize="13sp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true"/>
+      </LinearLayout>
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false">
+        <TextView android:id="@+id/ageBaby" style="@style/HomeAgeChoice" android:text="0–3岁" android:drawableTop="@drawable/ic_category_rattle" />
+        <TextView android:id="@+id/agePreschool" style="@style/HomeAgeChoice" android:text="3–6岁" android:drawableTop="@drawable/ic_category_blocks" />
+        <TextView android:id="@+id/ageSchool" style="@style/HomeAgeChoice" android:text="6–9岁" android:drawableTop="@drawable/ic_category_book" />
+        <TextView android:id="@+id/ageOlder" style="@style/HomeAgeChoice" android:text="9岁以上" android:drawableTop="@drawable/ic_category_explore" />
+      </LinearLayout>
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:baselineAligned="false">
+        <com.google.android.material.button.MaterialButton android:id="@+id/themeBedtime" style="@style/HomeThemeChoice" android:text="睡前故事" app:icon="@drawable/ic_category_moon" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/themeEmotion" style="@style/HomeThemeChoice" android:text="情绪成长" app:icon="@drawable/ic_category_growth" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/themeScience" style="@style/HomeThemeChoice" android:text="科普启蒙" app:icon="@drawable/ic_category_science" />
+      </LinearLayout>
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:gravity="center_vertical">
+        <TextView android:id="@+id/sectionTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="精选绘本" android:textColor="@color/ink" android:textSize="20sp" android:textStyle="bold" />
+        <TextView android:id="@+id/allProducts" android:layout_width="wrap_content" android:layout_height="48dp" android:gravity="center" android:paddingHorizontal="8dp" android:text="查看全部" android:textColor="@color/cool_green_dark" android:textSize="14sp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" />
+      </LinearLayout>
+      <com.google.android.material.button.MaterialButtonToggleGroup android:id="@+id/sortGroup" android:layout_width="match_parent" android:layout_height="wrap_content" app:singleSelection="true" app:selectionRequired="true" app:checkedButton="@id/sortComprehensive">
+        <com.google.android.material.button.MaterialButton android:id="@+id/sortComprehensive" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingHorizontal="8dp" android:singleLine="true" android:text="综合" android:textSize="14sp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/sortNewest" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingHorizontal="8dp" android:singleLine="true" android:text="最新" android:textSize="14sp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/sortPrice" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingHorizontal="8dp" android:singleLine="true" android:text="价格 ↑↓" android:textSize="14sp" />
+      </com.google.android.material.button.MaterialButtonToggleGroup>
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:id="@+id/filterSummary" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:paddingVertical="8dp" android:textColor="@color/muted" android:textSize="12sp" />
+        <TextView android:id="@+id/clearFilters" android:layout_width="wrap_content" android:layout_height="48dp" android:gravity="center" android:paddingHorizontal="8dp" android:text="清除筛选" android:textColor="@color/cool_green_dark" android:visibility="gone" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" />
+      </LinearLayout>
+      <androidx.recyclerview.widget.RecyclerView android:id="@+id/categoryList" android:layout_width="match_parent" android:layout_height="48dp" android:visibility="gone" />
+      <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="24dp" android:gravity="center" android:textColor="@color/muted" android:visibility="gone" />
+      <com.google.android.material.button.MaterialButton android:id="@+id/retry" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="重新加载" android:visibility="gone" />
+      <androidx.recyclerview.widget.RecyclerView android:id="@+id/productList" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginHorizontal="-4dp" android:clipToPadding="false" />
+      <com.google.android.material.button.MaterialButton android:id="@+id/loadMore" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="加载更多绘本" android:visibility="gone" />
+      <com.google.android.material.card.MaterialCardView android:id="@+id/communityCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="16dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/line_soft">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+          <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="亲子共读" android:textColor="@color/ink" android:textSize="20sp" android:textStyle="bold" android:drawableStart="@drawable/ic_community" android:drawablePadding="8dp" android:drawableTint="@color/cool_green" />
+            <TextView android:id="@+id/communityMore" android:layout_width="wrap_content" android:layout_height="48dp" android:gravity="center" android:paddingHorizontal="8dp" android:text="更多笔记 ›" android:textColor="@color/cool_green_dark" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" />
+          </LinearLayout>
+          <androidx.recyclerview.widget.RecyclerView android:id="@+id/communityPosts" android:layout_width="match_parent" android:layout_height="wrap_content" />
+          <TextView android:id="@+id/communityEmpty" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="16dp" android:text="分享一次共读，留下阅读时光" android:textColor="@color/muted" android:visibility="gone" />
+        </LinearLayout>
+      </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+  </androidx.core.widget.NestedScrollView>
+  <ProgressBar android:id="@+id/loading" android:layout_width="32dp" android:layout_height="32dp" android:layout_gravity="top|center_horizontal" android:layout_marginTop="8dp" android:visibility="gone" android:indeterminateTint="@color/cool_green" />
+</com.huimeng.bookshop.ui.PullRefreshLayout>

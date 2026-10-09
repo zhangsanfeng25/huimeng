@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/milk_white">
+  <ScrollView android:id="@+id/scroll" android:layout_width="match_parent" android:layout_height="match_parent" android:paddingBottom="96dp" android:clipToPadding="false">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="52dp" android:gravity="center_vertical">
+        <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp" android:background="@drawable/bg_search" android:contentDescription="返回" android:padding="12dp" android:src="@drawable/ic_back"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="14dp" android:text="确认订单" android:textColor="@color/ink" android:textSize="23sp" android:textStyle="bold"/>
+      </LinearLayout>
+      <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="收货地址" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold"/>
+      <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeColor="@color/line_soft" app:strokeWidth="1dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+          <FrameLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp">
+            <TextView android:id="@+id/address" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginEnd="72dp" android:minHeight="48dp" android:singleLine="false" android:inputType="none" android:lineSpacingExtra="5dp" android:textColor="@color/ink" android:textSize="15sp"/>
+            <com.google.android.material.button.MaterialButton android:id="@+id/editAddress" style="@style/Widget.Material3.Button.TextButton" android:layout_width="64dp" android:layout_height="48dp" android:layout_gravity="top|end" android:minWidth="0dp" android:paddingHorizontal="4dp" android:insetTop="0dp" android:insetBottom="0dp" android:text="修改" android:contentDescription="修改当前收货地址" android:singleLine="true"/>
+          </FrameLayout>
+          <TextView android:id="@+id/changeAddress" android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:text="选择其他收货地址 ›" android:textColor="@color/muted" android:textSize="13sp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true"/>
+          <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line_soft"/>
+          <TextView android:id="@+id/addAddress" android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:text="＋ 新增收货地址" android:textColor="@color/cool_green_dark" android:textStyle="bold" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true"/>
+        </LinearLayout>
+      </com.google.android.material.card.MaterialCardView>
+      <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="商品清单" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold"/>
+      <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeColor="@color/line_soft" app:strokeWidth="1dp">
+        <TextView android:id="@+id/items" android:layout_width="match_parent" android:layout_height="wrap_content" android:lineSpacingExtra="7dp" android:padding="16dp" android:textColor="@color/muted" android:textSize="14sp"/>
+      </com.google.android.material.card.MaterialCardView>
+      <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:text="展示金额仅供参考，最终以提交后的服务端金额为准。模拟支付不会产生真实费用。" android:textColor="@color/muted" android:textSize="13sp"/>
+      <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="28dp" android:indeterminateTint="@color/cool_green"/>
+    </LinearLayout>
+  </ScrollView>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="82dp" android:layout_gravity="bottom" android:background="@color/surface_card" android:elevation="12dp" android:gravity="center_vertical" android:paddingVertical="12dp" android:paddingHorizontal="18dp">
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+      <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="应付合计" android:textColor="@color/muted" android:textSize="12sp"/>
+      <TextView android:id="@+id/total" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="¥0.00" android:textColor="@color/price_red" android:textSize="22sp" android:textStyle="bold"/>
+    </LinearLayout>
+    <com.google.android.material.button.MaterialButton android:id="@+id/submit" android:layout_width="148dp" android:layout_height="54dp" android:enabled="false" android:text="提交订单" android:textSize="16sp" android:paddingHorizontal="8dp" android:singleLine="true" app:cornerRadius="18dp"/>
+  </LinearLayout>
+</FrameLayout>

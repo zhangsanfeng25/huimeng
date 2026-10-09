@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/page_background" android:fillViewport="true">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="22dp">
+    <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp" android:background="@drawable/bg_search" android:contentDescription="返回" android:padding="12dp" android:src="@drawable/ic_back" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp" android:text="确认付款" android:textColor="@color/ink" android:textSize="27sp" android:textStyle="bold" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="这是本地演示支付，不会调用真实支付平台或扣款。" android:textColor="@color/muted" android:textSize="14sp" />
+    <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="22dp" app:strokeColor="@color/line_soft" app:strokeWidth="1dp">
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center" android:padding="24dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="待付款金额" android:textColor="@color/muted" />
+        <TextView android:id="@+id/amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:textColor="@color/price_red" android:textSize="34sp" android:textStyle="bold" />
+        <TextView android:id="@+id/order" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:textColor="@color/muted" android:textSize="12sp" />
+      </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:text="选择演示方式" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
+    <RadioGroup android:id="@+id/methods" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/bg_login_card" android:padding="14dp">
+      <RadioButton android:id="@+id/balance" android:layout_width="match_parent" android:layout_height="54dp" android:buttonTint="@color/cool_green_dark" android:checked="true" android:text="模拟余额" android:textColor="@color/ink" android:textSize="16sp" />
+      <RadioButton android:id="@+id/alipay" android:layout_width="match_parent" android:layout_height="54dp" android:buttonTint="@color/cool_green_dark" android:text="模拟支付宝" android:textColor="@color/ink" android:textSize="16sp" />
+      <RadioButton android:id="@+id/wechat" android:layout_width="match_parent" android:layout_height="54dp" android:buttonTint="@color/cool_green_dark" android:text="模拟微信支付" android:textColor="@color/ink" android:textSize="16sp" />
+    </RadioGroup>
+    <com.google.android.material.button.MaterialButton android:id="@+id/confirm" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="30dp" android:text="确认模拟付款" android:textSize="16sp" app:cornerRadius="18dp" />
+    <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginTop="18dp" android:visibility="gone" />
+  </LinearLayout>
+</ScrollView>

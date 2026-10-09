@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/milk_white">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="52dp" android:gravity="center_vertical" android:orientation="horizontal">
+            <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp" android:background="@drawable/bg_search" android:contentDescription="返回" android:padding="10dp" android:src="@drawable/ic_back" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:layout_weight="1" android:text="外观与壁纸" android:textColor="@color/ink" android:textSize="24sp" android:textStyle="bold" />
+        </LinearLayout>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:text="界面颜色" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="切换后文字、卡片、图标和系统栏会同步适配" android:textColor="@color/muted" android:textSize="13sp" />
+        <com.google.android.material.button.MaterialButtonToggleGroup android:id="@+id/themeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" app:selectionRequired="true" app:singleSelection="true">
+            <com.google.android.material.button.MaterialButton android:id="@+id/light" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:text="浅色"  android:paddingHorizontal="8dp" android:minWidth="0dp" android:singleLine="true"/>
+            <com.google.android.material.button.MaterialButton android:id="@+id/dark" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:text="深色"  android:paddingHorizontal="8dp" android:minWidth="0dp" android:singleLine="true"/>
+            <com.google.android.material.button.MaterialButton android:id="@+id/system" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:text="跟随系统"  android:paddingHorizontal="8dp" android:minWidth="0dp" android:singleLine="true"/>
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="32dp" android:text="背景壁纸" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="壁纸在买家端与商家端共同生效" android:textColor="@color/muted" android:textSize="13sp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="154dp" android:layout_marginTop="16dp" android:orientation="horizontal">
+            <com.google.android.material.button.MaterialButton android:id="@+id/changeAvatar" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="18dp" android:text="更换头像" app:cornerRadius="18dp"/><com.google.android.material.card.MaterialCardView android:id="@+id/wallpaperDefault" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginEnd="6dp" android:layout_weight="1" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeColor="@color/line_soft" app:strokeWidth="2dp">
+                <TextView android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="默认\n纯色" android:textColor="@color/ink" android:textSize="14sp" android:textStyle="bold" />
+            </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView app:cardBackgroundColor="@color/surface_card" android:id="@+id/wallpaperMint" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginHorizontal="3dp" android:layout_weight="1" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeColor="@color/line_soft" app:strokeWidth="2dp">
+                <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="薄荷晴空壁纸" android:scaleType="centerCrop" android:src="@drawable/wallpaper_mint_small" />
+                    <TextView android:layout_width="match_parent" android:layout_height="42dp" android:layout_gravity="bottom" android:background="#B8FFFFFF" android:gravity="center" android:text="薄荷晴空" android:textColor="#173A2D" android:textSize="13sp" android:textStyle="bold" />
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView app:cardBackgroundColor="@color/surface_card" android:id="@+id/wallpaperTwilight" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginStart="6dp" android:layout_weight="1" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeColor="@color/line_soft" app:strokeWidth="2dp">
+                <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="紫蓝梦境壁纸" android:scaleType="centerCrop" android:src="@drawable/wallpaper_twilight_small" />
+                    <TextView android:layout_width="match_parent" android:layout_height="42dp" android:layout_gravity="bottom" android:background="#B81A1942" android:gravity="center" android:text="紫蓝梦境" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="154dp" android:layout_marginTop="12dp" android:orientation="horizontal">
+            <com.google.android.material.card.MaterialCardView android:id="@+id/wallpaperSunrise" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginEnd="6dp" android:layout_weight="1" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:strokeColor="@color/line_soft" app:strokeWidth="2dp">
+                <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="暖霞书页壁纸" android:scaleType="centerCrop" android:src="@drawable/wallpaper_sunrise_small"/>
+                    <TextView android:layout_width="match_parent" android:layout_height="42dp" android:layout_gravity="bottom" android:background="#B8FFFFFF" android:gravity="center" android:text="暖霞书页" android:textColor="#6B3226" android:textSize="13sp" android:textStyle="bold"/>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView android:id="@+id/wallpaperOcean" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginHorizontal="3dp" android:layout_weight="1" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:strokeColor="@color/line_soft" app:strokeWidth="2dp">
+                <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="深海微光壁纸" android:scaleType="centerCrop" android:src="@drawable/wallpaper_ocean_small"/>
+                    <TextView android:layout_width="match_parent" android:layout_height="42dp" android:layout_gravity="bottom" android:background="#A8123546" android:gravity="center" android:text="深海微光" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView android:id="@+id/wallpaperGarden" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginStart="6dp" android:layout_weight="1" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:strokeColor="@color/line_soft" app:strokeWidth="2dp">
+                <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="绿野花园壁纸" android:scaleType="centerCrop" android:src="@drawable/wallpaper_garden_small"/>
+                    <TextView android:layout_width="match_parent" android:layout_height="42dp" android:layout_gravity="bottom" android:background="#B8FFFFFF" android:gravity="center" android:text="绿野花园" android:textColor="#29442C" android:textSize="13sp" android:textStyle="bold"/>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+        <TextView android:id="@+id/wallpaperHint" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:gravity="center" android:textColor="@color/cool_green_dark" android:textSize="13sp" android:textStyle="bold" />
+    </LinearLayout>
+</ScrollView>

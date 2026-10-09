@@ -1,0 +1,24 @@
+<resources>
+    <color name="auth_cream">#F6F2E7</color>
+    <color name="auth_green">#28543C</color>
+    <color name="auth_accent">#28543C</color>
+    <color name="auth_ink">#203D2C</color>
+    <color name="auth_muted">#596651</color>
+    <color name="auth_field">#EAEADF</color>
+    <color name="auth_error">#A63434</color>
+    <color name="auth_fade_clear">#00F6F2E7</color>
+    <color name="auth_hero_tint">#00000000</color>
+    <color name="mist_purple">#837FDB</color>
+    <color name="sky_blue">#CAD8F4</color>
+    <color name="milk_white">#FBFAF8</color>
+    <color name="page_background">#FBFAF8</color>
+    <color name="ink">#172747</color>
+    <color name="muted">#63718A</color>
+    <color name="starlight">#E8D9AE</color>
+    <color name="cool_green">#716DC4</color>
+    <color name="cool_green_dark">#514DA4</color>
+    <color name="surface_soft">#F1F0F9</color>
+    <color name="line_soft">#E4E7F0</color>
+    <color name="price_red">#C94650</color>
+    <color name="surface_card">#FFFFFF</color>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/page_background" android:orientation="vertical">
+ <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginStart="18dp" android:layout_marginTop="12dp" android:background="@drawable/bg_search" android:contentDescription="返回商家页面" android:padding="12dp" android:src="@drawable/ic_back"/>
+ <FrameLayout android:id="@+id/notificationsContainer" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+</LinearLayout>

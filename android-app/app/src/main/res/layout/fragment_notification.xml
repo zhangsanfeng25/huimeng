@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.huimeng.bookshop.ui.PullRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/milk_white" android:orientation="vertical" android:padding="18dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/heading" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="消息中心" android:textColor="@color/ink" android:textSize="26sp" android:textStyle="bold"/>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="订单、活动与系统通知" android:textColor="@color/muted" android:textSize="14sp"/>
+        </LinearLayout>
+        <TextView android:id="@+id/selectAll" android:layout_width="wrap_content" android:layout_height="48dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="全选" android:textColor="@color/cool_green_dark" android:textSize="15sp" android:visibility="gone"/>
+    </LinearLayout>
+    <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="32dp" android:indeterminateTint="@color/cool_green"/>
+    <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="50dp" android:gravity="center" android:text="暂无消息" android:textColor="@color/muted" android:visibility="gone"/>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="18dp" android:layout_weight="1"/>
+    <LinearLayout android:id="@+id/selectionBar" android:layout_width="match_parent" android:layout_height="60dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <com.google.android.material.button.MaterialButton android:id="@+id/cancelSelection" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="取消"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/markRead" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:layout_weight="1" android:text="设为已读"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/deleteSelected" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:layout_weight="1" android:text="删除"/>
+    </LinearLayout>
+</LinearLayout>
+
+</com.huimeng.bookshop.ui.PullRefreshLayout>

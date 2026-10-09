@@ -1,0 +1,173 @@
+openapi: 3.0.3
+info:
+  title: 绘梦儿童绘本商城 API
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:3000/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: 服务健康检查
+      responses:
+        '200': { description: 正常 }
+  /auth/login:
+    post:
+      security: []
+      summary: 用户、商家或管理员登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, minLength: 8 }
+                role: { type: string, enum: [USER, MERCHANT, ADMIN] }
+      responses:
+        '200': { description: 登录成功 }
+        '401': { description: 账号或密码错误 }
+  /auth/register:
+    post:
+      security: []
+      summary: 注册用户账号
+      responses:
+        '201': { description: 注册成功 }
+  /auth/me:
+    get:
+      summary: 当前会话与角色
+      responses:
+        '200': { description: 当前用户 }
+  /catalog/categories:
+    get:
+      security: []
+      summary: 分类列表
+      responses:
+        '200': { description: 分类 }
+  /catalog/products:
+    get:
+      security: []
+      summary: 搜索已上架商品
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+      responses:
+        '200': { description: 商品列表 }
+  /catalog/products/{id}:
+    get:
+      security: []
+      summary: 商品详情与评价
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 商品详情 }
+        '404': { description: 不存在或已下架 }
+  /me/cart:
+    get:
+      summary: 当前用户购物车
+      responses:
+        '200': { description: 购物车 }
+  /me/cart/{productId}:
+    put:
+      summary: 添加或更新购物车
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 已更新 }
+  /me/addresses:
+    get:
+      summary: 当前用户地址
+      responses:
+        '200': { description: 地址列表 }
+    post:
+      summary: 新增地址
+      responses:
+        '201': { description: 已创建 }
+  /checkout:
+    post:
+      summary: 跨店结算并预占库存
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      responses:
+        '201': { description: 结算组与子订单 }
+        '409': { description: 幂等冲突或库存不足 }
+  /checkout/{groupId}/pay:
+    post:
+      summary: 模拟支付结算组
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 支付结果 }
+  /merchant/products:
+    get:
+      summary: 本店商品
+      responses:
+        '200': { description: 商品列表 }
+    post:
+      summary: 创建商品草稿
+      responses:
+        '201': { description: 商品和版本编号 }
+  /merchant/products/{productId}/submit:
+    post:
+      summary: 提交商品审核
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 已提交 }
+  /merchant/orders/{orderId}/ship:
+    post:
+      summary: 本店模拟发货
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 已发货 }
+  /community/users/{id}:
+    get:
+      summary: 读者公开资料和公开阅读笔记
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: data 包含 user（id、nickname、avatarUrl）、posts、postCount 和公开笔记的 likeCount }
+        '401': { description: 需要有效登录会话 }
+        '404': { description: 用户不存在或已停用 }
+  /community/posts:
+    get:
+      security: []
+      summary: 公开社区列表
+      responses:
+        '200': { description: 帖子 }
+    post:
+      summary: 用户或商家发布帖子
+      responses:
+        '201': { description: 已发布 }
+  /dashboard:
+    get:
+      summary: 管理员经营工作台
+      responses:
+        '200': { description: 指标、趋势与任务 }
+  /users:
+    get:
+      summary: 管理员用户列表
+      responses:
+        '200': { description: 用户列表 }
+  /reviews/{id}:
+    put:
+      summary: 管理员审核商品版本
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 审核结果 }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-token

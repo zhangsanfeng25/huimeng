@@ -1,0 +1,23 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.HuiMeng.ForestLogin" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/auth_accent</item>
+        <item name="colorOnPrimary">@color/auth_cream</item>
+        <item name="colorOnSurface">@color/auth_ink</item>
+        <item name="colorOnSurfaceVariant">@color/auth_muted</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <item name="android:statusBarColor">@color/auth_cream</item>
+        <item name="android:navigationBarColor">@color/auth_cream</item>
+    </style>
+    <style name="Theme.HuiMeng" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/cool_green</item>
+        <item name="colorOnPrimary">#111827</item>
+        <item name="colorSecondary">@color/mist_purple</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/page_background</item>
+        <item name="android:navigationBarColor">@color/surface_card</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+    </style>
+</resources>

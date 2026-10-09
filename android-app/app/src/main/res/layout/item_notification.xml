@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12dp" app:cardBackgroundColor="@color/surface_card" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeColor="@color/line_soft" app:strokeWidth="1dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+        <CheckBox android:id="@+id/selection" android:layout_width="40dp" android:layout_height="48dp" android:buttonTint="@color/cool_green_dark" android:contentDescription="选择消息" android:focusable="false" android:visibility="gone"/>
+        <View android:id="@+id/dot" android:layout_width="9dp" android:layout_height="9dp" android:layout_marginTop="7dp" android:background="@drawable/bg_unread_dot"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/ink" android:textSize="16sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/content" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:lineSpacingExtra="3dp" android:textColor="@color/muted" android:textSize="14sp"/>
+            <TextView android:id="@+id/time" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:textColor="#A0A5A2" android:textSize="11sp"/>
+        </LinearLayout>
+        <TextView android:id="@+id/arrow" android:layout_width="28dp" android:layout_height="48dp" android:gravity="center" android:text="›" android:textColor="@color/cool_green_dark" android:textSize="23sp" android:contentDescription="查看消息详情"/>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

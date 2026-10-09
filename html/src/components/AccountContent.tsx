@@ -1,0 +1,10 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+type Item=Record<string,unknown>;
+const statuses:Record<string,string>={ONLINE:'销售中',OFFLINE:'已下架',PLATFORM_OFFLINE:'平台下架',DRAFT:'草稿',PENDING_REVIEW:'待审核',REJECTED:'已驳回',PUBLIC:'公开',HIDDEN:'已隐藏',WAITING_PAYMENT:'待支付',PREPARING:'准备出库',READY_TO_SHIP:'待发货',SHIPPED:'已发货',IN_TRANSIT:'运输中',OUT_FOR_DELIVERY:'派送中',COMPLETED:'已完成',CANCELLED:'已取消'};
+export function AccountContent({detail}:{detail:Item}){
+  const sections=[...(Array.isArray(detail.productList)?[{key:'productList',label:'商品',route:'/products'}]:[]),{key:'orderList',label:'订单',route:'/orders'},{key:'postList',label:'帖子',route:'/community'},{key:'commentList',label:'社区评论',route:'/community'},{key:'ratingList',label:'商品评价',route:'/ratings'}];
+  const [active,setActive]=useState(sections[0].key);
+  const section=sections.find(v=>v.key===active)||sections[0],list=(Array.isArray(detail[section.key])?detail[section.key]:[]) as Item[];
+  return <section className="account-content"><h3>关联内容管理</h3><nav aria-label="关联内容分类">{sections.map(v=><button className={section.key===v.key?'secondary active':'secondary'} key={v.key} onClick={()=>setActive(v.key)}>{v.label}（{Array.isArray(detail[v.key])?(detail[v.key] as unknown[]).length:0}）</button>)}</nav><div className="table-scroll"><table><thead><tr><th>编号</th><th>内容</th><th>状态 / 金额</th><th>操作</th></tr></thead><tbody>{list.map(v=><tr key={String(v.id)}><td>{String(v.id)}</td><td><strong>{String(v.title||v.postTitle||v.shop||'')}</strong><p className="account-content-text">{String(v.content||'')}</p></td><td>{statuses[String(v.status)]||String(v.status||'')}{v.amount!==undefined?<p>¥{Number(v.amount).toFixed(2)}</p>:null}</td><td><Link className="link" to={`${section.route}?record=${encodeURIComponent(String(section.key==='commentList'?v.postId:v.id))}${section.key==='commentList'?`&comment=${encodeURIComponent(String(v.id))}`:''}`}>查看并管理</Link></td></tr>)}</tbody></table>{!list.length?<p className="empty">该账户暂无{section.label}记录</p>:null}</div></section>;
+}

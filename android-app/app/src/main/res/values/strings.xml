@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">绘梦书城</string>
+    <string name="login">登录</string>
+    <string name="user_role">用户端</string>
+    <string name="merchant_role">商家端</string>
+</resources>

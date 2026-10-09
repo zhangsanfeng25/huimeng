@@ -1,0 +1,52 @@
+package com.huimeng.bookshop.ui;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import com.huimeng.bookshop.core.ApiClient;
+import com.huimeng.bookshop.databinding.FragmentNotificationBinding;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.ArrayList;
+import java.util.List;
+
+public class NotificationFragment extends Fragment{
+    private FragmentNotificationBinding binding;private NotificationAdapter adapter;
+    private final androidx.activity.result.ActivityResultLauncher<Intent> detail=registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),result->{if(binding!=null)load();});
+    @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){
+        binding=FragmentNotificationBinding.inflate(inflater,container,false);
+        adapter=new NotificationAdapter(item->{Intent intent=new Intent(requireContext(),NotificationDetailActivity.class);
+            intent.putExtra("notice_id",item.id()).putExtra("title",item.title()).putExtra("content",item.content()).putExtra("created_at",item.createdAt()).putExtra("read",item.read());detail.launch(intent);},this::renderSelection);
+        binding.list.setLayoutManager(new LinearLayoutManager(requireContext()));binding.list.setAdapter(adapter);
+        binding.selectAll.setOnClickListener(v->adapter.selectAll());
+        binding.cancelSelection.setOnClickListener(v->adapter.exitSelection());
+        binding.markRead.setOnClickListener(v->bulk("read"));
+        binding.deleteSelected.setOnClickListener(v->{if(adapter.selectedCount()>0)new AlertDialog.Builder(requireContext())
+            .setMessage("删除选中的 "+adapter.selectedCount()+" 条消息？此操作仅影响当前账户。")
+            .setNegativeButton("取消",null).setPositiveButton("删除",(dialog,which)->bulk("delete")).show();});
+        return binding.getRoot();
+    }
+    @Override public void onViewCreated(@NonNull View view,@Nullable Bundle state){super.onViewCreated(view,state);binding.getRoot().setOnRefreshListener(this::load);load();}
+    private void renderSelection(){if(binding==null)return;boolean mode=adapter.selecting();binding.heading.setText(mode?"已选择 "+adapter.selectedCount()+" 条":"消息中心");
+        binding.selectionBar.setVisibility(mode?View.VISIBLE:View.GONE);binding.selectAll.setVisibility(mode?View.VISIBLE:View.GONE);
+        binding.markRead.setEnabled(adapter.selectedCount()>0);binding.deleteSelected.setEnabled(adapter.selectedCount()>0);}
+    private void bulk(String action){List<String> ids=adapter.selectedIds();if(ids.isEmpty())return;
+        binding.markRead.setEnabled(false);binding.deleteSelected.setEnabled(false);
+        try{new ApiClient(requireContext()).post("me/notifications/bulk/"+action,new JSONObject().put("ids",new JSONArray(ids)),result->{if(binding==null)return;adapter.exitSelection();load();},error->{if(binding==null)return;renderSelection();Toast.makeText(requireContext(),error,Toast.LENGTH_SHORT).show();});}
+        catch(Exception error){renderSelection();Toast.makeText(requireContext(),"操作失败，请重试",Toast.LENGTH_SHORT).show();}
+    }
+    private void load(){if(adapter.getItemCount()==0)binding.loading.setVisibility(View.VISIBLE);new ApiClient(requireContext()).get("me/notifications",result->{if(binding==null)return;
+        binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);List<NotificationAdapter.Notice> rows=new ArrayList<>();JSONArray data=result.optJSONArray("data");
+        if(data!=null)for(int i=0;i<data.length();i++){JSONObject item=data.optJSONObject(i);if(item!=null)rows.add(new NotificationAdapter.Notice(item.optString("id"),item.optString("title"),item.optString("content"),item.optString("created_at"),item.optInt("is_read")==1));}
+        adapter.submit(rows);binding.empty.setText("暂无消息");binding.empty.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);
+    },error->{if(binding==null)return;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);binding.empty.setText(error);binding.empty.setVisibility(View.VISIBLE);});}
+    @Override public void onDestroyView(){super.onDestroyView();binding=null;}
+}

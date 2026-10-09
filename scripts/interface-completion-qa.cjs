@@ -1,0 +1,35 @@
+// Browser plugin not available; use the bundled Playwright runtime and installed Chrome.
+const {chromium}=require('C:/Users/Hugo-Gao/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {execFileSync}=require('child_process'),fs=require('fs'),assert=require('assert/strict');
+const adb='D:/ruanjian/Android-Studio-SDK/platform-tools/adb.exe',out='D:/bishe/huimeng/output/interface-completion-20261004',base='http://127.0.0.1:3300';
+fs.mkdirSync(out+'/screenshots',{recursive:true});
+const shell=(...args)=>execFileSync(adb,['shell',...args],{encoding:'utf8',timeout:20000});
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function nodes(){shell('uiautomator','dump','/sdcard/interface-qa.xml');const xml=shell('cat','/sdcard/interface-qa.xml');return [...xml.matchAll(/<node\s+([^>]+)>/g)].map(match=>Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(v=>[v[1],v[2].replace(/&amp;/g,'&').replace(/&quot;/g,'"')])));}
+async function find(predicate,timeout=12000){const until=Date.now()+timeout;while(Date.now()<until){const row=(await nodes()).find(predicate);if(row)return row;await delay(300);}throw Error('Android element not found: '+predicate);}
+async function tap(predicate){const row=await find(predicate);const points=row.bounds.match(/\d+/g).map(Number);shell('input','tap',String(Math.round((points[0]+points[2])/2)),String(Math.round((points[1]+points[3])/2)));return row;}
+const byId=id=>v=>v['resource-id']==='com.huimeng.bookshop:id/'+id;
+const byText=text=>v=>v.text===text;
+async function enter(id,text){await tap(byId(id));shell('input','text',text.replace(/ /g,'%s'));shell('input','keyevent','KEYCODE_BACK');}
+async function shot(name){fs.writeFileSync(out+'/screenshots/'+name+'.png',execFileSync(adb,['exec-out','screencap','-p'],{timeout:15000}));}
+async function scrollTo(id){for(let i=0;i<7;i++){if((await nodes()).some(byId(id)))return;const size=shell('wm','size').match(/(\d+)x(\d+)/);shell('input','swipe',String(+size[1]/2),String(+size[2]*.8),String(+size[1]/2),String(+size[2]*.35),'350');}throw Error('Missing field '+id);}
+(async()=>{
+ const browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const adminResponse=await context.request.post(base+'/api/v1/auth/login',{data:{username:'admin',password:'huimeng123',role:'ADMIN'}});assert.equal(adminResponse.status(),200);const admin=(await adminResponse.json()).token;
+ await context.addInitScript(token=>sessionStorage.setItem('huimeng_admin_session',token),admin);await page.goto(base+'/merchants');await page.getByRole('heading',{name:'商家管理',exact:true}).waitFor();await page.locator('.sync-status.live').waitFor();
+ const account='qa_reader_'+Date.now().toString().slice(-7);const registered=await context.request.post(base+'/api/v1/auth/register',{data:{username:account,nickname:'界面验收读者',password:'demo12345'}});assert.equal(registered.status(),201);
+ shell('am','force-stop','com.huimeng.bookshop');shell('am','start','-n','com.huimeng.bookshop/.ui.WelcomeActivity');await find(byId('accountInput'));await enter('accountInput',account);await enter('passwordInput','demo12345');await tap(byId('loginButton'));await find(byText('我的'),20000);
+ await tap(byText('我的'));await tap(byId('switchRole'));await find(byId('applyMerchant'));await shot('app-role-apply');await tap(byId('applyMerchant'));await find(byId('shopName'));
+ await enter('shopName','QA Reading House');await enter('contactName','QA Reader');await enter('contactPhone','13800002001');await scrollTo('businessAddress');await enter('businessAddress','Dalian Reading Road 20');await scrollTo('description');await enter('description','QA fixture for childrens picture book shop.');await scrollTo('terms');await tap(byId('terms'));await scrollTo('submit');await tap(byId('submit'));await find(v=>v.text.includes('等待平台审核'));await shot('app-application-pending');
+ const row=page.locator('tbody tr').filter({hasText:account});await row.waitFor();await row.getByRole('button',{name:'查看',exact:true}).click();await page.getByRole('heading',{name:'商家申请资料'}).waitFor();await page.getByText('Dalian Reading Road 20',{exact:true}).waitFor();await page.screenshot({path:out+'/screenshots/web-application-review.png',fullPage:true});
+ await page.getByRole('button',{name:'驳回申请',exact:true}).click();await page.getByRole('alert').filter({hasText:'请填写驳回原因'}).waitFor();await page.locator('.merchant-application textarea').fill('请补充经营地址说明');await page.getByRole('button',{name:'驳回申请',exact:true}).click();await find(v=>v.text==='修改并重新提交',15000);await shot('app-application-rejected');await tap(byId('submit'));await find(v=>v.text==='等待平台审核');
+ await page.getByRole('button',{name:'同意申请并开通商家',exact:true}).waitFor();await page.getByRole('button',{name:'同意申请并开通商家',exact:true}).click();await find(byText('切换到商家端'),15000);await shot('app-application-approved');await tap(byId('submit'));await find(byText('概览'),15000);await shot('app-new-merchant-dashboard');
+ await tap(byText('我的'));await tap(byId('switchRole'));await find(v=>v.text.includes('商家权限已开通'));await shot('app-role-approved');await tap(byId('buyerCard'));await find(byText('首页'));await tap(byText('首页'));await tap(byId('searchButton'));await find(byText('搜索绘本'));await shot('app-search');await tap(byText('分类'));await find(byText('绘本分类'));await find(v=>v.text==='睡前故事');await shot('app-categories');await tap(byText('睡前故事'));await find(v=>v.text.includes('找到'));await shot('app-category-results');
+ // Launch ratings through a real product row, preserving manifest export restrictions.
+ if(!(await nodes()).some(v=>v['resource-id']==='com.huimeng.bookshop:id/cover')){await tap(v=>v.text.includes('清除分类'));await find(v=>v['resource-id']==='com.huimeng.bookshop:id/cover');}
+ await tap(v=>v['resource-id']==='com.huimeng.bookshop:id/cover');
+ for(let i=0;i<7;i++){if((await nodes()).some(byText('查看全部评价')))break;const size=shell('wm','size').match(/(\d+)x(\d+)/);shell('input','swipe',String(+size[1]/2),String(+size[2]*.8),String(+size[1]/2),String(+size[2]*.3),'350');}
+ await tap(byText('查看全部评价'));await find(byText('读者评价'));await shot('app-ratings');
+ await page.setViewportSize({width:390,height:844});await page.getByRole('heading',{name:'商家申请资料'}).waitFor();await page.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth+1);await page.screenshot({path:out+'/screenshots/web-review-mobile.png',fullPage:true});
+ assert.deepEqual(errors,[]);fs.writeFileSync(out+'/integration-result.json',JSON.stringify({status:'passed',account,checks:['App form submission','web SSE new row','required rejection reason','App realtime rejection','resubmission','web approval','App immediate merchant switch without relogin','role card refresh','search and categories','independent ratings','web 390px overflow'],errors},null,2));await browser.close();console.log('Interface integration QA passed');
+})().catch(error=>{console.error(error);process.exit(1)});

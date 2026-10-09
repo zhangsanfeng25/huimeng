@@ -1,0 +1,27 @@
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto_sans_sc_regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto_sans_sc_semibold.woff") format("woff");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto_sans_sc_bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  font-family: "Noto Sans SC", Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
