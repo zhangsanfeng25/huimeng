@@ -43,7 +43,9 @@ git push origin main
 
 ## 标记正式版本
 
-Android 发布时递增 `versionCode`，并按实际改动调整 `versionName`。同步更新 `android-app/BUILD_NOTES.md`、`docs/CHANGELOG.md` 和 README 中的 APK 信息。
+用户已要求：后续上传或覆盖项目版本时，同步递增 Android 的 `versionCode` 和 `versionName`，重新构建并上传对应 APK，不删除以前的 APK。每次新版本另存安装包、创建独立 Release，在该版本附件所在页面写明实际改动。
+
+同步更新 `android-app/BUILD_NOTES.md`、`docs/CHANGELOG.md`、`docs/releases/android-版本号.md` 和 README 中的 APK 信息。
 
 修复通常递增补丁号，新增兼容功能递增次版本号，破坏性变化递增主版本号。例如下一次 Android 修复版可使用 `1.0.34` 和 `versionCode = 24`，这只是规则示例。
 
@@ -57,3 +59,7 @@ git push origin android-v1.0.34
 以上标签是示例，不能在版本仍为 `1.0.33` 时直接执行。网页和 API 可分别采用 `web-v版本号`、`api-v版本号` 标签；更新各自 `package.json` 后同步更新根目录锁文件。
 
 APK 等交付物通过仓库的 Release 附件或指定交付渠道上传，不纳入源码提交。发布附件前检查 APK 实际版本、签名和运行结果，注明 Debug/Release 及验证范围。
+
+每份发布说明列出相对上一版的新增、修复或调整，以及版本号、构建类型、适用环境、验证记录、未解决问题和 SHA-256。先完成并核对 APK 附件，再发布 Release；发布后核对附件名称、大小和下载入口。历史 APK、Release 和标签保留，不覆盖附件或强制移动旧标签。
+
+当前安装包：GitHub [Android 1.0.33 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.33)，改动说明见 [android-1.0.33.md](releases/android-1.0.33.md)。此包为 Debug 模拟器演示包。
