@@ -31,13 +31,14 @@ import org.json.JSONObject;
 /** Device tests use a local Volley network fixture, never the business API/database. */
 @SuppressWarnings("deprecation")
 public class RefreshNavigationTest extends InstrumentationTestCase {
-    private MainActivity activity;
+    protected MainActivity activity;
     private RequestQueue fixtureQueue, previousQueue;
     private SharedPreferences preferences;
     private Map<String, ?> previousPreferences;
     private String previousTemporaryToken;
     private final Map<String,Map<String,?>> auxiliaryPreferences=new HashMap<>();
     private final AtomicInteger calls = new AtomicInteger();
+    private final AtomicInteger nonNoticeCalls = new AtomicInteger();
     private final AtomicInteger logisticsVersion = new AtomicInteger();
     private volatile String lastCatalog="";
     private final AtomicInteger addedQuantity=new AtomicInteger();
@@ -66,6 +67,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         previousQueue = (RequestQueue)requests.get(app);
         fixtureQueue = new RequestQueue(new NoCache(), request -> {
             calls.incrementAndGet();
+            if(!request.getUrl().endsWith("me/notifications"))nonNoticeCalls.incrementAndGet();
             if(request.getUrl().endsWith("auth/me")&&request.getMethod()==com.android.volley.Request.Method.PUT)try{savedAccount=new JSONObject(new String(request.getBody(),StandardCharsets.UTF_8));accountWrites.incrementAndGet();}catch(Exception error){throw new RuntimeException(error);}
             if(request.getUrl().endsWith("auth/me/avatar"))try{savedAvatar=new JSONObject(new String(request.getBody(),StandardCharsets.UTF_8)).getString("avatarUrl");}catch(Exception error){throw new RuntimeException(error);}
             if(request.getUrl().endsWith("community/posts"))communityReads.incrementAndGet();
@@ -75,7 +77,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
             if(request.getUrl().contains("q=offline"))throw new com.android.volley.ClientError(new NetworkResponse(400,"{\"message\":\"测试搜索失败\"}".getBytes(StandardCharsets.UTF_8),false,0,Collections.emptyList()));
             if(request.getUrl().contains("merchant/media/uploads")){SystemClock.sleep(4000);return new NetworkResponse(200,"{\"url\":\"/public/community-12345678.jpg\"}".getBytes(StandardCharsets.UTF_8),false,0,Collections.emptyList());}
             if(request.getUrl().contains("me/cart/book-")&&request.getMethod()==com.android.volley.Request.Method.PUT)try{addedQuantity.set(new JSONObject(new String(request.getBody(),StandardCharsets.UTF_8)).optInt("quantity"));}catch(Exception error){throw new RuntimeException(error);}
-            String body = fixture(request.getUrl());
+            String body = fixture(request);
             return new NetworkResponse(200, body.getBytes(StandardCharsets.UTF_8), false, 0, Collections.emptyList());
         });
         requests.set(app, fixtureQueue); fixtureQueue.start();
@@ -85,7 +87,8 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         SystemClock.sleep(300);
     }
 
-    private String fixture(String url) {
+    protected String fixture(com.android.volley.Request<?> request){return fixture(request.getUrl());}
+    protected String fixture(String url) {
         if(url.endsWith("auth/me/avatar"))return "{\"avatarUrl\":\""+savedAvatar+"\"}";
         if(url.endsWith("auth/me"))return "{\"user\":{\"username\":\"reader_test\",\"name\":\"测试读者\",\"avatarUrl\":\""+savedAvatar+"\"}}";
         if(url.endsWith("me/cart"))return populatedCart?"{\"data\":[{\"id\":\"book-0\",\"name\":\"一套适合亲子共读的长标题绘本：和小熊一起认识森林中的朋友\",\"quantity\":2,\"selected\":1,\"stock\":20,\"priceCents\":2800}]}":"{\"data\":[]}";
@@ -160,12 +163,12 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         screenshot("account-unified-save");runTestOnUiThread(edit::finish);
     }
     public void testSearchAgeThemeAndPriceToggleKeepCombinedQuery() throws Throwable {
-        runTestOnUiThread(()->{android.widget.TextView input=activity.findViewById(R.id.searchInput);input.setText("晚安");input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);});getInstrumentation().waitForIdleSync();SystemClock.sleep(300);
-        assertEquals("晚安",android.net.Uri.parse(lastCatalog).getQueryParameter("q"));
-        runTestOnUiThread(()->{activity.findViewById(R.id.agePreschool).performClick();activity.findViewById(R.id.themeBedtime).performClick();activity.findViewById(R.id.sortPrice).performClick();});getInstrumentation().waitForIdleSync();SystemClock.sleep(300);
+        Activity browse=getInstrumentation().startActivitySync(new Intent(activity,SearchActivity.class).putExtra("query","晚安").putExtra("age","3-6").putExtra("theme","bedtime").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+        getInstrumentation().waitForIdleSync();SystemClock.sleep(300);
+        runTestOnUiThread(()->assertTrue(clickText(browse.getWindow().getDecorView(),"价格 ↑↓")));getInstrumentation().waitForIdleSync();SystemClock.sleep(300);
         android.net.Uri uri=android.net.Uri.parse(lastCatalog);assertEquals("晚安",uri.getQueryParameter("q"));assertEquals("3-6",uri.getQueryParameter("age"));assertEquals("bedtime",uri.getQueryParameter("theme"));assertEquals("price_asc",uri.getQueryParameter("sort"));
-        runTestOnUiThread(()->activity.findViewById(R.id.sortPrice).performClick());getInstrumentation().waitForIdleSync();SystemClock.sleep(300);assertEquals("price_desc",android.net.Uri.parse(lastCatalog).getQueryParameter("sort"));
-        runTestOnUiThread(()->{androidx.core.widget.NestedScrollView scroll=activity.findViewById(R.id.scroll);scroll.scrollTo(0,((View)activity.findViewById(R.id.sectionTitle).getParent()).getTop());});screenshot("home-sort");
+        runTestOnUiThread(()->assertTrue(clickText(browse.getWindow().getDecorView(),"价格 ↑")));getInstrumentation().waitForIdleSync();SystemClock.sleep(300);assertEquals("price_desc",android.net.Uri.parse(lastCatalog).getQueryParameter("sort"));
+        runTestOnUiThread(browse::finish);
     }
     public void testQuickAddAndHomeCommunityOpenRealDestinations() throws Throwable {
         runTestOnUiThread(()->{androidx.recyclerview.widget.RecyclerView list=activity.findViewById(R.id.productList);list.getChildAt(0).findViewById(R.id.quickAdd).performClick();});getInstrumentation().waitForIdleSync();SystemClock.sleep(400);assertEquals(1,addedQuantity.get());
@@ -221,6 +224,21 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         Activity add=getInstrumentation().waitForMonitorWithTimeout(addMonitor,3000);assertNotNull(add);getInstrumentation().waitForIdleSync();assertNull(add.getIntent().getStringExtra("copy_address"));
         runTestOnUiThread(()->{((android.widget.TextView)add.findViewById(R.id.recipient)).setText("新增收货人");((android.widget.TextView)add.findViewById(R.id.phone)).setText("13800000001");((android.widget.TextView)add.findViewById(R.id.region)).setText("辽宁省");((android.widget.TextView)add.findViewById(R.id.detail)).setText("新增地址");add.findViewById(R.id.save).performClick();});getInstrumentation().waitForIdleSync();SystemClock.sleep(600);assertEquals("POST",addressWriteMethod);
         runTestOnUiThread(()->assertTrue(((android.widget.TextView)checkout.findViewById(R.id.address)).getText().toString().contains("新增收货人")));screenshot("checkout-edited");getInstrumentation().removeMonitor(addMonitor);runTestOnUiThread(checkout::finish);
+    }
+    public void testViewerLikeChangesAreNotHiddenByUnchangedCount() throws Exception {
+        JSONObject original=new JSONObject().put("id","profile-test").put("title","阅读笔记").put("likeCount",2).put("liked",0);
+        com.huimeng.bookshop.model.CommunityPost neutral=com.huimeng.bookshop.model.CommunityPost.from(original);
+        original.put("liked",1);
+        assertFalse("当前用户的点赞状态变化应被列表识别，不能只根据点赞总数判断",neutral.equals(com.huimeng.bookshop.model.CommunityPost.from(original)));
+    }
+    public void testAddressModifyOpensExistingRecordDirectly() throws Throwable {
+        Activity addresses=getInstrumentation().startActivitySync(new Intent(activity,AddressesActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));SystemClock.sleep(600);
+        Instrumentation.ActivityMonitor monitor=getInstrumentation().addMonitor(AddAddressActivity.class.getName(),null,false);
+        runTestOnUiThread(()->{androidx.recyclerview.widget.RecyclerView list=addresses.findViewById(R.id.list);list.getChildAt(0).findViewById(R.id.edit).performClick();});
+        Activity editor=getInstrumentation().waitForMonitorWithTimeout(monitor,3000);
+        assertNotNull("修改按钮必须直接打开现有地址，而不是弹出操作菜单",editor);
+        assertEquals("address-1",new JSONObject(editor.getIntent().getStringExtra("copy_address")).optString("id"));
+        runTestOnUiThread(()->{editor.finish();addresses.finish();});getInstrumentation().removeMonitor(monitor);
     }
     public void testUserAndMerchantTabsAndFormsRender() throws Throwable {
         for(int tab=1;tab<=4;tab++){final int position=tab;runTestOnUiThread(()->activity.selectTab(position));getInstrumentation().waitForIdleSync();screenshot("user-tab-"+tab);}
@@ -317,21 +335,21 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
             assertTrue("首页必须接入轮播海报",banner instanceof BannerCarouselView);
             carousel[0]=(BannerCarouselView)banner;
             pages[0]=(androidx.recyclerview.widget.RecyclerView)carousel[0].getChildAt(0);
-            assertEquals("展示五张已确认海报",5,pages[0].getAdapter().getItemCount());
+            assertEquals("展示五张已确认海报",5,((android.view.ViewGroup)carousel[0].getChildAt(1)).getChildCount());
             carousel[0].setActive(false);
         });
         for(int i=0;i<5;i++){
             final int page=i;
-            runTestOnUiThread(()->pages[0].scrollToPosition(page));
+            runTestOnUiThread(()->pages[0].scrollToPosition(page+1));
             getInstrumentation().waitForIdleSync();SystemClock.sleep(300);
             runTestOnUiThread(()->{
-                assertNotNull("海报必须成功解码",((android.widget.ImageView)pages[0].findViewHolderForAdapterPosition(page).itemView).getDrawable());
+                assertNotNull("海报必须成功解码",((android.widget.ImageView)pages[0].findViewHolderForAdapterPosition(page+1).itemView).getDrawable());
                 android.view.ViewGroup dots=(android.view.ViewGroup)carousel[0].getChildAt(1);
                 assertEquals("页码圆点跟随海报",android.graphics.Color.WHITE,((android.graphics.drawable.GradientDrawable)dots.getChildAt(page).getBackground()).getColor().getDefaultColor());
             });
             screenshot("home-banner-"+(i+1));
         }
-        runTestOnUiThread(()->{pages[0].scrollToPosition(0);carousel[0].setActive(true);});
+        runTestOnUiThread(()->{pages[0].scrollToPosition(1);carousel[0].setActive(true);});
         getInstrumentation().waitForIdleSync();SystemClock.sleep(5700);
         runTestOnUiThread(()->{assertEquals(1,carousel[0].currentPage());activity.selectTab(2);});
         getInstrumentation().waitForIdleSync();SystemClock.sleep(5500);
@@ -416,7 +434,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
     public void testSwitchTabsRetainsHomeAndDoesNotReload() throws Throwable {
         final Fragment[] home = new Fragment[1];
         runTestOnUiThread(() -> home[0] = activity.getSupportFragmentManager().getPrimaryNavigationFragment());
-        int initialCalls = calls.get();
+        int initialCalls = nonNoticeCalls.get();
         runTestOnUiThread(() -> activity.selectTab(2)); getInstrumentation().waitForIdleSync();
         runTestOnUiThread(() -> activity.selectTab(3)); getInstrumentation().waitForIdleSync();
         runTestOnUiThread(() -> activity.selectTab(4)); getInstrumentation().waitForIdleSync();
@@ -426,7 +444,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
             assertFalse("首页应重新显示", home[0].isHidden());
         });
         SystemClock.sleep(5500);
-        assertEquals("切换和停留都不应自动请求页面数据", initialCalls, calls.get());
+        assertEquals("切换时保留现有页面数据；消息页允许实时刷新", initialCalls, nonNoticeCalls.get());
     }
 
     public void testPullIndicatorFollowsClampsAndRefreshesOnlyOnRelease() throws Throwable {

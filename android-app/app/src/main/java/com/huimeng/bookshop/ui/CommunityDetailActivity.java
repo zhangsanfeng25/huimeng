@@ -50,7 +50,7 @@ public class CommunityDetailActivity extends AppCompatActivity{
         binding.photos.setAdapter(new PostImagesAdapter(images));if(!images.isEmpty())binding.photoIndicator.setText("1 / "+images.size());
         showComments(data.optJSONArray("comments"));
     },this::toast);}
-    private void showComments(JSONArray array){List<TextAdapter.Row> rows=new ArrayList<>();if(array!=null)for(int i=0;i<array.length();i++){JSONObject item=array.optJSONObject(i);if(item!=null)rows.add(new TextAdapter.Row(item.optString("authorName")+" · "+item.optString("createdAt").replace('T',' ').replaceAll("\\.\\d+Z$",""),item.optString("content")));}
+    private void showComments(JSONArray array){List<TextAdapter.Row> rows=new ArrayList<>();if(array!=null)for(int i=0;i<array.length();i++){JSONObject item=array.optJSONObject(i);if(item!=null)rows.add(new TextAdapter.Row(item.optString("authorName")+" · "+com.huimeng.bookshop.core.CommentTime.format(item.optString("createdAt")),item.optString("content")));}
         shownComments=rows.size();binding.commentCount.setText(shownComments+" 条");binding.emptyComments.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);comments.submit(rows);}
     private void syncCounts(){new ApiClient(this).get("community/posts/"+postId,result->{if(isFinishing()||isDestroyed())return;JSONObject data=result.optJSONObject("data");if(data==null)return;
         if(!likeBusy){liked=data.optInt("liked")==1||data.optBoolean("liked");likeCount=data.optInt("likeCount");renderLike();}

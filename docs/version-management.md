@@ -10,6 +10,8 @@
 
 2026-10-09 初始化检查：`npm run lint` 与 `npm run build` 通过；`npm test` 的 40 项服务端测试通过，随后 `scripts/test-launcher-logs.ps1` 报错 `DEBUG must include errors with their preceding timestamp`，完整流程因此停止，后续检查未执行。此基线不能标记为全套测试通过；本次没有重新构建或验证 Android APK。
 
+1.0.36 优化时已确认上述日志失败来自固定 2026-10-02 样例超过三天过滤窗口；仅更新测试日期，生产规则保持。2026-10-09 本轮完整 `npm test` 通过，包括 47 项服务端测试、实时同步、维护及控制中心回归。
+
 ## 上传范围
 
 提交 Android、网页、API 源码，启动脚本、文档、共享素材、Gradle wrapper 和根目录 `package-lock.json`。
@@ -64,4 +66,4 @@ APK 等交付物通过仓库的 Release 附件或指定交付渠道上传，不�
 
 每份发布说明列出相对上一版的新增、修复或调整，以及版本号、构建类型、适用环境、验证记录、未解决问题和 SHA-256。先完成并核对 APK 附件，再发布 Release；发布后核对附件名称、大小和下载入口。历史 APK、Release 和标签保留，不覆盖附件或强制移动旧标签。
 
-当前安装包：GitHub [Android 1.0.33 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.33)，改动说明见 [android-1.0.33.md](releases/android-1.0.33.md)。此包为 Debug 模拟器演示包。
+当前安装包：GitHub [Android 1.0.36 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.36)，改动说明见 [android-1.0.36.md](releases/android-1.0.36.md)。此包为 Debug 模拟器演示包；1.0.33 Release 和本地 1.0.34/1.0.35 APK 保留。

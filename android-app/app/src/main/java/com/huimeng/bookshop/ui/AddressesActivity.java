@@ -16,7 +16,7 @@ public final class AddressesActivity extends AppCompatActivity{
     private ActivityAddressesBinding binding;private AddressAdapter adapter;
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityAddressesBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
         binding.back.setOnClickListener(v->finish());binding.add.setOnClickListener(v->startActivity(new Intent(this,AddAddressActivity.class)));
-        adapter=new AddressAdapter(this::options);binding.list.setLayoutManager(new LinearLayoutManager(this));binding.list.setAdapter(adapter);
+        adapter=new AddressAdapter(this::edit,this::options);binding.list.setLayoutManager(new LinearLayoutManager(this));binding.list.setAdapter(adapter);
     }
     @Override protected void onResume(){super.onResume();load();}
     private void load(){binding.loading.setVisibility(View.VISIBLE);binding.empty.setVisibility(View.GONE);

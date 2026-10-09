@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat;
 import com.huimeng.bookshop.R;
 import com.huimeng.bookshop.ui.WelcomeActivity;
 import com.huimeng.bookshop.ui.LoginActivity;
+import com.huimeng.bookshop.ui.RegisterActivity;
 
 public final class WallpaperStore{
     public static final String DEFAULT="DEFAULT",MINT="MINT",TWILIGHT="TWILIGHT",SUNRISE="SUNRISE",OCEAN="OCEAN",GARDEN="GARDEN";
@@ -24,7 +25,7 @@ public final class WallpaperStore{
     public String wallpaper(){return preferences.getString("wallpaper",DEFAULT);}
     public void setWallpaper(String value){preferences.edit().putString("wallpaper",value).apply();}
     public void apply(Activity activity){
-        if (activity instanceof WelcomeActivity || activity instanceof LoginActivity) return;
+        if (activity instanceof WelcomeActivity || activity instanceof LoginActivity || activity instanceof RegisterActivity) return;
         String choice=wallpaper();
         boolean selected=!DEFAULT.equals(choice);
         if(selected){

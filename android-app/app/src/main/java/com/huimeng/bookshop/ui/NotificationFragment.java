@@ -12,6 +12,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import com.huimeng.bookshop.core.ApiClient;
+import com.huimeng.bookshop.core.AccountSync;
 import com.huimeng.bookshop.databinding.FragmentNotificationBinding;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -19,10 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NotificationFragment extends Fragment{
-    private FragmentNotificationBinding binding;private NotificationAdapter adapter;
+    private FragmentNotificationBinding binding;private NotificationAdapter adapter;private AccountSync sync;
+    private boolean reading,queuedRead;private int requestId;
     private final androidx.activity.result.ActivityResultLauncher<Intent> detail=registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),result->{if(binding!=null)load();});
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){
         binding=FragmentNotificationBinding.inflate(inflater,container,false);
+        sync=new AccountSync(requireContext(),this::load,"notices","orders");
         adapter=new NotificationAdapter(item->{Intent intent=new Intent(requireContext(),NotificationDetailActivity.class);
             intent.putExtra("notice_id",item.id()).putExtra("title",item.title()).putExtra("content",item.content()).putExtra("created_at",item.createdAt()).putExtra("read",item.read());detail.launch(intent);},this::renderSelection);
         binding.list.setLayoutManager(new LinearLayoutManager(requireContext()));binding.list.setAdapter(adapter);
@@ -34,7 +37,9 @@ public class NotificationFragment extends Fragment{
             .setNegativeButton("取消",null).setPositiveButton("删除",(dialog,which)->bulk("delete")).show();});
         return binding.getRoot();
     }
-    @Override public void onViewCreated(@NonNull View view,@Nullable Bundle state){super.onViewCreated(view,state);binding.getRoot().setOnRefreshListener(this::load);load();}
+    @Override public void onViewCreated(@NonNull View view,@Nullable Bundle state){super.onViewCreated(view,state);binding.getRoot().setOnRefreshListener(this::load);}
+    @Override public void onResume(){super.onResume();if(sync!=null)sync.start();}
+    @Override public void onPause(){if(sync!=null)sync.stop();super.onPause();}
     private void renderSelection(){if(binding==null)return;boolean mode=adapter.selecting();binding.heading.setText(mode?"已选择 "+adapter.selectedCount()+" 条":"消息中心");
         binding.selectionBar.setVisibility(mode?View.VISIBLE:View.GONE);binding.selectAll.setVisibility(mode?View.VISIBLE:View.GONE);
         binding.markRead.setEnabled(adapter.selectedCount()>0);binding.deleteSelected.setEnabled(adapter.selectedCount()>0);}
@@ -43,10 +48,12 @@ public class NotificationFragment extends Fragment{
         try{new ApiClient(requireContext()).post("me/notifications/bulk/"+action,new JSONObject().put("ids",new JSONArray(ids)),result->{if(binding==null)return;adapter.exitSelection();load();},error->{if(binding==null)return;renderSelection();Toast.makeText(requireContext(),error,Toast.LENGTH_SHORT).show();});}
         catch(Exception error){renderSelection();Toast.makeText(requireContext(),"操作失败，请重试",Toast.LENGTH_SHORT).show();}
     }
-    private void load(){if(adapter.getItemCount()==0)binding.loading.setVisibility(View.VISIBLE);new ApiClient(requireContext()).get("me/notifications",result->{if(binding==null)return;
+    private void load(){if(binding==null)return;if(reading){queuedRead=true;return;}reading=true;int id=++requestId;if(adapter.getItemCount()==0)binding.loading.setVisibility(View.VISIBLE);new ApiClient(requireContext()).get("me/notifications",result->{if(binding==null||id!=requestId)return;
         binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);List<NotificationAdapter.Notice> rows=new ArrayList<>();JSONArray data=result.optJSONArray("data");
         if(data!=null)for(int i=0;i<data.length();i++){JSONObject item=data.optJSONObject(i);if(item!=null)rows.add(new NotificationAdapter.Notice(item.optString("id"),item.optString("title"),item.optString("content"),item.optString("created_at"),item.optInt("is_read")==1));}
         adapter.submit(rows);binding.empty.setText("暂无消息");binding.empty.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);
-    },error->{if(binding==null)return;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);binding.empty.setText(error);binding.empty.setVisibility(View.VISIBLE);});}
-    @Override public void onDestroyView(){super.onDestroyView();binding=null;}
+        afterRead();
+    },error->{if(binding==null||id!=requestId)return;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);binding.empty.setText(error);binding.empty.setVisibility(View.VISIBLE);afterRead();});}
+    private void afterRead(){reading=false;boolean again=queuedRead;queuedRead=false;if(again&&binding!=null&&getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))load();}
+    @Override public void onDestroyView(){if(sync!=null)sync.stop();requestId++;reading=false;queuedRead=false;super.onDestroyView();binding=null;}
 }

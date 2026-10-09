@@ -25,8 +25,9 @@ public final class UserProfileActivity extends AppCompatActivity {
         binding.back.setOnClickListener(v->finish());
         adapter=new AuthorPostsAdapter(post->startActivity(new Intent(this,CommunityDetailActivity.class).putExtra("post_id",post.id())));
         binding.posts.setLayoutManager(new GridLayoutManager(this,2));binding.posts.setAdapter(adapter);
-        binding.getRoot().setOnRefreshListener(this::load);load();
+        binding.getRoot().setOnRefreshListener(this::load);
     }
+    @Override protected void onResume(){super.onResume();load();}
     private void load(){if(loading)return;loading=true;
         new ApiClient(this).get("community/users/"+Uri.encode(userId),result->{loading=false;if(isFinishing()||isDestroyed())return;
             binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);JSONObject data=result.optJSONObject("data");if(data==null)return;

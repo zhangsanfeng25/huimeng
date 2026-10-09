@@ -1,5 +1,11 @@
 <resources>
     <color name="auth_cream">#152219</color>
+    <color name="auth_card">#1C2B20</color>
+    <color name="auth_border">#3F5343</color>
+    <color name="nav_surface">#DE1B2435</color>
+    <color name="nav_border">#705B6783</color>
+    <color name="nav_indicator">#36AAA6EF</color>
+    <color name="logout_surface">#22FF8B93</color>
     <color name="auth_green">#36694D</color>
     <color name="auth_accent">#A6D6B3</color>
     <color name="auth_ink">#E6EFE4</color>

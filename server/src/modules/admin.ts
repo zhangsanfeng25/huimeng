@@ -12,6 +12,7 @@ import { broadcast, subscribe } from '../core/events.js';
 import { hashPassword } from '../core/security.js';
 import { categoryOptions } from '../core/category-options.js';
 import { closePendingCheckout } from '../core/order-lifecycle.js';
+import { createOrderNotifications } from '../core/order-notifications.js';
 import { leastUsedDefaultAvatar } from '../core/default-avatars.js';
 import { merchantApplication } from './merchant-applications.js';
 
@@ -231,9 +232,15 @@ adminRouter.put('/orders/:id/manage',(req,res)=>{
     const next={ship:'SHIPPED',transit:'IN_TRANSIT',deliver:'OUT_FOR_DELIVERY',complete:'COMPLETED'}[value.action];
     const allowed=value.action==='ship'?order.status==='PAID':value.action==='transit'?order.logistics_status==='SHIPPED':value.action==='deliver'?order.logistics_status==='IN_TRANSIT':order.logistics_status==='OUT_FOR_DELIVERY';
     if(!allowed)return res.status(409).json({message:'当前订单状态不允许此操作'});
-    db.transaction(()=>{const stamp=now();const result=db.prepare('UPDATE orders SET status=?,logistics_status=?,shipped_at=CASE WHEN ?=\'ship\' THEN ? ELSE shipped_at END,completed_at=CASE WHEN ?=\'complete\' THEN ? ELSE completed_at END,updated_at=?,version=version+1 WHERE id=? AND version=?').run(next==='COMPLETED'?'COMPLETED':'SHIPPED',next,value.action,stamp,value.action,stamp,stamp,id,value.version);if(!result.changes)throw new Error('订单已更新');db.prepare('INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?)').run(id,req.actor!.id,value.action,order.status,next,value.note,stamp);})();
+    db.transaction(()=>{
+      const stamp=now();
+      const result=db.prepare('UPDATE orders SET status=?,logistics_status=?,shipped_at=CASE WHEN ?=\'ship\' THEN ? ELSE shipped_at END,completed_at=CASE WHEN ?=\'complete\' THEN ? ELSE completed_at END,updated_at=?,version=version+1 WHERE id=? AND version=?').run(next==='COMPLETED'?'COMPLETED':'SHIPPED',next,value.action,stamp,value.action,stamp,stamp,id,value.version);
+      if(!result.changes)throw new Error('订单已更新');
+      db.prepare('INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?)').run(id,req.actor!.id,value.action,order.status,next,value.note,stamp);
+      if(value.action==='ship'||value.action==='complete')createOrderNotifications(id,value.action==='ship'?'SHIPPED':'COMPLETED',stamp);
+    })();
   }
-  audit(req.actor!.id,req.actor!.name,'orders',value.action,id);broadcast('orders','update');broadcast('products','update');res.json({ok:true});
+  audit(req.actor!.id,req.actor!.name,'orders',value.action,id);broadcast('orders','update');broadcast('products','update');if(value.action==='ship'||value.action==='complete')broadcast('notices','create');res.json({ok:true});
 });
 adminRouter.get('/:resource',(req,res)=>{
   const resource=String(req.params.resource);

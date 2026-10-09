@@ -7,6 +7,8 @@ import { broadcast } from '../core/events.js';
 import { config } from '../config.js';
 import { matchesAge, themeTerms } from '../core/catalog-filters.js';
 import { closePendingCheckout, expirePendingCheckouts } from '../core/order-lifecycle.js';
+import { createOrderNotifications } from '../core/order-notifications.js';
+import type { Statement } from 'better-sqlite3';
 
 import { merchantApplicationRouter } from './merchant-applications.js';
 import { merchantProductsRouter } from './merchant-products.js';
@@ -108,11 +110,12 @@ shopRouter.post('/checkout',requireAuth('USER'),asyncRoute(async(req,res)=>{
   if(!address)return res.status(400).json({message:'收货地址不存在'});
   const groupId=id('CG'),stamp=now(),expiresAt=new Date(Date.now()+config.orderTimeoutMinutes*60_000).toISOString();
   const result=db.transaction(()=>{
+    let productQuery:Statement,reserveStock:Statement,orderInsert:Statement,itemInsert:Statement,reserveMovement:Statement,createEvent:Statement;
     const byMerchant=new Map<string,Array<any>>();let grand=0;
     for(const item of parsed.data.items){
-      const product=db.prepare(`${productSelect} WHERE p.id=? AND p.status='ONLINE'`).get(item.productId) as any;
+      const product=(productQuery??=db.prepare(`${productSelect} WHERE p.id=? AND p.status='ONLINE'`)).get(item.productId) as any;
       if(!product)throw new Error('部分商品已下架');
-      const changed=db.prepare(`UPDATE products SET stock_available=stock_available-?,stock_reserved=stock_reserved+?,updated_at=? WHERE id=? AND stock_available>=?`).run(item.quantity,item.quantity,stamp,item.productId,item.quantity);
+      const changed=(reserveStock??=db.prepare(`UPDATE products SET stock_available=stock_available-?,stock_reserved=stock_reserved+?,updated_at=? WHERE id=? AND stock_available>=?`)).run(item.quantity,item.quantity,stamp,item.productId,item.quantity);
       if(changed.changes!==1)throw new Error(`${product.name} 库存不足`);
       const subtotal=product.priceCents*item.quantity;grand+=subtotal;
       const group=byMerchant.get(product.merchantId)||[];group.push({...item,...product,subtotal});byMerchant.set(product.merchantId,group);
@@ -121,13 +124,17 @@ shopRouter.post('/checkout',requireAuth('USER'),asyncRoute(async(req,res)=>{
     const orderIds:string[]=[];
     for(const [merchantId,items] of byMerchant){
       const orderId=id('HM'),total=items.reduce((n,x)=>n+x.subtotal,0);orderIds.push(orderId);
-      db.prepare(`INSERT INTO orders(id,checkout_group_id,user_id,merchant_id,address_snapshot_json,total_cents,status,version,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,'PENDING_PAYMENT',1,?,?,?)`).run(orderId,groupId,req.actor!.id,merchantId,JSON.stringify(address),total,expiresAt,stamp,stamp);
-      for(const item of items){db.prepare(`INSERT INTO order_items(id,order_id,product_id,product_name,cover_url,unit_price_cents,quantity,subtotal_cents) VALUES(?,?,?,?,?,?,?,?)`).run(id('OI'),orderId,item.productId,item.name,item.coverUrl,item.priceCents,item.quantity,item.subtotal);db.prepare(`INSERT INTO stock_movements(product_id,order_id,type,available_delta,reserved_delta,created_at) VALUES(?,?,'RESERVE',?,?,?)`).run(item.productId,orderId,-item.quantity,item.quantity,stamp);}
-      db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?,'CREATE',NULL,'PENDING_PAYMENT',?)`).run(orderId,req.actor!.id,stamp);
+      (orderInsert??=db.prepare(`INSERT INTO orders(id,checkout_group_id,user_id,merchant_id,address_snapshot_json,total_cents,status,version,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,'PENDING_PAYMENT',1,?,?,?)`)).run(orderId,groupId,req.actor!.id,merchantId,JSON.stringify(address),total,expiresAt,stamp,stamp);
+      for(const item of items){
+        (itemInsert??=db.prepare(`INSERT INTO order_items(id,order_id,product_id,product_name,cover_url,unit_price_cents,quantity,subtotal_cents) VALUES(?,?,?,?,?,?,?,?)`)).run(id('OI'),orderId,item.productId,item.name,item.coverUrl,item.priceCents,item.quantity,item.subtotal);
+        (reserveMovement??=db.prepare(`INSERT INTO stock_movements(product_id,order_id,type,available_delta,reserved_delta,created_at) VALUES(?,?,'RESERVE',?,?,?)`)).run(item.productId,orderId,-item.quantity,item.quantity,stamp);
+      }
+      (createEvent??=db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?,'CREATE',NULL,'PENDING_PAYMENT',?)`)).run(orderId,req.actor!.id,stamp);
+      createOrderNotifications(orderId,'CREATED',stamp);
     }
     return {checkoutGroupId:groupId,orderIds,totalCents:grand,expiresAt};
   })();
-  broadcast('orders','create');broadcast('products','stock');res.status(201).json(result);
+  broadcast('orders','create');broadcast('products','stock');broadcast('notices','create');res.status(201).json(result);
 }));
 
 shopRouter.get('/checkout/:groupId',requireAuth('USER'),(req,res)=>{
@@ -141,6 +148,7 @@ shopRouter.post('/checkout/:groupId/pay',requireAuth('USER'),asyncRoute(async(re
   const method=z.enum(['DEMO_BALANCE','DEMO_ALIPAY','DEMO_WECHAT']).parse(req.body?.method||'DEMO_BALANCE');
   const groupId=String(req.params.groupId),stamp=now();
   const result=db.transaction(()=>{
+    let payEvent:Statement,deductReservedStock:Statement,payMovement:Statement;
     const group=db.prepare(`SELECT * FROM checkout_groups WHERE id=? AND user_id=?`).get(groupId,req.actor!.id) as any;
     if(!group)throw new Error('结算单不存在');
     const paid=db.prepare('SELECT * FROM payments WHERE checkout_group_id=?').get(groupId) as any;if(paid)return {paymentId:paid.id,reused:true};
@@ -149,12 +157,18 @@ shopRouter.post('/checkout/:groupId/pay',requireAuth('USER'),asyncRoute(async(re
     db.prepare(`INSERT INTO payments(id,checkout_group_id,amount_cents,method,idempotency_key,paid_at) VALUES(?,?,?,?,?,?)`).run(paymentId,groupId,group.total_cents,method,key,stamp);
     db.prepare(`UPDATE checkout_groups SET status='PAID',version=version+1 WHERE id=?`).run(groupId);
     db.prepare(`UPDATE orders SET status='PAID',logistics_status='PREPARING',paid_at=?,updated_at=?,version=version+1 WHERE checkout_group_id=? AND status='PENDING_PAYMENT'`).run(stamp,stamp,groupId);
-    for(const order of db.prepare(`SELECT id FROM orders WHERE checkout_group_id=?`).all(groupId) as any[])db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?,'PAY','WAITING_PAYMENT','PREPARING',?)`).run(order.id,req.actor!.id,stamp);
-    for(const item of db.prepare(`SELECT oi.product_id,oi.quantity FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.checkout_group_id=?`).all(groupId) as any[]){db.prepare(`UPDATE products SET stock_reserved=stock_reserved-? WHERE id=? AND stock_reserved>=?`).run(item.quantity,item.product_id,item.quantity);db.prepare(`INSERT INTO stock_movements(product_id,type,available_delta,reserved_delta,created_at) VALUES(?,'PAY',0,?,?)`).run(item.product_id,-item.quantity,stamp);}
+    for(const order of db.prepare(`SELECT id FROM orders WHERE checkout_group_id=?`).all(groupId) as any[]){
+      (payEvent??=db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?,'PAY','WAITING_PAYMENT','PREPARING',?)`)).run(order.id,req.actor!.id,stamp);
+      createOrderNotifications(order.id,'PAID',stamp);
+    }
+    for(const item of db.prepare(`SELECT oi.product_id,oi.quantity FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.checkout_group_id=?`).all(groupId) as any[]){
+      (deductReservedStock??=db.prepare(`UPDATE products SET stock_reserved=stock_reserved-? WHERE id=? AND stock_reserved>=?`)).run(item.quantity,item.product_id,item.quantity);
+      (payMovement??=db.prepare(`INSERT INTO stock_movements(product_id,type,available_delta,reserved_delta,created_at) VALUES(?,'PAY',0,?,?)`)).run(item.product_id,-item.quantity,stamp);
+    }
     db.prepare(`DELETE FROM cart_items WHERE user_id=? AND product_id IN
       (SELECT oi.product_id FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.checkout_group_id=?)`).run(req.actor!.id,groupId);
     return {paymentId,paidAt:stamp};
-  })();broadcast('orders','pay');res.json(result);
+  })();broadcast('orders','pay');if(!result.reused)broadcast('notices','create');res.json(result);
 }));
 
 shopRouter.get('/me/orders',requireAuth('USER'),(req,res)=>res.json({data:db.prepare(`SELECT o.*,m.shop_name shop,
@@ -170,7 +184,15 @@ shopRouter.get('/me/orders/:orderId',requireAuth('USER'),(req,res)=>{
   res.json({data:{...order,items,events}});
 });
 shopRouter.post('/me/orders/:orderId/confirm',requireAuth('USER'),(req,res)=>{
-  const stamp=now(),orderId=String(req.params.orderId);const changed=db.prepare(`UPDATE orders SET status='COMPLETED',logistics_status='COMPLETED',completed_at=?,updated_at=?,version=version+1 WHERE id=? AND user_id=? AND status='SHIPPED' AND logistics_status='OUT_FOR_DELIVERY'`).run(stamp,stamp,orderId,req.actor!.id);if(changed.changes!==1)return res.status(409).json({message:'订单尚未进入派送阶段'});db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?, 'CONFIRM','OUT_FOR_DELIVERY','COMPLETED',?)`).run(orderId,req.actor!.id,stamp);broadcast('orders','complete');res.json({ok:true});
+  const stamp=now(),orderId=String(req.params.orderId);
+  const completed=db.transaction(()=>{
+    const changed=db.prepare(`UPDATE orders SET status='COMPLETED',logistics_status='COMPLETED',completed_at=?,updated_at=?,version=version+1 WHERE id=? AND user_id=? AND status='SHIPPED' AND logistics_status='OUT_FOR_DELIVERY'`).run(stamp,stamp,orderId,req.actor!.id);
+    if(changed.changes!==1)return false;
+    db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?, 'CONFIRM','OUT_FOR_DELIVERY','COMPLETED',?)`).run(orderId,req.actor!.id,stamp);
+    createOrderNotifications(orderId,'COMPLETED',stamp);return true;
+  })();
+  if(!completed)return res.status(409).json({message:'订单尚未进入派送阶段'});
+  broadcast('orders','complete');broadcast('notices','create');res.json({ok:true});
 });
 shopRouter.post('/me/orders/:orderId/cancel',requireAuth('USER'),(req,res)=>{
   const order=db.prepare('SELECT checkout_group_id groupId,status FROM orders WHERE id=? AND user_id=?').get(String(req.params.orderId),req.actor!.id) as {groupId:string;status:string}|undefined;
@@ -194,14 +216,22 @@ shopRouter.get('/merchant/orders/:orderId',requireAuth('MERCHANT'),(req,res)=>{
   res.json({data:{...order,items,events}});
 });
 shopRouter.post('/merchant/orders/:orderId/ship',requireAuth('MERCHANT'),(req,res)=>{
-  const stamp=now(),orderId=String(req.params.orderId);const changed=db.prepare(`UPDATE orders SET status='SHIPPED',logistics_status='SHIPPED',shipped_at=?,updated_at=?,version=version+1 WHERE id=? AND merchant_id=? AND status='PAID'`).run(stamp,stamp,orderId,req.actor!.merchantId);if(changed.changes!==1)return res.status(409).json({message:'订单不存在或状态不允许发货'});db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'SHIP','READY_TO_SHIP','SHIPPED',?,?)`).run(orderId,req.actor!.id,`DEMO${Date.now()}`,stamp);audit(req.actor!.id,req.actor!.name,'订单','模拟发货',orderId);broadcast('orders','ship');res.json({ok:true,trackingNo:`DEMO${Date.now()}`});
+  const stamp=now(),orderId=String(req.params.orderId),trackingNo=`DEMO${Date.now()}`;
+  const shipped=db.transaction(()=>{
+    const changed=db.prepare(`UPDATE orders SET status='SHIPPED',logistics_status='SHIPPED',shipped_at=?,updated_at=?,version=version+1 WHERE id=? AND merchant_id=? AND status='PAID'`).run(stamp,stamp,orderId,req.actor!.merchantId);
+    if(changed.changes!==1)return false;
+    db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'SHIP','READY_TO_SHIP','SHIPPED',?,?)`).run(orderId,req.actor!.id,trackingNo,stamp);
+    createOrderNotifications(orderId,'SHIPPED',stamp);return true;
+  })();
+  if(!shipped)return res.status(409).json({message:'订单不存在或状态不允许发货'});
+  audit(req.actor!.id,req.actor!.name,'订单','模拟发货',orderId);broadcast('orders','ship');broadcast('notices','create');res.json({ok:true,trackingNo});
 });
 shopRouter.post('/merchant/orders/:orderId/advance',requireAuth('MERCHANT'),(req,res)=>{
   const orderId=String(req.params.orderId),stamp=now(),order=db.prepare(`SELECT status,logistics_status logisticsStatus FROM orders WHERE id=? AND merchant_id=?`).get(orderId,req.actor!.merchantId) as any;if(!order)return res.status(404).json({message:'订单不存在'});
   const next:Record<string,string>={PREPARING:'READY_TO_SHIP',READY_TO_SHIP:'SHIPPED',SHIPPED:'IN_TRANSIT',IN_TRANSIT:'OUT_FOR_DELIVERY'},to=next[order.logisticsStatus];if(!to)return res.status(409).json({message:'当前物流状态无需继续更新'});
   const status=to==='SHIPPED'?'SHIPPED':order.status,tracking=to==='SHIPPED'?`DEMO${Date.now()}`:null;
-  db.transaction(()=>{db.prepare(`UPDATE orders SET status=?,logistics_status=?,shipped_at=CASE WHEN ?='SHIPPED' THEN ? ELSE shipped_at END,updated_at=?,version=version+1 WHERE id=?`).run(status,to,to,stamp,stamp,orderId);db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'ADVANCE',?,?,?,?)`).run(orderId,req.actor!.id,order.logisticsStatus,to,tracking,stamp)})();
-  broadcast('orders','advance');res.json({ok:true,status,toStatus:to,trackingNo:tracking});
+  db.transaction(()=>{db.prepare(`UPDATE orders SET status=?,logistics_status=?,shipped_at=CASE WHEN ?='SHIPPED' THEN ? ELSE shipped_at END,updated_at=?,version=version+1 WHERE id=?`).run(status,to,to,stamp,stamp,orderId);db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'ADVANCE',?,?,?,?)`).run(orderId,req.actor!.id,order.logisticsStatus,to,tracking,stamp);if(to==='SHIPPED')createOrderNotifications(orderId,'SHIPPED',stamp)})();
+  broadcast('orders','advance');if(to==='SHIPPED')broadcast('notices','create');res.json({ok:true,status,toStatus:to,trackingNo:tracking});
 });
 
 shopRouter.get('/merchant/products',requireAuth('MERCHANT'),(req,res)=>res.json({data:db.prepare(`SELECT p.id,p.merchant_id merchantId,m.shop_name shop,p.category_id categoryId,c.name category,

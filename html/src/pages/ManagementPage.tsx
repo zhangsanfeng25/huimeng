@@ -63,9 +63,12 @@ export function ManagementPage({ type }: {
         });
         return () => { active = false; unsubscribe(); };
     }, [load, type, config.idKey]);
-    const statuses = [...new Set(rows.map(row => String(row.status || '')))].filter(Boolean);
-    const shops = [...new Set(rows.map(row => String(row.shop || row.merchant || '')))].filter(Boolean);
-    const filtered = useMemo(() => rows.filter(row => (!query || Object.values(row).some(v => String(v).toLowerCase().includes(query.toLowerCase()))) && (!statusFilter || row.status === statusFilter) && (!shopFilter || (row.shop || row.merchant) === shopFilter)), [rows, query, statusFilter, shopFilter]);
+    const statuses = useMemo(() => [...new Set(rows.map(row => String(row.status || '')))].filter(Boolean), [rows]);
+    const shops = useMemo(() => [...new Set(rows.map(row => String(row.shop || row.merchant || '')))].filter(Boolean), [rows]);
+    const filtered = useMemo(() => {
+        const keyword = query.toLowerCase();
+        return rows.filter(row => (!query || Object.values(row).some(v => String(v).toLowerCase().includes(keyword))) && (!statusFilter || row.status === statusFilter) && (!shopFilter || (row.shop || row.merchant) === shopFilter));
+    }, [rows, query, statusFilter, shopFilter]);
     useEffect(() => setPage(1), [query, statusFilter, shopFilter, type]);
     const pageCount = Math.max(1, Math.ceil(filtered.length / 25)), safePage = Math.min(page, pageCount), visibleRows = filtered.slice((safePage - 1) * 25, safePage * 25);
     const requestDetail = (id: string) => { setError(''); const request = ++detailRequest.current; api<{

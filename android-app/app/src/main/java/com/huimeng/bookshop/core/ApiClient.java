@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public final class ApiClient {
+    private static final String ASSET_ORIGIN=BuildConfig.API_BASE_URL.replaceFirst("/api/v1/$","");
     private static boolean redirecting;
     private final Context context;
     private final SessionStore session;
@@ -43,8 +44,7 @@ public final class ApiClient {
     public static String assetUrl(String value){
         if(value==null||value.trim().isEmpty())return "";
         if(value.startsWith("http://")||value.startsWith("https://"))return value;
-        String origin=BuildConfig.API_BASE_URL.replaceFirst("/api/v1/$","");
-        return origin+(value.startsWith("/")?value:"/"+value);
+        return ASSET_ORIGIN+(value.startsWith("/")?value:"/"+value);
     }
     private void request(int method,String path,JSONObject body,Consumer<JSONObject> success,Consumer<String> failure){
         request(method,path,body,new HashMap<>(),success,failure);

@@ -30,7 +30,9 @@
 
 社区列表与阅读笔记详情支持点击作者头像或名称进入读者主页。主页仅显示公开昵称、头像、公开笔记及这些笔记的获赞数，不公开账户、联系方式或隐藏帖子。新增主页接口为 `GET /api/v1/community/users/:id`，需要登录。更新服务源码后，需要在现有控制中心关闭并重新打开服务以加载最新 API。
 
-首页已接入五张确认后的写实海报，支持左右滑动，每 5 秒自动切换；手动操作后重新计时，离开首页或应用进入后台时暂停。海报按 37:17 比例完整显示，保留原宣传区域圆角。最新 Android 包为 `output/interface-completion-20261004/huimeng-1.0.33.apk`，功能与验证记录见 `android-app/BUILD_NOTES.md`。
+首页已接入五张确认后的写实海报，支持左右首尾循环滑动，每 5 秒自动切换；手动操作后重新计时，离开首页或应用进入后台时暂停。海报按 37:17 比例完整显示，保留原宣传区域圆角。最新 Android 包为 `output/android-1.0.36/huimeng-1.0.36.apk`，保留已完成的界面和交互修复，优化 Android 绘制/购物车、API SQL 与管理网页筛选和格式器。功能与验证记录见 `android-app/BUILD_NOTES.md`。
+
+首页年龄、主题分类和“查看全部”进入独立结果页，可继续搜索、排序和分页。评论时间按设备本地日期显示：今天为小时分钟、本年非今天为月日、往年为年月日。下单、支付、发货和确认收货后，买家与对应商家会收到未读订单提醒；网页管理端代处理发货或完成订单时同样同步。消息页进入时读取最新列表，前台订阅 SSE，断线时每约 5 秒重试同步，离开后停止。
 
 默认头像已提供五种阅读与成长图片，入口为 App 的“我的 → 外观与壁纸设置 → 更换头像”或“编辑账户”。点选立即保存至共用 API；用户管理列表及用户/商家详情显示相同头像，并通过 SSE 自动更新。图库上传与裁剪继续保留，头像统一圆形裁切及细边框。现有六个用户/商家账户已均匀分配五张头像，替换前已保存数据库快照；新注册及后台新建用户优先采用使用次数最少的默认头像。
 
@@ -38,7 +40,7 @@
 
 源码上传范围、日常提交与发布标签规则见 [源码上传与版本管理](docs/version-management.md)。业务数据库、备份及用户上传图片只保留在本机或独立备份中，不通过 Git 同步。
 
-正式发行版 APK 和对应改动说明见 [Android 1.0.33 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.33)，最新正式版入口为 [releases/latest](https://github.com/zhangsanfeng25/huimeng/releases/latest)。下载附件 `huimeng-1.0.33.apk`；当前 APK 为 Debug 模拟器演示包，使用方式与验证限制见该版本说明。仓库为私有，下载需登录有访问权限的 GitHub 账号。后续更新递增 APK 版本并创建独立正式 Release，保留历史安装包。
+正式发行版 APK 和对应简短改动说明见 [Android 1.0.36 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.36)，最新正式版入口为 [releases/latest](https://github.com/zhangsanfeng25/huimeng/releases/latest)。下载附件 `huimeng-1.0.36.apk`；当前 APK 为 Debug 模拟器演示包，使用方式与验证限制见该版本说明。仓库为私有，下载需登录有访问权限的 GitHub 账号。各版本独立发布，历史安装包和 Release 保留。
 
 真机调试需要将 Android `API_BASE_URL` 改成电脑局域网 IP，并使 `server/.env` 的 `HOST=0.0.0.0`，再重新启动服务与构建 App。
 

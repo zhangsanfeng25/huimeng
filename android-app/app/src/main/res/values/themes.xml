@@ -20,10 +20,20 @@
         <item name="android:navigationBarColor">@color/surface_card</item>
     </style>
     <style name="Theme.HuiMeng.Welcome" parent="Theme.Material3.Light.NoActionBar">
-        <item name="android:windowFullscreen">true</item><item name="android:windowActionModeOverlay">true</item><item name="android:fontFamily">sans</item><item name="android:navigationBarColor">#182A4B</item><item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <item name="android:windowFullscreen">true</item><item name="android:windowActionModeOverlay">true</item><item name="android:fontFamily">sans</item><item name="android:windowBackground">@color/welcome_cream</item><item name="android:navigationBarColor">@color/welcome_cream</item><item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
     <style name="ProfileShortcut">
         <item name="android:layout_width">0dp</item><item name="android:layout_height">match_parent</item><item name="android:layout_weight">1</item><item name="android:gravity">center</item><item name="android:drawableTint">@color/cool_green_dark</item><item name="android:textColor">@color/ink</item><item name="android:textSize">14sp</item>
+    </style>
+    <style name="Widget.HuiMeng.LogoutButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">@color/price_red</item><item name="strokeColor">@color/price_red</item>
+        <item name="backgroundTint">@color/logout_surface</item><item name="rippleColor">@color/logout_surface</item>
+        <item name="android:textSize">16sp</item><item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.06</item><item name="android:textStyle">normal</item>
+    </style>
+    <style name="Widget.HuiMeng.AuthField" parent="Widget.Material3.TextInputLayout.FilledBox">
+        <item name="boxBackgroundColor">@color/auth_field</item><item name="boxStrokeWidth">0dp</item><item name="boxStrokeWidthFocused">1dp</item>
+        <item name="boxCornerRadiusTopStart">16dp</item><item name="boxCornerRadiusTopEnd">16dp</item><item name="boxCornerRadiusBottomStart">16dp</item><item name="boxCornerRadiusBottomEnd">16dp</item>
     </style>
     <style name="HomeAgeChoice">
         <item name="android:layout_width">0dp</item><item name="android:layout_height">wrap_content</item><item name="android:minHeight">56dp</item><item name="android:layout_weight">1</item><item name="android:layout_marginHorizontal">3dp</item><item name="android:paddingVertical">6dp</item><item name="android:gravity">center</item><item name="android:background">@drawable/bg_home_choice</item><item name="android:drawableTint">@color/cool_green_dark</item><item name="android:drawablePadding">4dp</item><item name="android:textSize">12sp</item><item name="android:textColor">@color/ink</item><item name="android:clickable">true</item><item name="android:focusable">true</item>

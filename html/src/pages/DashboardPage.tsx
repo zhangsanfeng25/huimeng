@@ -59,8 +59,9 @@ function MiniTrend({ values, color }: { values: number[]; color: string }) {
   </svg>;
 }
 
+const moneyFormatter = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 function formatMoney(value: number) {
-  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
+  return moneyFormatter.format(value);
 }
 
 
@@ -106,15 +107,16 @@ export function DashboardPage() {
   const trend = data?.trend ?? [];
   const maxBar = Math.max(...trend.flatMap(item => [item.orders, item.turnover / 100]), 1);
   const totalProducts = (data?.distribution ?? []).reduce((sum, item) => sum + item.value, 0);
-  const recentSpark = trend.slice(-6).map(item => item.orders);
-  const amountSpark = trend.slice(-6).map(item => item.turnover);
-
-  const metricCards = useMemo(() => [
+  const metricCards = useMemo(() => {
+    const recentSpark = trend.slice(-6).map(item => item.orders);
+    const amountSpark = trend.slice(-6).map(item => item.turnover);
+    return [
     { label: '订单总量', value: metrics.orders.toLocaleString(), note: '全部订单', icon: ShoppingCart, color: '#45aaf2', values: recentSpark, trendLabel: '近6日每日订单量' },
     { label: '成交金额', value: formatMoney(metrics.turnover), note: '已支付且未取消', icon: Banknote, color: '#ff7f5c', values: amountSpark, trendLabel: '近6日每日成交额' },
     { label: '在售商品', value: metrics.products.toLocaleString(), note: `${metrics.pendingReviews} 件待审核`, icon: BookOpen, color: '#2fca80', values: trend.slice(-6).map(item=>item.products), trendLabel: '近6日每日新增商品' },
     { label: '注册用户', value: metrics.users.toLocaleString(), note: '平台用户总数', icon: Users, color: '#8c67f6', values: trend.slice(-6).map(item=>item.users), trendLabel: '近6日每日注册用户' },
-  ], [amountSpark, metrics, recentSpark, trend]);
+    ];
+  }, [metrics, trend]);
 
   const activities = [
     ...(data?.operations??[]).map(row=>({id:row.id,title:`${row.operator} · ${row.action}`,detail:`${({products:'商品',reviews:'审核',community:'社区',users:'用户',notices:'通知',merchants:'商家',categories:'分类'} as Record<string,string>)[row.module]||row.module} · ${row.objectId||'—'} · ${new Date(row.createdAt).toLocaleString('zh-CN')}`,time:row.createdAt,tone:'primary'})),

@@ -8,34 +8,38 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import express from 'express';
 import { config } from '../config.js';
+import type { Statement } from 'better-sqlite3';
+
+let publicPosts:Statement,publicPost:Statement,publicComments:Statement,publicUser:Statement,authorPosts:Statement,noticeList:Statement;
 
 export const communityRouter=Router();
 const makeId=(prefix:string)=>`${prefix}${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
 communityRouter.get('/community/posts',requireAuth(),(req,res)=>{
-  const data=db.prepare(`SELECT p.id,p.title,p.content,p.cover_url coverUrl,p.images_json images,p.product_id productId,p.author_user_id authorId,p.author_role authorRole,p.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl,
+  const data=(publicPosts??=db.prepare(`SELECT p.id,p.title,p.content,p.cover_url coverUrl,p.images_json images,p.product_id productId,p.author_user_id authorId,p.author_role authorRole,p.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl,
     (SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.status='PUBLIC') commentCount,
     (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount,
     EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) liked
-    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.status='PUBLIC' ORDER BY p.created_at DESC`).all(req.actor!.id);
+    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.status='PUBLIC' ORDER BY p.created_at DESC`)).all(req.actor!.id);
   res.json({data});
 });
 communityRouter.get('/community/posts/:id',requireAuth(),(req,res)=>{
-  const post=db.prepare(`SELECT p.*,p.author_user_id authorId,u.nickname authorName,u.avatar_url avatarUrl,
+  const post=(publicPost??=db.prepare(`SELECT p.*,p.author_user_id authorId,u.nickname authorName,u.avatar_url avatarUrl,
     (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount,
     EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) liked
-    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.id=? AND p.status='PUBLIC'`).get(req.actor!.id,String(req.params.id));
+    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.id=? AND p.status='PUBLIC'`)).get(req.actor!.id,String(req.params.id));
   if(!post)return res.status(404).json({message:'帖子不存在'});
-  const comments=db.prepare(`SELECT c.id,c.content,c.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? AND c.status='PUBLIC' ORDER BY c.created_at`).all(String(req.params.id));
+  const comments=(publicComments??=db.prepare(`SELECT c.id,c.content,c.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? AND c.status='PUBLIC' ORDER BY c.created_at`)).all(String(req.params.id));
   res.json({data:{...(post as any),comments}});
 });
 communityRouter.get('/community/users/:id',requireAuth(),(req,res)=>{
-  const user=db.prepare("SELECT id,nickname,COALESCE(avatar_url,'') avatarUrl FROM users WHERE id=? AND status='ACTIVE'").get(String(req.params.id));
+  const user=(publicUser??=db.prepare("SELECT id,nickname,COALESCE(avatar_url,'') avatarUrl FROM users WHERE id=? AND status='ACTIVE'")).get(String(req.params.id));
   if(!user)return res.status(404).json({message:'用户不存在或已停用'});
-  const posts=db.prepare(`SELECT p.id,p.title,p.content,p.cover_url coverUrl,p.author_user_id authorId,p.author_role authorRole,p.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl,
+  const posts=(authorPosts??=db.prepare(`SELECT p.id,p.title,p.content,p.cover_url coverUrl,p.author_user_id authorId,p.author_role authorRole,p.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl,
     (SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.status='PUBLIC') commentCount,
-    (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount
-    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.author_user_id=? AND p.status='PUBLIC' ORDER BY p.created_at DESC,p.id DESC`).all(String(req.params.id)) as Array<{likeCount:number}>;
+    (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount,
+    EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) liked
+    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.author_user_id=? AND p.status='PUBLIC' ORDER BY p.created_at DESC,p.id DESC`)).all(req.actor!.id,String(req.params.id)) as Array<{likeCount:number}>;
   res.json({data:{user,posts,postCount:posts.length,likeCount:posts.reduce((total,post)=>total+post.likeCount,0)}});
 });
 communityRouter.post('/community/uploads',requireAuth('USER','MERCHANT'),express.raw({type:'image/jpeg',limit:'3mb'}),(req,res)=>{
@@ -78,13 +82,13 @@ communityRouter.post('/community/posts/:id/comments',requireAuth('USER','MERCHAN
 
 function visibleNotices(userId:string,roles:string[]){
   const buyer=roles.includes('USER')?1:0,merchant=roles.includes('MERCHANT')?1:0;
-  return db.prepare(`SELECT n.id,n.title,n.content,n.audience,n.created_at,
+  return (noticeList??=db.prepare(`SELECT n.id,n.title,n.content,n.audience,n.created_at,
     CASE WHEN s.read_at IS NOT NULL OR (n.user_id=? AND n.is_read=1) THEN 1 ELSE 0 END is_read
     FROM notifications n LEFT JOIN notification_user_state s ON s.notification_id=n.id AND s.user_id=?
     WHERE n.status='SENT' AND s.deleted_at IS NULL AND (n.user_id=? OR (n.user_id IS NULL AND
       n.created_at >= (SELECT created_at FROM users WHERE id=?) AND
       (n.audience NOT IN ('全部商家','全部用户') OR (n.audience='全部商家' AND ?=1) OR (n.audience='全部用户' AND ?=1))))
-    ORDER BY n.created_at DESC`).all(userId,userId,userId,userId,merchant,buyer);
+    ORDER BY n.created_at DESC`)).all(userId,userId,userId,userId,merchant,buyer);
 }
 const noticeVisibility=db.prepare(`SELECT n.id FROM notifications n LEFT JOIN notification_user_state s ON s.notification_id=n.id AND s.user_id=?
   WHERE n.id=? AND n.status='SENT' AND s.deleted_at IS NULL AND (n.user_id=? OR (n.user_id IS NULL AND

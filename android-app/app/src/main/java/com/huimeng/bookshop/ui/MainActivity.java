@@ -21,6 +21,8 @@ public class MainActivity extends AppCompatActivity {
         if(session.token().isEmpty()){logoutLocal();return;}
         binding=ActivityMainBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
         buildNavigation(binding.bottomNav,session.role());
+        binding.bottomNav.setBackgroundTintList(null);
+        binding.bottomNav.setItemActiveIndicatorColor(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(this,R.color.nav_indicator)));
         int initial=state==null?1:state.getInt("selected_tab",1);
         binding.bottomNav.setSelectedItemId(tabId(initial));
         binding.bottomNav.setOnItemSelectedListener(item->{show(tabPosition(item.getItemId()));return true;});

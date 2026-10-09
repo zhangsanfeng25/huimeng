@@ -6,10 +6,11 @@ try {
     $logsDir = $fixture
     $logPath = Join-Path $fixture 'launcher.log'
     $serviceLogPath = Join-Path $fixture 'service.log'
-    [System.IO.File]::WriteAllText($serviceLogPath, "[周五 02/10/2026 15:17:50.89] Building admin website...`nnpm error No workspaces found:`nnpm error --workspace=html`nERROR: Project build failed.`n", [System.Text.Encoding]::UTF8)
+    $legacyStamp = '[周五 ' + (Get-Date).AddMinutes(-3).ToString('dd/MM/yyyy HH:mm:ss.ff', [Globalization.CultureInfo]::InvariantCulture) + ']'
+    [System.IO.File]::WriteAllText($serviceLogPath, "$legacyStamp Building admin website...`nnpm error No workspaces found:`nnpm error --workspace=html`nERROR: Project build failed.`n", [System.Text.Encoding]::UTF8)
     $actual = Get-RunLogs 'Debug'
-    if ($actual -notmatch '\[周五 02/10/2026 15:17:50.89\] npm error No workspaces found:') { throw 'DEBUG must include errors with their preceding timestamp' }
-    if ($actual -notmatch '\[周五 02/10/2026 15:17:50.89\] ERROR: Project build failed\.') { throw 'DEBUG must preserve the final failure' }
+    if ($actual -notmatch ([regex]::Escape($legacyStamp) + ' npm error No workspaces found:')) { throw 'DEBUG must include errors with their preceding timestamp' }
+    if ($actual -notmatch ([regex]::Escape($legacyStamp) + ' ERROR: Project build failed\.')) { throw 'DEBUG must preserve the final failure' }
     $errorsOnly = Get-RunLogs '错误'
     if ($errorsOnly -match 'Building admin website') { throw 'Error filter must exclude info' }
     $old = (Get-Date).AddDays(-4).ToString('yyyy-MM-dd HH:mm:ss')

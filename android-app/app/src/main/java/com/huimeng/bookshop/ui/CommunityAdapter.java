@@ -32,7 +32,7 @@ public class CommunityAdapter extends ListAdapter<CommunityPost,CommunityAdapter
         void bind(CommunityPost item,Consumer<CommunityPost> listener){
             binding.title.setText(item.title());binding.content.setText(item.content());
             binding.author.setText(item.authorName()+("MERCHANT".equals(item.authorRole())?" · 商家":""));
-            binding.likes.setText("♥ "+item.likeCount());binding.comments.setText(" · "+item.commentCount()+" 条评论");
+            PostLikeDisplay.bind(binding.likes,item,false);binding.comments.setText(" · "+item.commentCount()+" 条评论");
             Glide.with(binding.cover).load(ApiClient.assetUrl(item.coverUrl())).placeholder(new ColorDrawable(0xFFE6F5EC)).error(R.drawable.ic_book_placeholder).centerCrop().into(binding.cover);
             DefaultAvatars.show(binding.avatar,item.avatarUrl());
             binding.avatar.setContentDescription("查看"+item.authorName()+"的主页");

@@ -40,7 +40,6 @@ public class HomeFragment extends Fragment {
     private final List<Product> displayed=new ArrayList<>();
     private final Set<String> adding=new HashSet<>();
     private boolean loading;
-    private androidx.appcompat.app.AlertDialog categoryDialog;
     private androidx.activity.result.ActivityResultLauncher<Intent> shoppingReturn;
     @Override public void onCreate(@Nullable Bundle state){super.onCreate(state);shoppingReturn=registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),result->refreshCartBadge());if(state!=null){category=state.getString("category","");categoryName=state.getString("category_name","");age=state.getString("age","");theme=state.getString("theme","");query=state.getString("query","");sort=state.getString("sort","comprehensive");}}
     @Override public void onSaveInstanceState(@NonNull Bundle state){super.onSaveInstanceState(state);state.putString("category",category);state.putString("category_name",categoryName);state.putString("age",age);state.putString("theme",theme);state.putString("query",query);state.putString("sort",sort);}
@@ -66,7 +65,7 @@ public class HomeFragment extends Fragment {
         binding.sortPrice.setOnClickListener(v->chooseSort("price_asc".equals(sort)?"price_desc":"price_asc"));
         binding.searchButton.setOnClickListener(v->startActivity(new Intent(requireContext(),SearchActivity.class).putExtra("query",String.valueOf(binding.searchInput.getText()).trim())));binding.searchInput.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_SEARCH){search();return true;}return false;});
         binding.searchInput.setOnItemClickListener((parent,view,position,id)->search());updateHistory();
-        binding.allCategories.setOnClickListener(v->startActivity(new Intent(requireContext(),CategoriesActivity.class)));binding.clearFilters.setOnClickListener(v->clearFilters());binding.allProducts.setOnClickListener(v->clearFilters());
+        binding.allCategories.setOnClickListener(v->startActivity(new Intent(requireContext(),CategoriesActivity.class)));binding.clearFilters.setOnClickListener(v->clearFilters());binding.allProducts.setOnClickListener(v->startActivity(new Intent(requireContext(),SearchActivity.class).putExtra("browse_title","全部绘本")));
         binding.retry.setOnClickListener(v->loadProducts(false));binding.loadMore.setOnClickListener(v->loadProducts(true));
         binding.cartButton.setOnClickListener(v->shoppingReturn.launch(new Intent(requireContext(),CartActivity.class)));
         binding.communityMore.setOnClickListener(v->((MainActivity)requireActivity()).selectTab(2));
@@ -74,7 +73,7 @@ public class HomeFragment extends Fragment {
         for(View button:new View[]{binding.searchButton,binding.cartButton,binding.allProducts,binding.communityMore})TapMotion.attach(button);
         binding.searchInput.setText(query);binding.sortGroup.check("newest".equals(sort)?R.id.sortNewest:sort.startsWith("price")?R.id.sortPrice:R.id.sortComprehensive);binding.sortPrice.setText("price_asc".equals(sort)?"价格 ↑":"price_desc".equals(sort)?"价格 ↓":"价格 ↑↓");renderFilters();loadProducts(false);loadPosts();refreshCartBadge();return binding.getRoot();
     }
-    private void bindChoice(TextView view,String value,boolean isAge){view.setOnClickListener(v->{if(isAge)age=age.equals(value)?"":value;else theme=theme.equals(value)?"":value;renderFilters();loadProducts(false);});TapMotion.attach(view);}
+    private void bindChoice(TextView view,String value,boolean isAge){view.setOnClickListener(v->startActivity(new Intent(requireContext(),SearchActivity.class).putExtra(isAge?"age":"theme",value).putExtra("browse_title",view.getText().toString()+(isAge?"绘本":""))));TapMotion.attach(view);}
     private void chooseSort(String value){sort=value;binding.sortGroup.check("newest".equals(sort)?R.id.sortNewest:sort.startsWith("price")?R.id.sortPrice:R.id.sortComprehensive);binding.sortPrice.setText("price_asc".equals(sort)?"价格 ↑":"price_desc".equals(sort)?"价格 ↓":"价格 ↑↓");loadProducts(false);}
     private void renderFilters(){binding.ageBaby.setSelected("0-3".equals(age));binding.agePreschool.setSelected("3-6".equals(age));binding.ageSchool.setSelected("6-9".equals(age));binding.ageOlder.setSelected("9-plus".equals(age));binding.themeBedtime.setSelected("bedtime".equals(theme));binding.themeEmotion.setSelected("emotion".equals(theme));binding.themeScience.setSelected("science".equals(theme));binding.clearFilters.setVisibility(age.isEmpty()&&theme.isEmpty()&&query.isEmpty()&&category.isEmpty()?View.GONE:View.VISIBLE);}
     private void search(){String value=String.valueOf(binding.searchInput.getText()).trim();if(value.length()>100){toast("搜索关键词最多 100 字");return;}query=value;binding.searchInput.dismissDropDown();
@@ -84,9 +83,6 @@ public class HomeFragment extends Fragment {
     private String historyKey(){return "history_"+new SessionStore(requireContext()).accountId();}
     private List<String> history(){List<String> values=new ArrayList<>();try{JSONArray rows=new JSONArray(requireContext().getSharedPreferences("huimeng_search",Context.MODE_PRIVATE).getString(historyKey(),"[]"));for(int i=0;i<rows.length();i++)values.add(rows.optString(i));}catch(Exception ignored){}return values;}
     private void updateHistory(){binding.searchInput.setAdapter(new ArrayAdapter<>(requireContext(),android.R.layout.simple_dropdown_item_1line,history()));}
-    private void showCategories(){
-        new ApiClient(requireContext()).get("catalog/categories",result->{if(binding==null||!isAdded())return;List<String> ids=new ArrayList<>(),names=new ArrayList<>();ids.add("");names.add("全部分类");JSONArray data=result.optJSONArray("data");if(data!=null)for(int i=0;i<data.length();i++){JSONObject row=data.optJSONObject(i);if(row!=null&&!row.optString("id").isEmpty()){ids.add(row.optString("id"));names.add(row.optString("parent")+" · "+row.optString("name"));}}int checked=Math.max(0,ids.indexOf(category));categoryDialog=new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext()).setTitle("选择分类").setSingleChoiceItems(names.toArray(new String[0]),checked,(dialog,index)->{category=ids.get(index);categoryName=index==0?"":names.get(index);renderFilters();loadProducts(false);dialog.dismiss();}).setNegativeButton("取消",null).show();},this::toast);
-    }
     private void clearFilters(){age="";theme="";query="";category="";categoryName="";binding.searchInput.setText("");renderFilters();loadProducts(false);}
     private void loadProducts(boolean append){
         if(binding==null||(append&&loading))return;final int request=++productRequest,targetPage=append?page+1:1;loading=true;
@@ -110,5 +106,5 @@ public class HomeFragment extends Fragment {
     private void toast(String value){if(isAdded())Toast.makeText(requireContext(),value,Toast.LENGTH_SHORT).show();}
     @Override public void onResume(){super.onResume();if(binding!=null)binding.bannerCarousel.setActive(true);}
     @Override public void onPause(){if(binding!=null)binding.bannerCarousel.setActive(false);super.onPause();}
-    @Override public void onDestroyView(){if(categoryDialog!=null){categoryDialog.dismiss();categoryDialog=null;}productRequest++;if(binding!=null)binding.bannerCarousel.setActive(false);super.onDestroyView();binding=null;}
+    @Override public void onDestroyView(){productRequest++;if(binding!=null)binding.bannerCarousel.setActive(false);super.onDestroyView();binding=null;}
 }

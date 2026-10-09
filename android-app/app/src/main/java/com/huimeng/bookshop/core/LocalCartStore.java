@@ -34,7 +34,16 @@ public final class LocalCartStore {
         for(int i=0;i<data.length();i++){JSONObject row=data.optJSONObject(i);if(row!=null&&!row.optString("id").isEmpty())values.add(new Entry(Product.from(row),Math.max(1,row.optInt("quantity",1)),row.optBoolean("selected",true)));}
         return values;
     }
-    public int quantity(String productId){for(Entry item:list())if(item.product().id().equals(productId))return item.quantity();return 0;}
+    public int quantity(String productId){
+        JSONArray data=read();
+        for(int i=0;i<data.length();i++){
+            JSONObject row=data.optJSONObject(i);
+            if(row==null)continue;
+            String id=row.optString("id");
+            if(!id.isEmpty()&&id.equals(productId))return Math.max(1,row.optInt("quantity",1));
+        }
+        return 0;
+    }
     public void upsert(Product product,int quantity,boolean selected){JSONArray existing=read(),next=new JSONArray();
         for(int i=0;i<existing.length();i++){JSONObject row=existing.optJSONObject(i);if(row!=null&&!product.id().equals(row.optString("id")))next.put(row);}
         try{next.put(toJson(new Entry(product,Math.max(1,Math.min(99,quantity)),selected)));}catch(Exception ignored){}

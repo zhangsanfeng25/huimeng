@@ -118,7 +118,10 @@ export function CommunityPage() {
         });
         return () => { active = false; unsubscribe(); };
     }, [load]);
-    const filtered = useMemo(() => rows.filter(row => !query || [row.id, row.title, row.authorName, row.authorAccount, row.content, row.product].some(v => String(v || '').toLowerCase().includes(query.toLowerCase()))), [rows, query]);
+    const filtered = useMemo(() => {
+        const keyword = query.toLowerCase();
+        return rows.filter(row => !query || [row.id, row.title, row.authorName, row.authorAccount, row.content, row.product].some(v => String(v || '').toLowerCase().includes(keyword)));
+    }, [rows, query]);
     const refreshDetail = async (id: string) => { const value = (await api<{
         data: Detail;
     }>(`/community/${encodeURIComponent(id)}/details`)).data; setDetail(value); return value; };

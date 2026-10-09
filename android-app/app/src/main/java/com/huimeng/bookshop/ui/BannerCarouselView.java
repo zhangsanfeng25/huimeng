@@ -38,8 +38,7 @@ public final class BannerCarouselView extends FrameLayout {
     private final Runnable advance=this::advancePage;
     private void advancePage(){
         if(!canAdvance())return;
-        int next=(currentPage()+1)%banners.size();
-        pages.smoothScrollToPosition(next);
+        pages.smoothScrollToPosition(currentAdapterPage()+1);
         schedule();
     }
     public BannerCarouselView(Context context){this(context,null);}
@@ -55,7 +54,7 @@ public final class BannerCarouselView extends FrameLayout {
         pages.addOnScrollListener(new RecyclerView.OnScrollListener(){
             @Override public void onScrolled(@NonNull RecyclerView recycler,int dx,int dy){updateDots();}
             @Override public void onScrollStateChanged(@NonNull RecyclerView recycler,int state){
-                if(state==RecyclerView.SCROLL_STATE_IDLE){updateDots();schedule();}else handler.removeCallbacks(advance);
+                if(state==RecyclerView.SCROLL_STATE_IDLE){normalizeLoopPosition();updateDots();schedule();}else handler.removeCallbacks(advance);
             }
         });
         pages.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener(){
@@ -70,14 +69,23 @@ public final class BannerCarouselView extends FrameLayout {
         banners.clear();banners.addAll(next);handler.removeCallbacks(advance);
         for(int i=0;i<getChildCount();i++){View child=getChildAt(i);if(child!=pages&&child!=dots)child.setVisibility(banners.isEmpty()?VISIBLE:GONE);}
         pages.setVisibility(banners.isEmpty()?GONE:VISIBLE);dots.setVisibility(banners.size()>1?VISIBLE:GONE);
-        pages.bringToFront();dots.bringToFront();pages.getAdapter().notifyDataSetChanged();pages.scrollToPosition(0);
+        pages.bringToFront();dots.bringToFront();pages.getAdapter().notifyDataSetChanged();pages.scrollToPosition(banners.size()>1?1:0);
         indicatedPage=-1;dots.removeAllViews();for(int i=0;i<banners.size();i++){View dot=new View(getContext());LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(5),dp(5));params.setMargins(dp(3),0,dp(3),0);dot.setLayoutParams(params);dots.addView(dot);}
         updateDots();schedule();
     }
     public void setActive(boolean value){active=value;schedule();}
-    public int currentPage(){View page=snap.findSnapView(layout);return page==null?0:Math.max(0,layout.getPosition(page));}
+    public int currentPage(){View page=snap.findSnapView(layout);return page==null?0:logicalPage(layout.getPosition(page));}
+    private int currentAdapterPage(){View page=snap.findSnapView(layout);return page==null?(banners.size()>1?1:0):layout.getPosition(page);}
+    private int logicalPage(int position){return banners.size()>1?Math.floorMod(position-1,banners.size()):0;}
+    private void normalizeLoopPosition(){
+        if(banners.size()<2)return;
+        int position=currentAdapterPage();
+        // Identical edge copies make the repositioning invisible in both directions.
+        if(position==0)layout.scrollToPositionWithOffset(banners.size(),0);
+        else if(position==banners.size()+1)layout.scrollToPositionWithOffset(1,0);
+    }
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
-    private boolean canAdvance(){return active&&visible&&isAttachedToWindow()&&!touching&&banners.size()>1&&ValueAnimator.areAnimatorsEnabled()&&!((android.view.accessibility.AccessibilityManager)getContext().getSystemService(Context.ACCESSIBILITY_SERVICE)).isTouchExplorationEnabled();}
+    private boolean canAdvance(){return active&&visible&&isAttachedToWindow()&&!touching&&pages.getScrollState()==RecyclerView.SCROLL_STATE_IDLE&&banners.size()>1&&ValueAnimator.areAnimatorsEnabled()&&!((android.view.accessibility.AccessibilityManager)getContext().getSystemService(Context.ACCESSIBILITY_SERVICE)).isTouchExplorationEnabled();}
     private void schedule(){handler.removeCallbacks(advance);if(canAdvance())handler.postDelayed(advance,5000);}
     private void updateDots(){int current=currentPage();if(current==indicatedPage)return;indicatedPage=current;for(int i=0;i<dots.getChildCount();i++){GradientDrawable shape=new GradientDrawable();shape.setShape(GradientDrawable.OVAL);shape.setColor(i==current?Color.WHITE:0x66FFFFFF);dots.getChildAt(i).setBackground(shape);}}
     @Override public void onVisibilityAggregated(boolean value){super.onVisibilityAggregated(value);visible=value;schedule();}
@@ -93,8 +101,8 @@ public final class BannerCarouselView extends FrameLayout {
     @Override protected void onSizeChanged(int width,int height,int oldWidth,int oldHeight){super.onSizeChanged(width,height,oldWidth,oldHeight);if(width!=oldWidth)pages.getAdapter().notifyDataSetChanged();}
     private final class Pages extends RecyclerView.Adapter<Page>{
         @NonNull @Override public Page onCreateViewHolder(@NonNull ViewGroup parent,int type){ImageView image=new ImageView(parent.getContext());image.setLayoutParams(new RecyclerView.LayoutParams(-1,-1));image.setScaleType(ImageView.ScaleType.FIT_CENTER);return new Page(image);}
-        @Override public void onBindViewHolder(@NonNull Page holder,int position){Banner banner=banners.get(position);holder.image.setContentDescription(banner.description()+"，第"+(position+1)+"张，共"+banners.size()+"张，可左右滑动");holder.image.setOnClickListener(v->{int index=holder.getBindingAdapterPosition();if(onBannerClick!=null&&index!=RecyclerView.NO_POSITION)onBannerClick.accept(index);});Glide.with(holder.image).load(banner.resource()).fitCenter().into(holder.image);}
-        @Override public int getItemCount(){return banners.size();}
+        @Override public void onBindViewHolder(@NonNull Page holder,int position){int logical=logicalPage(position);Banner banner=banners.get(logical);holder.image.setContentDescription(banner.description()+"，第"+(logical+1)+"张，共"+banners.size()+"张，可左右滑动");holder.image.setOnClickListener(v->{int index=holder.getBindingAdapterPosition();if(onBannerClick!=null&&index!=RecyclerView.NO_POSITION)onBannerClick.accept(logicalPage(index));});Glide.with(holder.image).load(banner.resource()).fitCenter().into(holder.image);}
+        @Override public int getItemCount(){return banners.size()>1?banners.size()+2:banners.size();}
     }
     private static final class Page extends RecyclerView.ViewHolder{final ImageView image;Page(ImageView image){super(image);this.image=image;}}
 }

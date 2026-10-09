@@ -4,11 +4,12 @@
     android:layout_height="match_parent">
 
     <ImageView
+        android:id="@+id/welcomeArtwork"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:contentDescription="孩子与小熊坐在绘本上，眺望月光下的故事世界"
+        android:contentDescription="孩子与小熊坐在绘本上，眺望日光下的森林故事世界"
         android:scaleType="centerCrop"
-        android:src="@drawable/welcome_storybook_night" />
+        android:src="@drawable/welcome_storybook_forest" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -25,7 +26,7 @@
             android:layout_height="wrap_content"
             android:letterSpacing="0.06"
             android:text="绘梦书城"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/welcome_ink"
             android:textSize="36sp"
             android:textStyle="bold" />
 
@@ -34,7 +35,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="让好故事，陪伴每一次成长"
-            android:textColor="#E6E7F8"
+            android:textColor="@color/welcome_muted"
             android:textSize="15sp" />
     </LinearLayout>
 
@@ -52,7 +53,7 @@
         android:paddingStart="18dp"
         android:paddingEnd="18dp"
         android:text="跳过"
-        android:textColor="#1F294D"
+        android:textColor="@color/welcome_ink"
         android:textSize="16sp"
         android:textStyle="bold" />
 </FrameLayout>

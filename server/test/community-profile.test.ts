@@ -67,3 +67,30 @@ test('不存在或停用的用户不可访问，匿名请求需要登录', async
   db.prepare("UPDATE users SET status='DISABLED' WHERE id=?").run(other.id);
   assert.equal((await fetch(`${base}/community/users/${other.id}`, { headers })).status, 404);
 });
+
+test('作者主页区分当前用户点赞与其他用户点赞，零点赞不误标已点赞', async () => {
+  const stamp=new Date().toISOString();
+  for(const id of ['profile-mine','profile-others','profile-zero'])db.prepare("INSERT INTO community_posts(id,author_user_id,author_role,title,content,status,created_at,updated_at) VALUES(?,?,'USER',?,?,'PUBLIC',?,?)").run(id,author.id,id,'点赞状态验收',stamp,stamp);
+  const other=db.prepare('SELECT id FROM users WHERE id<>? LIMIT 1').get(author.id) as {id:string};
+  db.prepare('INSERT INTO post_likes(post_id,user_id,created_at) VALUES(?,?,?)').run('profile-mine',author.id,stamp);
+  db.prepare('INSERT INTO post_likes(post_id,user_id,created_at) VALUES(?,?,?)').run('profile-others',other.id,stamp);
+  const {data}=await (await fetch(`${base}/community/users/${author.id}`,{headers})).json() as {data:{posts:Array<{id:string;liked:number;likeCount:number}>}};
+  assert.equal(data.posts.find(p=>p.id==='profile-mine')?.liked,1);
+  assert.equal(data.posts.find(p=>p.id==='profile-others')?.liked,0);
+  assert.equal(data.posts.find(p=>p.id==='profile-others')?.likeCount,1);
+  assert.equal(data.posts.find(p=>p.id==='profile-zero')?.liked,0);
+  assert.equal(data.posts.find(p=>p.id==='profile-zero')?.likeCount,0);
+});
+
+test('从详情点赞后进入作者主页状态一致，取消后恢复空心状态',async()=>{
+  const stamp=new Date().toISOString(),id='profile-like-cycle';
+  db.prepare("INSERT INTO community_posts(id,author_user_id,author_role,title,content,status,created_at,updated_at) VALUES(?,?,'USER',?,?,'PUBLIC',?,?)").run(id,author.id,'点赞跨页面','流程验收',stamp,stamp);
+  const likedResponse=await fetch(`${base}/community/posts/${id}/like`,{method:'PUT',headers});assert.equal(likedResponse.status,200);
+  const detail=await (await fetch(`${base}/community/posts/${id}`,{headers})).json() as {data:{liked:number;likeCount:number}};
+  const profile=await (await fetch(`${base}/community/users/${author.id}`,{headers})).json() as {data:{posts:Array<{id:string;liked:number;likeCount:number}>}};
+  assert.equal(detail.data.liked,1);assert.equal(profile.data.posts.find(p=>p.id===id)?.liked,1);
+  assert.equal(profile.data.posts.find(p=>p.id===id)?.likeCount,detail.data.likeCount);
+  assert.equal((await fetch(`${base}/community/posts/${id}/like`,{method:'DELETE',headers})).status,200);
+  const cleared=await (await fetch(`${base}/community/users/${author.id}`,{headers})).json() as {data:{posts:Array<{id:string;liked:number;likeCount:number}>}};
+  assert.equal(cleared.data.posts.find(p=>p.id===id)?.liked,0);assert.equal(cleared.data.posts.find(p=>p.id===id)?.likeCount,0);
+});

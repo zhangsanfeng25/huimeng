@@ -1,4 +1,32 @@
-# 当前版本：1.0.33（2026-10-04）
+# 当前版本：1.0.36（2026-10-09）
+
+安装包：../output/android-1.0.36/huimeng-1.0.36.apk（versionCode 26）。保持当前界面、操作、接口和刷新时序；优化购物车直接读取、封面绘制对象、评论格式器、图片地址前缀及搜索状态读取，移除不可达分类弹窗。网页复用金额格式器和同步订阅，减少筛选/图表重算；API 复用固定 SQL 执行器，仍实时查库确认权限。
+
+本轮网页/API lint、build、完整 npm test 通过：47 项服务端测试，实时同步、维护、日志、控制中心布局及响应回归均通过。Gradle assembleDebug、assembleDebugAndroidTest、lintDebug 通过（0 errors、479 warnings）。API 34 模拟器完整交互回归 38 项通过，最终测试 APK 的五项行为保持检查通过，共 43 项。其中封面 160 画面共 10,560,000 像素与旧 1.0.35 相同，随测试 APK 附带的黄金哈希比较通过；搜索草稿、分类、排序与清空状态在重建后保持。
+
+此包为 Debug 模拟器演示包，API 为 http://10.0.2.2:3000/api/v1/；内部版本及 v2 Debug 签名验证通过。32,311,743 字节，SHA-256：8B9550CA875991F2724952D8D87BCA30AE730D9EAE22A2F17DFA6283737D5B3F。独立正式 Release、简短说明与限制见 ../docs/releases/android-1.0.36.md；历史 APK 保留。优化验证日志在 ../output/code-optimization-20261009/。
+
+API 26、实体手机及本轮额外小屏/放大字体未设备实测；封面黄金哈希取自同一 API 34 平台，不保证其他系统字体版本逐像素相同。模拟器休眠时两项搜索草稿和账户可见性断言失效，唤醒并增加测试焦点同步后重测通过；生产代码没有为这些环境失败改变行为。38 项完整交互日志为 android-regression-awake.log，最终五项日志为 android-preservation-portable.log。
+
+## 上一版本：1.0.35（2026-10-09，本地交付，未独立发布）
+
+安装包：../output/android-1.0.35/huimeng-1.0.35.apk（versionCode 25）。修复登录框上浮提示、首页“查看全部”和七个分类入口、轮播首尾双向循环、当前账号作者主页点赞同步、评论本地日期显示，以及下单/付款/发货/确认收货消息。网页管理端代处理也会同步提醒。前台消息页使用 SSE 与断线轮询，进入页面立即刷新。
+
+本轮网页和服务器 lint、build 通过，服务端 47 项测试及隔离实时同步回归通过；Gradle assembleDebug、assembleDebugAndroidTest、lintDebug 通过（0 errors、479 warnings）。设备最终结果、系统中断及补测范围见 ../output/interaction-fixes-20261009/verification.md。
+
+API 34 模拟器七项修复最终通过，三项原生前台截图复查通过。原整套回归被模拟器系统崩溃中断，结合中断前结果及补测完成 38 项原有/新增交互覆盖；真实账户作者点赞及实际睡前主题目录两项只读检查另行通过。不能把这些结果描述为一次完整设备测试全绿。
+
+本地共用服务已重载并通过健康检查。APK 为 Debug 模拟器演示包，API 为 http://10.0.2.2:3000/api/v1/；内部版本与 v2 Debug 签名通过。SHA-256：A42EEB3ADDD986EBD68DD5C4F652B5D1B97D7AB51A2625446DFF00A9A5DD6BE1。1.0.34 及更早安装包保留。API 26、实体手机、小屏/放大字体及维护和控制中心完整测试未在本轮重跑；未上传 GitHub。版本说明见 ../docs/releases/android-1.0.35.md。
+
+## 上一版本：1.0.34（2026-10-09，尚未发布）
+
+安装包：../output/android-1.0.34/huimeng-1.0.34.apk（versionCode 24）。完成注册页森林配色、确认的欢迎壁纸 A、半透明胶囊导航、当前用户点赞状态、紧凑地址卡片与直接修改、红色退出按钮。原欢迎图片及 1.0.33 安装包保留。
+
+本轮 Gradle assembleDebug、assembleDebugAndroidTest、lintDebug 通过，最终 lint 为 0 errors、479 warnings。服务端 41 项测试通过；Android 回归首轮 31 项中 30 项通过，申请入口测试改为验证实际入口和导航后定向通过；浅/深色页面截图工具通过。欢迎页额外验证跳过、三秒自动进入和深色主题显示，浅色两项、深色一项通过。API 26、实体手机及本轮额外小屏/放大字体未实测。维护及控制中心完整测试未在本轮重跑。
+
+APK 为 Debug 模拟器演示包，API 为 http://10.0.2.2:3000/api/v1/。内部版本与 v2 Debug 签名验证通过；SHA-256：1FFA2FF277916C80F8F14E893895B0399F76D6D2CAB13BDE14CD05BA3AD26B3C。点赞状态修复包含服务端接口更新，使用时通过控制中心关闭并重新打开服务加载最新源码。实际截图及日志见 ../output/ui-polish-20261009/verification.md；版本说明见 ../docs/releases/android-1.0.34.md。
+
+## 上一版本：1.0.33（2026-10-04）
 
 安装包：../output/interface-completion-20261004/huimeng-1.0.33.apk（versionCode 23）。沿用现有风格，补齐独立搜索/分类、独立评价、商家商品图片选择裁剪上传与封面管理，以及用户申请 → 网页审核 → 原会话实时切换商家闭环。服务升级需在控制中心关闭并重新打开服务，以执行增量迁移并加载最新代码。
 
