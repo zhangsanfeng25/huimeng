@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class MerchantOrdersFragment extends Fragment{
+public class MerchantOrdersFragment extends Fragment implements LocalDataRefresh{
     private FragmentMerchantListBinding binding;private ActionAdapter adapter;private final Handler handler=new Handler(Looper.getMainLooper());private boolean loading;
     private final Runnable refresh=new Runnable(){@Override public void run(){if(binding!=null&&isResumed()&&!isHidden()){load(false);handler.postDelayed(this,5000);}}};
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){binding=FragmentMerchantListBinding.inflate(inflater,container,false);binding.title.setText("订单管理");binding.subtitle.setText("物流状态自动同步");binding.add.setVisibility(View.GONE);adapter=new ActionAdapter(this::advance,this::openDetail);binding.list.setLayoutManager(new LinearLayoutManager(requireContext()));binding.list.setAdapter(adapter);binding.getRoot().setOnRefreshListener(()->load(false));load(true);return binding.getRoot();}
@@ -35,4 +35,5 @@ public class MerchantOrdersFragment extends Fragment{
     private String zh(String value){return switch(value){case "PENDING_PAYMENT","WAITING_PAYMENT"->"待付款";case "PAID","PREPARING"->"准备出库";case "READY_TO_SHIP"->"待发货";case "SHIPPED"->"已发货";case "IN_TRANSIT"->"运输中";case "OUT_FOR_DELIVERY"->"派送中";case "COMPLETED"->"已完成";case "CANCELLED"->"已取消";default->value;};}
     private void error(String error){loading=false;if(binding==null)return;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);if(isAdded()&&isResumed())Toast.makeText(requireContext(),error,Toast.LENGTH_SHORT).show();}
     @Override public void onDestroyView(){handler.removeCallbacks(refresh);super.onDestroyView();binding=null;}
+    @Override public void refreshLocalData(){if(binding!=null && isAdded()){load(false);}}
 }

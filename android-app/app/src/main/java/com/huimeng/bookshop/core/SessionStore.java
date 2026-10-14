@@ -23,6 +23,10 @@ public final class SessionStore {
     public String token(){return !temporaryToken.isEmpty()?temporaryToken:(remembered()?preferences.getString("token",""):"");}
     public boolean remembered(){return preferences.getBoolean("remember_login",false);}
     public boolean hasRememberedSession(){return remembered()&&!preferences.getString("token","").isEmpty();}
+    public boolean hasLocalSpace(){return preferences.getBoolean("local_ready",false)&&!localSpaceId().isEmpty();}
+    public String localSpaceId(){return preferences.getString("local_space","");}
+    public void localSpace(String id){preferences.edit().putString("local_space",id).putBoolean("local_ready",true).apply();}
+    public void clearNetworkSession(){temporaryToken="";preferences.edit().remove("token").putBoolean("remember_login",false).putBoolean("can_merchant",false).apply();}
     public String role(){return preferences.getString("role","USER");}
     public String name(){return preferences.getString("name","绘梦用户");}
     public String accountId(){return preferences.getString("account_id","");}

@@ -13,7 +13,7 @@ import com.huimeng.bookshop.core.ApiClient;
 import com.huimeng.bookshop.core.SessionStore;
 import com.huimeng.bookshop.databinding.FragmentMerchantProfileBinding;
 
-public class MerchantProfileFragment extends Fragment{
+public class MerchantProfileFragment extends Fragment implements LocalDataRefresh{
     private FragmentMerchantProfileBinding binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){
         binding=FragmentMerchantProfileBinding.inflate(inflater,container,false);
@@ -32,4 +32,5 @@ public class MerchantProfileFragment extends Fragment{
     private void renderProfile(){if(binding!=null){SessionStore profile=new SessionStore(requireContext());binding.name.setText(profile.name());String url=profile.avatarUrl();DefaultAvatars.show(binding.avatar,url);}}
     private void refreshProfile(){new ApiClient(requireContext()).get("auth/me",result->{if(binding==null)return;org.json.JSONObject user=result.optJSONObject("user");if(user!=null){SessionStore profile=new SessionStore(requireContext());profile.updateProfile(user.optString("username",profile.username()),user.optString("name",profile.name()));profile.setAvatarUrl(user.optString("avatarUrl",profile.avatarUrl()));renderProfile();}binding.getRoot().setRefreshing(false);},error->{if(binding!=null){binding.getRoot().setRefreshing(false);android.widget.Toast.makeText(requireContext(),error,android.widget.Toast.LENGTH_SHORT).show();}});}
     @Override public void onDestroyView(){super.onDestroyView();binding=null;}
+    @Override public void refreshLocalData(){if(binding!=null && isAdded()){refreshProfile();}}
 }

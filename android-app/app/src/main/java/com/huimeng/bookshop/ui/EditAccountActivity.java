@@ -70,7 +70,7 @@ public final class EditAccountActivity extends AppCompatActivity{
     private void saveAvatar(String url,File temporary,String requestedToken){
         try{new ApiClient(this).put("auth/me/avatar",new JSONObject().put("avatarUrl",url),saved->{
             if(isFinishing()||isDestroyed()||!requestedToken.equals(session.token()))return;
-            String stored=saved.optString("avatarUrl",url);session.setAvatarUrl(stored);showAvatar(stored);setAvatarBusy(false);binding.avatarStatus.setText("头像已更新，网页将同步显示");if(temporary!=null)temporary.delete();
+            String stored=saved.optString("avatarUrl",url);session.setAvatarUrl(stored);showAvatar(stored);setAvatarBusy(false);binding.avatarStatus.setText(saved.optBoolean("pending")?"头像已保存在本地，联网后同步":"头像已更新，网页将同步显示");if(temporary!=null)temporary.delete();
         },error->{if(requestedToken.equals(session.token()))avatarFailed(error);});}catch(Exception error){avatarFailed("保存头像失败");}
     }
     private void uploadAvatar(String path){File file=new File(path);final String requestedToken=session.token();avatarRevision++;setAvatarBusy(true);binding.avatarStatus.setText("正在上传头像…");

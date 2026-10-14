@@ -70,7 +70,7 @@ public class PublishPostActivity extends AppCompatActivity{
     }
     private void uploadNext(int index,JSONArray urls,String title,String content){
         if(index==cropped.size()){try{JSONObject body=new JSONObject().put("title",title).put("content",content).put("images",urls);
-            binding.publish.setText("正在发布…");new ApiClient(this).post("community/posts",body,result->{for(String path:cropped)new File(path).delete();toast("发布成功");finish();},this::fail);
+            binding.publish.setText("正在发布…");new ApiClient(this).post("community/posts",body,result->{for(String path:cropped)new File(path).delete();toast(result.optBoolean("pending")?"帖子已保存在本地，待联网发布":"发布成功");finish();},this::fail);
         }catch(Exception error){fail("发布失败，请重试");}return;}
         try{byte[] bytes=Files.readAllBytes(new File(cropped.get(index)).toPath());if(bytes.length>3*1024*1024){fail("第 "+(index+1)+" 张图片超过 3 MB");return;}
             binding.publish.setText("正在上传 "+(index+1)+"/"+cropped.size());new ApiClient(this).uploadJpeg(bytes,result->{String url=result.optString("url");if(url.isEmpty()){fail("图片上传失败");return;}urls.put(url);uploadNext(index+1,urls,title,content);},this::fail);

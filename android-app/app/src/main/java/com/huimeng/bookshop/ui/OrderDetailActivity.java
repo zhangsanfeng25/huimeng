@@ -34,7 +34,7 @@ public class OrderDetailActivity extends AppCompatActivity{
             status=data.optString("status");logistics=data.optString("logistics_status",status);
             groupId=data.optString("checkout_group_id");totalCents=data.optInt("total_cents");
             binding.orderId.setText("订单号："+data.optString("id"));binding.shop.setText(data.optString("shop"));
-            binding.status.setText(zh(logistics));binding.total.setText(String.format(Locale.CHINA,"¥%.2f",totalCents/100.0));
+            binding.status.setText(zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":""));binding.total.setText(String.format(Locale.CHINA,"¥%.2f",totalCents/100.0));
             JSONObject address=data.optJSONObject("address_snapshot_json");if(address==null){try{address=new JSONObject(data.optString("address_snapshot_json"));}catch(Exception ignored){}}
             if(address!=null&&!address.optString("recipient").isEmpty()){binding.address.setText("收货信息  "+address.optString("recipient")+"  "+address.optString("phone")+"\n"+address.optString("region")+address.optString("detail"));binding.address.setVisibility(View.VISIBLE);}else binding.address.setVisibility(View.GONE);
             binding.itemList.removeAllViews();itemId="";reviewItems.clear();
@@ -66,7 +66,7 @@ public class OrderDetailActivity extends AppCompatActivity{
     }
     private void act(){if("PENDING_PAYMENT".equals(status))startActivity(new Intent(this,PaymentActivity.class)
             .putExtra("group_id",groupId).putExtra("amount_cents",totalCents));
-        else if("OUT_FOR_DELIVERY".equals(logistics))new ApiClient(this).post("me/orders/"+orderId+"/confirm",new JSONObject(),result->{Toast.makeText(this,"已确认收货",Toast.LENGTH_SHORT).show();load(false);},this::error);
+        else if("OUT_FOR_DELIVERY".equals(logistics))new ApiClient(this).post("me/orders/"+orderId+"/confirm",new JSONObject(),result->{Toast.makeText(this,result.optBoolean("pending")?"收货意向已保存，待联网确认":"已确认收货",Toast.LENGTH_SHORT).show();load(false);},this::error);
         else if("COMPLETED".equals(logistics)){if(reviewItems.isEmpty())return;String[] names=new String[reviewItems.size()];for(int i=0;i<names.length;i++)names[i]=reviewItems.get(i).optString("productName");new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("选择要评价的绘本").setItems(names,(dialog,index)->startActivity(new Intent(this,RatingActivity.class).putExtra("order_item_id",reviewItems.get(index).optString("id")))).show();}}
     private void addCancelButton(){
         com.google.android.material.button.MaterialButton cancel=new com.google.android.material.button.MaterialButton(this,null,com.google.android.material.R.attr.materialButtonOutlinedStyle);

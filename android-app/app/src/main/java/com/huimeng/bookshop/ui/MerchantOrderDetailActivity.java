@@ -28,7 +28,7 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
         new ApiClient(this).get("merchant/orders/"+orderId,result->{loading=false;binding.loading.setVisibility(View.GONE);
             JSONObject data=result.optJSONObject("data");if(data==null||isFinishing()||isDestroyed())return;String next=data.toString();if(next.equals(displayed))return;displayed=next;
             logistics=data.optString("logistics_status",data.optString("status"));
-            binding.status.setText(zh(logistics));binding.orderId.setText("订单号："+data.optString("id"));
+            binding.status.setText(zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":""));binding.orderId.setText("订单号："+data.optString("id"));
             binding.shop.setText("买家："+data.optString("buyer"));
             binding.total.setText(String.format(Locale.CHINA,"¥%.2f",data.optInt("total_cents")/100.0));
             JSONObject address=data.optJSONObject("address_snapshot_json");if(address==null){try{address=new JSONObject(data.optString("address_snapshot_json"));}catch(Exception ignored){}}
@@ -53,7 +53,7 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
         },this::error);
     }
     private void advance(){new ApiClient(this).post("merchant/orders/"+orderId+"/advance",new JSONObject(),result->{
-        Toast.makeText(this,"订单已更新为："+zh(result.optString("toStatus")),Toast.LENGTH_SHORT).show();load(false);
+        Toast.makeText(this,result.optBoolean("pending")?"订单操作已保存在本地，待联网确认":"订单已更新为："+zh(result.optString("toStatus")),Toast.LENGTH_SHORT).show();load(false);
     },this::error);}
     private String action(String value){return switch(value){case "PREPARING"->"完成出库准备";case "READY_TO_SHIP"->"确认发货";case "SHIPPED"->"更新为运输中";case "IN_TRANSIT"->"更新为派送中";default->"";};}
     private String zh(String value){return switch(value){case "PENDING_PAYMENT","WAITING_PAYMENT"->"待付款";case "PAID","PREPARING"->"准备出库";case "READY_TO_SHIP"->"待发货";case "SHIPPED"->"已发货";case "IN_TRANSIT"->"运输中";case "OUT_FOR_DELIVERY"->"派送中";case "COMPLETED"->"已完成";case "CANCELLED"->"已取消";default->value;};}

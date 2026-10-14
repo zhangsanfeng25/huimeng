@@ -21,7 +21,7 @@ public final class AccountSync {
     private final Runnable fallback=new Runnable(){public void run(){if(!running)return;if(!connected||System.currentTimeMillis()-lastEvent>25000)refresh.run();main.postDelayed(this,5000);}};
     public AccountSync(Context context,Runnable refresh){this(context,refresh,"users","merchants");}
     public AccountSync(Context context,Runnable refresh,String... resources){this.context=context.getApplicationContext();this.refresh=refresh;this.resources=new java.util.HashSet<>(java.util.Arrays.asList(resources));}
-    public void start(){if(running)return;running=true;int id=++generation;refresh.run();main.postDelayed(fallback,5000);Thread worker=new Thread(()->listen(id),"huimeng-account-events");worker.setDaemon(true);worker.start();}
+    public void start(){if(new SessionStore(context).hasLocalSpace()){refresh.run();com.huimeng.bookshop.core.sync.SyncCoordinator.get(context).requestSync();return;}if(running)return;running=true;int id=++generation;refresh.run();main.postDelayed(fallback,5000);Thread worker=new Thread(()->listen(id),"huimeng-account-events");worker.setDaemon(true);worker.start();}
     public void stop(){running=false;++generation;connected=false;main.removeCallbacksAndMessages(null);HttpURLConnection old=connection;connection=null;if(old!=null)new Thread(old::disconnect,"huimeng-events-close").start();}
     private void signal(int id){main.post(()->{if(running&&id==generation)refresh.run();});}
     private void listen(int id){

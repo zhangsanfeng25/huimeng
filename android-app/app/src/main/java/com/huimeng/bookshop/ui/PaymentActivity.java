@@ -41,7 +41,7 @@ public class PaymentActivity extends AppCompatActivity {
         Map<String,String> headers=new HashMap<>();headers.put("Idempotency-Key","pay-"+groupId);
         try{
             JSONObject body=new JSONObject().put("method",method);
-            new ApiClient(this).post("checkout/"+groupId+"/pay",body,headers,result->verifyPayment(),message->{
+            new ApiClient(this).post("checkout/"+groupId+"/pay",body,headers,result->{if(result.optBoolean("pending")){paying=false;canPay=false;binding.loading.setVisibility(View.GONE);binding.confirm.setText("付款意向已保存，待联网确认");binding.confirm.setEnabled(false);Toast.makeText(this,"已保存本地，网络确认前不会显示付款成功",Toast.LENGTH_LONG).show();}else verifyPayment();},message->{
                 new ApiClient(this).get("checkout/"+groupId,status->{JSONObject data=status.optJSONObject("data");
                     if(data!=null&&"PAID".equals(data.optString("status")))showSuccess();else error(message);
                 },ignored->error(message));

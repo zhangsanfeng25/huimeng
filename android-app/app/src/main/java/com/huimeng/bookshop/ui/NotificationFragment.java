@@ -19,7 +19,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NotificationFragment extends Fragment{
+public class NotificationFragment extends Fragment implements LocalDataRefresh{
     private FragmentNotificationBinding binding;private NotificationAdapter adapter;private AccountSync sync;
     private boolean reading,queuedRead;private int requestId;
     private final androidx.activity.result.ActivityResultLauncher<Intent> detail=registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),result->{if(binding!=null)load();});
@@ -56,4 +56,5 @@ public class NotificationFragment extends Fragment{
     },error->{if(binding==null||id!=requestId)return;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);binding.empty.setText(error);binding.empty.setVisibility(View.VISIBLE);afterRead();});}
     private void afterRead(){reading=false;boolean again=queuedRead;queuedRead=false;if(again&&binding!=null&&getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))load();}
     @Override public void onDestroyView(){if(sync!=null)sync.stop();requestId++;reading=false;queuedRead=false;super.onDestroyView();binding=null;}
+    @Override public void refreshLocalData(){if(binding!=null && isAdded()){load();}}
 }

@@ -28,6 +28,13 @@ public final class ApiClient {
         uploadJpeg("community/uploads",Request.Method.POST,bytes,success,failure);
     }
     public void uploadJpeg(String path,int method,byte[] bytes,Consumer<JSONObject> success,Consumer<String> failure){
+        if(session.hasLocalSpace()){
+            String space=session.localSpaceId();com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{try{
+                com.huimeng.bookshop.core.local.LocalMediaStore media=new com.huimeng.bookshop.core.local.LocalMediaStore(context,com.huimeng.bookshop.core.local.LocalDatabase.get(context));
+                String id=media.saveJpeg(space,bytes,path.startsWith("merchant/")?"PRODUCT":"COMMUNITY");JSONObject result=new JSONObject().put("url",media.resolveUri(space,id).toString()).put("pending",true);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{if(space.equals(session.localSpaceId()))success.accept(result);});
+            }catch(Exception e){new android.os.Handler(android.os.Looper.getMainLooper()).post(()->failure.accept("图片未保存："+e.getMessage()));}});return;
+        }
         String token=session.token();
         JsonObjectRequest request=new JsonObjectRequest(method,BuildConfig.API_BASE_URL+path,null,success::accept,error->{
             if(unauthorized(path,error.networkResponse==null?0:error.networkResponse.statusCode,token))return;
@@ -44,12 +51,18 @@ public final class ApiClient {
     public static String assetUrl(String value){
         if(value==null||value.trim().isEmpty())return "";
         if(value.startsWith("http://")||value.startsWith("https://"))return value;
+        if(value.startsWith("file://")||value.startsWith("android.resource://"))return value;
         return ASSET_ORIGIN+(value.startsWith("/")?value:"/"+value);
     }
     private void request(int method,String path,JSONObject body,Consumer<JSONObject> success,Consumer<String> failure){
         request(method,path,body,new HashMap<>(),success,failure);
     }
     private void request(int method,String path,JSONObject body,Map<String,String> extraHeaders,Consumer<JSONObject> success,Consumer<String> failure){
+        if(session.hasLocalSpace()&&(!path.startsWith("auth/")||path.equals("auth/me")||path.equals("auth/me/avatar")||path.equals("auth/switch-role")||path.equals("auth/default-avatars"))){
+            if(!(path.equals("auth/me")&&body!=null&&(body.has("newPassword")||body.has("currentPassword")))){
+                com.huimeng.bookshop.core.local.LocalRepository.request(context,method,path,body,success,failure);return;
+            }
+        }
         String token=session.token();
         JsonObjectRequest request=new JsonObjectRequest(method, BuildConfig.API_BASE_URL+path,body,success::accept,error->{
             if(unauthorized(path,error.networkResponse==null?0:error.networkResponse.statusCode,token))return;
@@ -66,6 +79,7 @@ public final class ApiClient {
     private boolean unauthorized(String path,int status,String requestToken){
         if(status!=401||path.startsWith("auth/"))return false;
         if(!session.token().equals(requestToken))return true;
+        if(session.hasLocalSpace()){session.clearNetworkSession();return false;}
         session.clear();
         synchronized(ApiClient.class){if(redirecting)return true;redirecting=true;}
         Intent intent=new Intent(context,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);

@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class MerchantProductsFragment extends Fragment{
+public class MerchantProductsFragment extends Fragment implements LocalDataRefresh{
     private FragmentMerchantListBinding binding;private ActionAdapter adapter;
     private final androidx.activity.result.ActivityResultLauncher<Intent> editor=registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),result->{if(binding!=null)load(false);});
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){binding=FragmentMerchantListBinding.inflate(inflater,container,false);binding.title.setText("商品管理");binding.subtitle.setText("创建绘本并提交管理员审核");binding.add.setText("＋ 新增商品");binding.add.setOnClickListener(v->editor.launch(new Intent(requireContext(),AddProductActivity.class)));adapter=new ActionAdapter(this::submit);binding.list.setLayoutManager(new LinearLayoutManager(requireContext()));binding.list.setAdapter(adapter);binding.getRoot().setOnRefreshListener(()->load(false));load();return binding.getRoot();}
@@ -28,4 +28,5 @@ public class MerchantProductsFragment extends Fragment{
     private String zh(String value){return switch(value){case "DRAFT"->"草稿";case "PENDING_REVIEW"->"审核中";case "ONLINE"->"已上架";case "OFFLINE"->"已下架";default->value;};}
     private void error(String error){binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);Toast.makeText(requireContext(),error,Toast.LENGTH_SHORT).show();}
     @Override public void onDestroyView(){super.onDestroyView();binding=null;}
+    @Override public void refreshLocalData(){if(binding!=null && isAdded()){load(false);}}
 }

@@ -51,6 +51,26 @@ public final class LocalDatabase extends SQLiteOpenHelper {
         }finally{db.endTransaction();}
     }
     public JSONArray pending(String space){JSONArray rows=new JSONArray();try(Cursor c=getReadableDatabase().rawQuery("SELECT operation_id,resource,entity_id,action,payload,base_version,state,attempts,next_attempt_at,error FROM sync_operations WHERE space_id=? AND state<>'ACKED' ORDER BY created_at,rowid",new String[]{space})){while(c.moveToNext())try{rows.put(new JSONObject().put("operationId",c.getString(0)).put("spaceId",space).put("resource",c.getString(1)).put("entityId",c.getString(2)).put("action",c.getString(3)).put("payload",object(c.getString(4))).put("baseVersion",c.getLong(5)).put("state",c.getString(6)).put("attempts",c.getInt(7)).put("nextAttemptAt",c.getLong(8)).put("error",c.getString(9)));}catch(Exception e){throw new IllegalStateException(e);}}return rows;}
+    public void acknowledge(JSONObject op,JSONObject result)throws org.json.JSONException{
+        String operation=op.getString("operationId"),space=op.getString("spaceId"),resource=op.getString("resource"),id=op.getString("entityId");
+        if(!operation.equals(result.optString("operationId")))throw new IllegalArgumentException("服务器回执不匹配");
+        SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{
+            ContentValues receipt=new ContentValues();receipt.put("operation_id",operation);receipt.put("result",result.toString());receipt.put("confirmed_at",System.currentTimeMillis());db.insertWithOnConflict("sync_results",null,receipt,SQLiteDatabase.CONFLICT_IGNORE);
+            db.execSQL("UPDATE sync_operations SET state='ACKED',error='' WHERE operation_id=? AND space_id=?",new Object[]{operation,space});
+            String remote=result.optString("entityId",id);long version=result.optLong("version");
+            db.execSQL("UPDATE local_entities SET remote_id=?,version=? WHERE space_id=? AND resource=? AND id=?",new Object[]{remote,version,space,resource,id});
+            db.execSQL("UPDATE sync_operations SET base_version=? WHERE space_id=? AND resource=? AND entity_id=? AND state='PENDING' AND payload_hash='' AND base_version=?",new Object[]{version,space,resource,id,op.optLong("baseVersion")});
+            JSONObject current=entity(space,resource,id);if(current!=null){boolean more=false;try(Cursor c=db.rawQuery("SELECT 1 FROM sync_operations WHERE space_id=? AND resource=? AND entity_id=? AND state<>'ACKED' LIMIT 1",new String[]{space,resource,id})){more=c.moveToFirst();}if(!more){current.put("syncState","CONFIRMED");current.remove("pendingAction");ContentValues row=new ContentValues();row.put("data",current.toString());row.put("confirmed",current.toString());db.update("local_entities",row,"space_id=? AND resource=? AND id=?",new String[]{space,resource,id});}}
+            if(op.optString("action").equals("checkout.create")){
+                JSONArray orderIds=result.optJSONObject("data")==null?null:result.optJSONObject("data").optJSONArray("orderIds");
+                JSONArray localOrders=list(space,"buyerOrders");for(int i=0;i<localOrders.length();i++){JSONObject order=localOrders.getJSONObject(i);if(!id.equals(order.optString("checkout_group_id")))continue;
+                    if(orderIds!=null&&orderIds.length()==1){db.execSQL("UPDATE local_entities SET remote_id=?,version=1 WHERE space_id=? AND resource='buyerOrders' AND id=?",new Object[]{orderIds.getString(0),space,order.getString("id")});db.execSQL("UPDATE sync_operations SET base_version=1 WHERE space_id=? AND resource='buyerOrders' AND entity_id=? AND state='PENDING' AND payload_hash='' AND base_version=0",new Object[]{space,order.getString("id")});}
+                    else db.execSQL("UPDATE local_entities SET deleted=1 WHERE space_id=? AND resource='buyerOrders' AND id=?",new Object[]{space,order.getString("id")});
+                }
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+    }
     public String metadata(String key){try(Cursor c=getReadableDatabase().rawQuery("SELECT value FROM local_metadata WHERE key=?",new String[]{key})){return c.moveToFirst()?c.getString(0):"";}}
     public void importLegacyCart(String key,String space,JSONArray legacy){
         SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{

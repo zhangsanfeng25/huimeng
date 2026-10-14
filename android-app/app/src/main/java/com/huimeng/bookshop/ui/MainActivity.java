@@ -18,8 +18,10 @@ public class MainActivity extends AppCompatActivity {
     private int selectedTab=1;
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);session=new SessionStore(this);
-        if(session.token().isEmpty()){logoutLocal();return;}
+        if(!session.hasLocalSpace()&&session.token().isEmpty()){startActivity(new Intent(this,WelcomeActivity.class));finish();return;}
         binding=ActivityMainBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
+        binding.syncStatus.setOnClickListener(v->startActivity(new Intent(this,SyncStatusActivity.class)));
+        com.huimeng.bookshop.core.sync.SyncStatusStore.observe(this,status->{binding.syncStatus.setText(status.optString("message","本地模式")+" · 待处理 "+status.optInt("pending")+" ›");refreshVisibleLocalData();});
         buildNavigation(binding.bottomNav,session.role());
         binding.bottomNav.setBackgroundTintList(null);
         binding.bottomNav.setItemActiveIndicatorColor(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(this,R.color.nav_indicator)));
@@ -61,9 +63,12 @@ public class MainActivity extends AppCompatActivity {
         }
         if(added)transaction.runOnCommit(()->new WallpaperStore(this).apply(this));
         transaction.commitNow();
+        refreshVisibleLocalData();
     }
     @Override protected void onSaveInstanceState(Bundle state){state.putInt("selected_tab",selectedTab);super.onSaveInstanceState(state);}
     public void selectTab(int item){if(binding!=null)binding.bottomNav.setSelectedItemId(tabId(item));}
+    @Override protected void onResume(){super.onResume();refreshVisibleLocalData();}
+    private void refreshVisibleLocalData(){if(binding==null||session==null||!session.hasLocalSpace())return;Fragment fragment=getSupportFragmentManager().getPrimaryNavigationFragment();if(fragment instanceof LocalDataRefresh)((LocalDataRefresh)fragment).refreshLocalData();}
     public void logout(){new ApiClient(this).post("auth/logout",new org.json.JSONObject(),result->logoutLocal(),error->logoutLocal());}
-    private void logoutLocal(){session.clear();startActivity(new Intent(this,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK));finish();}
+    private void logoutLocal(){if(session.hasLocalSpace()){session.clearNetworkSession();recreate();return;}session.clear();startActivity(new Intent(this,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK));finish();}
 }

@@ -105,11 +105,13 @@ public class LoginActivity extends AppCompatActivity {
                 if(user!=null&&user.optJSONArray("roles")!=null)
                     for(int i=0;i<user.optJSONArray("roles").length();i++)
                         if("MERCHANT".equals(user.optJSONArray("roles").optString(i)))canMerchant=true;
-                SessionStore session=new SessionStore(this);
-                session.save(result.optString("token"),requestedRole,user==null?account:user.optString("name",account),canMerchant,
-                    user==null?"":user.optString("id"),user==null?account:user.optString("username",account),remember);
-                session.setAvatarUrl(user==null?"":user.optString("avatarUrl"));
-                ApiClient.resetSessionRedirect();openMain();
+                if(user==null||user.optString("id").isEmpty()||result.optString("token").isEmpty()){setLoginBusy(false);binding.message.setText("网络账号验证结果不完整");return;}
+                final boolean merchantAllowed=canMerchant;
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("关联网络账号")
+                    .setMessage("已验证账号："+user.optString("username",account)+"\n确认后，本地空间将关联此账号并同步待上传内容。切换其他账号会使用独立空间。")
+                    .setNegativeButton("取消",(dialog,which)->setLoginBusy(false))
+                    .setOnCancelListener(dialog->setLoginBusy(false))
+                    .setPositiveButton("确认关联",(dialog,which)->associate(result,user,requestedRole,merchantAllowed,remember)).show();
             },error->{
                 if(isFinishing()||isDestroyed())return;
                 setLoginBusy(false);binding.message.setText(error);
@@ -117,4 +119,15 @@ public class LoginActivity extends AppCompatActivity {
         }catch(Exception error){setLoginBusy(false);binding.message.setText("登录参数错误");}
     }
     private void openMain(){startActivity(new Intent(this,MainActivity.class));finish();}
+    private void associate(JSONObject result,JSONObject user,String requestedRole,boolean canMerchant,boolean remember){
+        com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{try{
+            SessionStore session=new SessionStore(this);com.huimeng.bookshop.core.local.LocalDatabase db=com.huimeng.bookshop.core.local.LocalDatabase.get(this);com.huimeng.bookshop.core.local.LocalSpaceStore spaces=new com.huimeng.bookshop.core.local.LocalSpaceStore(db);
+            String space=spaces.ensureActiveSpace();JSONObject info=spaces.info(space);String origin=com.huimeng.bookshop.BuildConfig.API_BASE_URL,owner=info.optString("userId");
+            if(!owner.isEmpty()&&(!owner.equals(user.optString("id"))||!origin.equals(info.optString("origin"))))space=spaces.forAccount(origin,user.optString("id"));
+            else space=spaces.bind(space,origin,user.optString("id"));
+            spaces.select(space);spaces.role(space,requestedRole);com.huimeng.bookshop.core.local.SampleCatalog.seed(db,space);db.saveConfirmed(space,"profile","self",user,user.optLong("version"));
+            final String selectedSpace=space;
+            runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){com.huimeng.bookshop.core.sync.SyncCoordinator.get(this).stop();session.save(result.optString("token"),requestedRole,user.optString("name"),canMerchant,user.optString("id"),user.optString("username"),remember);session.localSpace(selectedSpace);session.setAvatarUrl(user.optString("avatarUrl"));ApiClient.resetSessionRedirect();openMain();}});
+        }catch(Exception e){runOnUiThread(()->{setLoginBusy(false);binding.message.setText("关联未完成，本地数据已保留："+e.getMessage());});}});
+    }
 }

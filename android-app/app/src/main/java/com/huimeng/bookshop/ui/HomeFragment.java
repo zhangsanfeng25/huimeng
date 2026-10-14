@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class HomeFragment extends Fragment {
+public class HomeFragment extends Fragment implements LocalDataRefresh {
     private FragmentHomeBinding binding;
     private ProductAdapter products;
     private HomePostAdapter posts;
@@ -107,4 +107,5 @@ public class HomeFragment extends Fragment {
     @Override public void onResume(){super.onResume();if(binding!=null)binding.bannerCarousel.setActive(true);}
     @Override public void onPause(){if(binding!=null)binding.bannerCarousel.setActive(false);super.onPause();}
     @Override public void onDestroyView(){productRequest++;if(binding!=null)binding.bannerCarousel.setActive(false);super.onDestroyView();binding=null;}
+    @Override public void refreshLocalData(){if(binding!=null && isAdded()){loadProducts(false);loadPosts();refreshCartBadge();}}
 }
