@@ -4,12 +4,19 @@ $source=[IO.File]::ReadAllText($launcher).Replace('$baseDir = Split-Path -Parent
 $source=$source.Replace('[void]$form.ShowDialog()','$timer.Stop()')
 . ([scriptblock]::Create($source))
 try {
+    Set-LauncherState 'starting'
+    if($timer.Interval -ne 250){throw 'Startup readiness polling must use 250ms'}
+    Set-LauncherState 'stopped'
+    if($timer.Interval -ne 2000){throw 'Stable readiness polling must use 2000ms'}
     # A slow operating-system query must never run on the WinForms thread.
     function Get-ManagedProcess { return $null }
     function Test-LocalPort { Start-Sleep -Milliseconds 2000; return $false }
     $script:serviceFunctions += "`nfunction Get-ManagedProcess { return `$null }; function Test-LocalPort { Start-Sleep -Milliseconds 2000; return `$false }"
     $watch=[Diagnostics.Stopwatch]::StartNew()
     Update-LauncherState
+    $jobIdentity=$script:serviceJob
+    1..4 | ForEach-Object {Update-LauncherState}
+    if(-not [object]::ReferenceEquals($jobIdentity,$script:serviceJob)){throw 'Overlapping service status tasks created'}
     $watch.Stop()
     if ($watch.ElapsedMilliseconds -gt 150) { throw ('Status refresh blocks UI for '+$watch.ElapsedMilliseconds+'ms') }
     $script:pulses=0

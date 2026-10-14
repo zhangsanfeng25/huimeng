@@ -516,6 +516,7 @@ $menuLog.Add_Click({ Open-RunLog })
 $settingsButton.Add_Click({ $settingsMenu.Show($settingsButton, 0, $settingsButton.Height) })
 
 function Set-LauncherState([string]$state) {
+    if ($timer) { $timer.Interval = if ($state -eq 'starting') { 250 } else { 2000 } }
     if ($state -ne $script:currentState) {
         switch ($state) {
             'running'  { Write-LauncherLog '统一服务运行中：网站与 Android 模拟器共用商城 API。' }
