@@ -29,6 +29,7 @@ function Invoke-NativeDataCheck([string[]]$TaskArguments) {
     return $script:verificationData
 }
 try {
+    if (-not $runLogButton) { throw 'Visible runtime log entry missing' }
     Push-Location (Join-Path $root 'server')
     try {
         & node dist/scripts/migrate.js | Out-Null
@@ -39,6 +40,12 @@ try {
     foreach ($scale in @(0.85,1.0,1.15)) {
         Set-FontScale $scale
         Update-Layout
+        foreach ($size in @($form.Size,$form.MinimumSize)) {
+            $form.Size=$size; Update-Layout
+            if (-not $runLogButton.Enabled -or $runLogButton.Bottom -gt $dataHint.Top -or $runLogButton.Top -lt ($dataButtons | Measure-Object Bottom -Maximum).Maximum) { throw 'Runtime log entry overlaps data controls or footer' }
+            $logSize=[Windows.Forms.TextRenderer]::MeasureText($runLogButton.Text,$runLogButton.Font)
+            if($logSize.Height -gt $runLogButton.Height - (Ui 6)){throw 'Runtime log button label clipped'}
+        }
         $reference = $dataButtons[0].Size
         foreach ($button in $dataButtons) {
             if ($button.Size -ne $reference) { throw 'Data buttons have inconsistent sizes' }
@@ -115,7 +122,13 @@ try {
             }
         }
     })
-    $logCheckTimer.Start(); Open-RunLog; $logCheckTimer.Dispose()
+    foreach($state in @('stopped','starting','failed','running')) {
+        Set-LauncherState $state
+        if(-not $runLogButton.Enabled){throw 'Log entry disabled during service transition'}
+        $logCheckTimer.Start()
+        [void][Windows.Forms.Control].GetMethod('OnClick',[Reflection.BindingFlags]'Instance,NonPublic').Invoke($runLogButton,@([EventArgs]::Empty))
+    }
+    $logCheckTimer.Dispose()
     if (-not $script:logDialogChecked) { throw ('Log layout check failed: ' + $script:verificationError) }
     $button = $dataButtons[0]; $originalBounds = $button.Bounds; $normal = $button.BackColor.ToArgb()
     $raiseEnter = [Windows.Forms.Control].GetMethod('OnMouseEnter',[Reflection.BindingFlags]'Instance,NonPublic')

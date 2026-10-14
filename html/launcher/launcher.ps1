@@ -248,9 +248,9 @@ $form = New-Object System.Windows.Forms.Form
 $form.SuspendLayout()
 [Windows.Forms.Control].GetProperty('DoubleBuffered',[Reflection.BindingFlags]'Instance,NonPublic').SetValue($form,$true,$null)
 $form.Text = '绘梦儿童管理网站 · 服务控制中心'
-$form.ClientSize = Ui-Size 560 505
-$form.MinimumSize = Ui-Size 560 545
-$form.MaximumSize = Ui-Size 1000 720
+$form.ClientSize = Ui-Size 560 565
+$form.MinimumSize = Ui-Size 560 605
+$form.MaximumSize = Ui-Size 1000 780
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
 $form.SizeGripStyle = [System.Windows.Forms.SizeGripStyle]::Show
@@ -367,6 +367,10 @@ $form.Controls.Add($stopButton)
 $settingsTip.SetToolTip($stopButton, '关闭网站与 Android 共用服务；关闭网页不会自动停止服务')
 
 . (Join-Path $baseDir 'maintenance-ui.ps1')
+$runLogButton = New-ServiceButton '运行日志' '#EEEAFB' '#5848AD' '#E2DCF6'
+$runLogButton.Add_Click({ Open-RunLog })
+$form.Controls.Add($runLogButton)
+$dataHint.Top = Ui 525
 
 function Update-Layout {
     $clientWidth = $form.ClientSize.Width
@@ -400,6 +404,10 @@ function Update-Layout {
     Set-RoundedRegion $settingsButton 10
     Set-RoundedRegion $startButton 12
     Set-RoundedRegion $stopButton 12
+    $runLogButton.Location = Ui-Point 24 466
+    $runLogButton.Size = [Drawing.Size]::new($buttonsWidth,(Ui 42))
+    Set-ControlFont $runLogButton 14 ([Drawing.FontStyle]::Regular)
+    Set-RoundedRegion $runLogButton 10
 }
 
 function Set-FontScale([double]$scale) {
@@ -412,6 +420,7 @@ function Set-FontScale([double]$scale) {
     Set-ControlFont $statusBadge 14 ([System.Drawing.FontStyle]::Regular)
     Set-ControlFont $startButton 17 ([System.Drawing.FontStyle]::Regular)
     Set-ControlFont $stopButton 17 ([System.Drawing.FontStyle]::Regular)
+    Set-ControlFont $runLogButton 14 ([System.Drawing.FontStyle]::Regular)
     Set-Content -Path $fontScalePath -Value $scale.ToString([System.Globalization.CultureInfo]::InvariantCulture) -Encoding Ascii
 }
 
