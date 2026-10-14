@@ -1,4 +1,12 @@
-# 当前版本：1.0.36（2026-10-09）
+# 当前本地版本：1.1.0（2026-10-14，尚未发布）
+
+安装包：../output/local-first-1.1.0/huimeng-1.1.0.apk（versionCode 27）。Debug，API 为 http://10.0.2.2:3000/api/v1/。无需网络登录即可进入本地 SQLite 空间；前台关联网络账号后自动上传图片、操作并拉取确认快照。密码、注册仍须在线；付款、送审、发货等离线只保存意向。
+
+APK 内部版本和 v2 Debug 签名已核对。SHA-256：FA13A0513DD0E5ADA4051EA2C51C739D6384F4F235EF88B00BC7525AC1766B4E。assembleDebug、assembleDebugAndroidTest、lintDebug 通过；Lint 0 errors、496 warnings。新增本地与联调测试 28 项通过，既有回归结果见最终验证报告。没有以构建代替设备验证，也没有发布 GitHub Release。
+
+详细实现、当前验证和限制见 [验证报告](../docs/verification/2026-10-14-local-first-sync.md)。历史包与记录保留。
+
+# 上一版本：1.0.36（2026-10-09）
 
 安装包：../output/android-1.0.36/huimeng-1.0.36.apk（versionCode 26）。保持当前界面、操作、接口和刷新时序；优化购物车直接读取、封面绘制对象、评论格式器、图片地址前缀及搜索状态读取，移除不可达分类弹窗。网页复用金额格式器和同步订阅，减少筛选/图表重算；API 复用固定 SQL 执行器，仍实时查库确认权限。
 
