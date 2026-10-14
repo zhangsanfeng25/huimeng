@@ -61,7 +61,8 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         Field token = SessionStore.class.getDeclaredField("temporaryToken"); token.setAccessible(true);
         previousTemporaryToken = (String)token.get(null);
         new SessionStore(context);token.set(null,"device-test");
-        preferences.edit().putString("role","USER").putString("account_id","device-test").commit();
+        getInstrumentation().runOnMainSync(()->com.huimeng.bookshop.core.sync.SyncCoordinator.get(context).stop());
+        preferences.edit().putBoolean("local_ready",false).remove("local_space").putString("role","USER").putString("account_id","device-test").commit();
         HuiMengApp app = (HuiMengApp)context.getApplicationContext();
         Field requests = HuiMengApp.class.getDeclaredField("requestQueue"); requests.setAccessible(true);
         previousQueue = (RequestQueue)requests.get(app);

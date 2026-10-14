@@ -1,6 +1,6 @@
 import { resolve, join, dirname, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
@@ -8,14 +8,17 @@ const launcherDir = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const projectRoot = resolve(launcherDir, '../..');
 function fingerprint(root, paths) {
   const hash = createHash('sha256').update(process.version);
-  function visit(path) {
-    if (!existsSync(path)) { hash.update('missing:' + relative(root,path)); return; }
-    const entries = (() => { try { return readdirSync(path, { withFileTypes:true }); } catch (error) { if (error.code === 'ENOTDIR') return null; throw error; } })();
-    if (entries) {
-      for (const entry of entries.sort((a,b) => a.name.localeCompare(b.name))) {
-        if (entry.name === 'launcher-build.json') continue;
-        if (entry.isSymbolicLink()) throw new Error('Build inputs cannot contain symbolic links');
-        visit(join(path,entry.name));
+  function visit(path, entry) {
+    let info=entry;
+    if (!info) {
+      try { info=lstatSync(path); }
+      catch (error) { if(error.code==='ENOENT'){hash.update('missing:' + relative(root,path));return;}throw error; }
+    }
+    if (info.isSymbolicLink()) throw new Error('Build inputs cannot contain symbolic links');
+    if (info.isDirectory()) {
+      for (const child of readdirSync(path,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))) {
+        if (child.name==='launcher-build.json') continue;
+        visit(join(path,child.name),child);
       }
     } else hash.update(relative(root,path)).update('\0').update(readFileSync(path)).update('\0');
   }

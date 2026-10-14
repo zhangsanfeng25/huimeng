@@ -49,4 +49,11 @@ public class LocalFirstFlowTest extends InstrumentationTestCase {
   String label=((android.widget.TextView)activity.findViewById(com.huimeng.bookshop.R.id.status)).getText().toString();assertTrue(label,label.contains("待联网确认"));screenshot("pending-order.png");getInstrumentation().runOnMainSync(()->activity.finish());
   activity=getInstrumentation().startActivitySync(new Intent(context,SyncStatusActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));getInstrumentation().waitForIdleSync();Thread.sleep(500);screenshot("sync-status.png");assertFalse(activity.isFinishing());
  }
+ public void testOriginalPublicDataAndServiceWithoutLogin()throws Exception{
+  java.util.concurrent.CountDownLatch ready=new java.util.concurrent.CountDownLatch(1);java.util.concurrent.atomic.AtomicReference<String> error=new java.util.concurrent.atomic.AtomicReference<>("");LocalRepository.prepare(context,ready::countDown,message->{error.set(message);ready.countDown();});assertTrue(ready.await(10,java.util.concurrent.TimeUnit.SECONDS));assertEquals("",error.get());String space=new SessionStore(context).localSpaceId();launch(space);
+  assertTrue("Original products must replace the one-book sample",db.list(space,"products").length()>1);assertTrue(db.list(space,"posts").length()>0);assertTrue(db.list(space,"notifications").length()>0);assertNull(db.entity(space,"products","sample-book"));assertTrue(new SessionStore(context).token().isEmpty());
+  int oldBanner=context.getResources().getIdentifier("syncStatus","id",context.getPackageName());assertTrue(oldBanner==0||activity.findViewById(oldBanner)==null);
+  long until=System.currentTimeMillis()+10000;while(!db.metadata("service-connected:"+space).equals("1")&&System.currentTimeMillis()<until)Thread.sleep(100);assertEquals("Service health must be detected without login","1",db.metadata("service-connected:"+space));screenshot("recovery-home.png");
+  getInstrumentation().runOnMainSync(()->activity.finish());activity=getInstrumentation().startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));assertNotNull(activity.findViewById(com.huimeng.bookshop.R.id.localSync));screenshot("recovery-settings.png");
+ }
 }

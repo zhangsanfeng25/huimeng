@@ -52,6 +52,7 @@ public final class ApiClient {
         if(value==null||value.trim().isEmpty())return "";
         if(value.startsWith("http://")||value.startsWith("https://"))return value;
         if(value.startsWith("file://")||value.startsWith("android.resource://"))return value;
+        String offline=com.huimeng.bookshop.core.local.LocalBootstrap.asset(value);if(!offline.isEmpty())return offline;
         return ASSET_ORIGIN+(value.startsWith("/")?value:"/"+value);
     }
     private void request(int method,String path,JSONObject body,Consumer<JSONObject> success,Consumer<String> failure){

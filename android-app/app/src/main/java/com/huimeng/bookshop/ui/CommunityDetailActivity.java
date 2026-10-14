@@ -2,7 +2,7 @@ package com.huimeng.bookshop.ui;
 
 import android.animation.ObjectAnimator;
 import android.content.Intent;
-import com.huimeng.bookshop.R;
+
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;

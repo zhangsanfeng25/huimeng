@@ -125,7 +125,7 @@ public class LoginActivity extends AppCompatActivity {
             String space=spaces.ensureActiveSpace();JSONObject info=spaces.info(space);String origin=com.huimeng.bookshop.BuildConfig.API_BASE_URL,owner=info.optString("userId");
             if(!owner.isEmpty()&&(!owner.equals(user.optString("id"))||!origin.equals(info.optString("origin"))))space=spaces.forAccount(origin,user.optString("id"));
             else space=spaces.bind(space,origin,user.optString("id"));
-            spaces.select(space);spaces.role(space,requestedRole);com.huimeng.bookshop.core.local.SampleCatalog.seed(db,space);db.saveConfirmed(space,"profile","self",user,user.optLong("version"));
+            spaces.select(space);spaces.role(space,requestedRole);com.huimeng.bookshop.core.local.LocalBootstrap.prepare(this,db,space);db.saveConfirmed(space,"profile","self",user,user.optLong("version"));
             final String selectedSpace=space;
             runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){com.huimeng.bookshop.core.sync.SyncCoordinator.get(this).stop();session.save(result.optString("token"),requestedRole,user.optString("name"),canMerchant,user.optString("id"),user.optString("username"),remember);session.localSpace(selectedSpace);session.setAvatarUrl(user.optString("avatarUrl"));ApiClient.resetSessionRedirect();openMain();}});
         }catch(Exception e){runOnUiThread(()->{setLoginBusy(false);binding.message.setText("关联未完成，本地数据已保留："+e.getMessage());});}});

@@ -3,7 +3,7 @@ package com.huimeng.bookshop.ui;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
+
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PathMeasure;

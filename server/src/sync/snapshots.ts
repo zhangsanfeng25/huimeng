@@ -6,7 +6,7 @@ import {merchantApplication} from '../services/merchant-data.js';
 import {visibleNotices} from '../services/notice-data.js';
 import {SyncError,type Actor} from './types.js';
 
-function resources(actor:Actor,resource:string):any[]{
+export function readSyncResources(actor:Actor,resource:string):any[]{
  const products=()=>db.prepare(`${productSelect.replace('SELECT p.id,','SELECT p.id,p.version,p.created_at createdAt,p.updated_at updatedAt,')} WHERE p.status='ONLINE'`).all();
  switch(resource){
   case 'categories':return db.prepare("SELECT id,name,parent_name parent,sort_order sort FROM categories WHERE status='ENABLED' ORDER BY sort_order,id").all();
@@ -35,6 +35,6 @@ export function snapshotPage(actor:Actor,resource:string,offset:number,limit:num
  if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>100)throw new SyncError(400,'INVALID_PAGE','快照分页格式不正确');
  let rows:any[],id=snapshotId;
  if(id){const row=db.prepare('SELECT data_json FROM sync_snapshots WHERE id=? AND user_id=? AND resource=? AND expires_at>?').get(id,actor.id,resource,now()) as {data_json:string}|undefined;if(!row)throw new SyncError(409,'SNAPSHOT_EXPIRED','快照已过期或不存在，请重新同步');rows=JSON.parse(row.data_json);}
- else {if(offset!==0)throw new SyncError(400,'INVALID_PAGE','新快照须从第一页开始');rows=db.transaction(()=>resources(actor,resource))();id=randomUUID();db.prepare('DELETE FROM sync_snapshots WHERE expires_at<=?').run(now());db.prepare('INSERT INTO sync_snapshots(id,user_id,resource,data_json,expires_at) VALUES(?,?,?,?,?)').run(id,actor.id,resource,JSON.stringify(rows),new Date(Date.now()+15*60_000).toISOString());}
+ else {if(offset!==0)throw new SyncError(400,'INVALID_PAGE','新快照须从第一页开始');rows=db.transaction(()=>readSyncResources(actor,resource))();id=randomUUID();db.prepare('DELETE FROM sync_snapshots WHERE expires_at<=?').run(now());db.prepare('INSERT INTO sync_snapshots(id,user_id,resource,data_json,expires_at) VALUES(?,?,?,?,?)').run(id,actor.id,resource,JSON.stringify(rows),new Date(Date.now()+15*60_000).toISOString());}
  const next=offset+limit;return {snapshotId:id!,items:rows.slice(offset,next),nextOffset:next<rows.length?next:null,complete:next>=rows.length};
 }

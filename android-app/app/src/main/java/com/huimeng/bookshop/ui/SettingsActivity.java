@@ -13,6 +13,7 @@ public class SettingsActivity extends AppCompatActivity{
     private ActivitySettingsBinding binding;private AppearanceStore store;private WallpaperStore wallpapers;private boolean ready;
     @Override protected void onCreate(Bundle state){super.onCreate(state);
         binding=ActivitySettingsBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
+        binding.localSync.setOnClickListener(v->startActivity(new android.content.Intent(this,SyncStatusActivity.class)));
         binding.changeAvatar.setOnClickListener(v->startActivity(new android.content.Intent(this,EditAccountActivity.class)));
         store=new AppearanceStore(this);wallpapers=new WallpaperStore(this);binding.back.setOnClickListener(v->finish());
         String value=store.theme();binding.themeGroup.check(AppearanceStore.LIGHT.equals(value)?binding.light.getId():AppearanceStore.DARK.equals(value)?binding.dark.getId():binding.system.getId());

@@ -44,3 +44,6 @@ server/uploads/*
 # OS-generated files
 Thumbs.db
 .DS_Store
+
+# Actual offline content is generated locally; never commit user data.
+android-app/app/src/main/assets/bootstrap/

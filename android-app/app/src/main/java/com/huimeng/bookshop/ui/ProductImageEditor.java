@@ -4,7 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.view.View;
+
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.ImageView;
@@ -20,11 +20,11 @@ import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 import com.huimeng.bookshop.R;
 import com.huimeng.bookshop.core.ApiClient;
-import com.android.volley.Request;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
-import java.io.File;
-import java.nio.file.Files;
+
+
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.List;

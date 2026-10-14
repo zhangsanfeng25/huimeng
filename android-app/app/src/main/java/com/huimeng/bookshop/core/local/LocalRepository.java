@@ -14,8 +14,7 @@ import java.util.concurrent.Executors;
 public final class LocalRepository {
     public static final ExecutorService IO=Executors.newSingleThreadExecutor();
     private static final Handler MAIN=new Handler(Looper.getMainLooper());
-    private final LocalDatabase db;
-    public LocalRepository(Context context){db=LocalDatabase.get(context);}
+    private LocalRepository(){}
     public static void request(Context context,int method,String path,JSONObject body,Consumer<JSONObject> ok,Consumer<String> fail){
         SessionStore session=new SessionStore(context);String space=session.localSpaceId();IO.execute(()->{try{
             JSONObject result=new LocalApi(LocalDatabase.get(context),space).handle(method,path,body);
@@ -27,12 +26,10 @@ public final class LocalRepository {
         if(!session.accountId().isEmpty()&&!session.token().isEmpty()&&spaces.info(space).optString("userId").isEmpty()){
             space=spaces.bind(space,BuildConfig.API_BASE_URL,session.accountId());spaces.select(space);
         }
-        SampleCatalog.seed(db,space);
+        LocalBootstrap.prepare(context,db,space);
         if(db.entity(space,"profile","self")==null)db.saveConfirmed(space,"profile","self",new JSONObject().put("id",session.accountId().isEmpty()?space:session.accountId()).put("username",session.username().isEmpty()?"local_reader":session.username()).put("name",session.name()).put("avatarUrl",session.avatarUrl()).put("roles",new JSONArray().put("USER")).put("activeRole",spaces.info(space).optString("role","USER")),0);
         String legacy=context.getSharedPreferences("huimeng_cart",0).getString("cart_"+session.accountId(),"[]");
         db.importLegacyCart(session.accountId(),space,new JSONArray(legacy));
         session.localSpace(space);MAIN.post(ready);
     }catch(Exception e){MAIN.post(()->fail.accept("本地数据准备失败，原数据已保留："+e.getMessage()));}});}
-    public void query(String space,String resource,JSONObject filter,Consumer<JSONObject> ok,Consumer<String> fail){IO.execute(()->{try{JSONObject result=new JSONObject().put("data",filter.has("id")?db.entity(space,resource,filter.optString("id")):db.list(space,resource));MAIN.post(()->ok.accept(result));}catch(Exception e){MAIN.post(()->fail.accept(e.getMessage()));}});}
-    public void mutate(String space,String action,JSONObject payload,Consumer<JSONObject> ok,Consumer<String> fail){IO.execute(()->{try{String id=payload.optString("id",java.util.UUID.randomUUID().toString());String resource=payload.getString("resource");String operation=db.mutate(space,resource,id,action,payload,payload.optBoolean("sample"));JSONObject result=new JSONObject().put("id",id).put("operationId",operation).put("syncState","PENDING");MAIN.post(()->ok.accept(result));}catch(Exception e){MAIN.post(()->fail.accept(e.getMessage()));}});}
 }

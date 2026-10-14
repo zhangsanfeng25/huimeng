@@ -20,8 +20,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(state);session=new SessionStore(this);
         if(!session.hasLocalSpace()&&session.token().isEmpty()){startActivity(new Intent(this,WelcomeActivity.class));finish();return;}
         binding=ActivityMainBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
-        binding.syncStatus.setOnClickListener(v->startActivity(new Intent(this,SyncStatusActivity.class)));
-        com.huimeng.bookshop.core.sync.SyncStatusStore.observe(this,status->{binding.syncStatus.setText(status.optString("message","本地模式")+" · 待处理 "+status.optInt("pending")+" ›");refreshVisibleLocalData();});
+        com.huimeng.bookshop.core.sync.SyncStatusStore.observe(this,status->refreshVisibleLocalData());
         buildNavigation(binding.bottomNav,session.role());
         binding.bottomNav.setBackgroundTintList(null);
         binding.bottomNav.setItemActiveIndicatorColor(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(this,R.color.nav_indicator)));

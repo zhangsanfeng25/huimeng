@@ -8,7 +8,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import com.huimeng.bookshop.R;
+
 import com.huimeng.bookshop.core.ApiClient;
 import com.huimeng.bookshop.core.SessionStore;
 import com.huimeng.bookshop.databinding.FragmentProfileBinding;

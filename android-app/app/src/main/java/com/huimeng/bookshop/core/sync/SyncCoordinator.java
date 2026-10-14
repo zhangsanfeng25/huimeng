@@ -24,12 +24,18 @@ public final class SyncCoordinator {
  public void requestSync(){if(Looper.myLooper()!=Looper.getMainLooper()){main.post(this::requestSync);return;}if(!running||busy)return;busy=true;int g=generation;String captured=space;
   LocalRepository.IO.execute(()->{try{
    if(!valid(g))return;LocalDatabase db=LocalDatabase.get(context);JSONObject binding=new LocalSpaceStore(db).info(captured);String user=binding.optString("userId");
-   if(user.isEmpty()){finish(g,"本地模式 · 尚未关联网络账号",15000);return;}
-   SessionStore session=new SessionStore(context);if(!BuildConfig.API_BASE_URL.equals(binding.optString("origin"))){finish(g,"服务地址与本地账号绑定不一致",15000);return;}
-   if(session.token().isEmpty()){finish(g,"本地模式 · 需登录网络账号后同步",15000);return;}
-   main.post(()->{if(!valid(g))return;transport.json(0,"health",null,health->{if(!valid(g))return;transport.json(0,"auth/me",null,result->{if(!valid(g))return;JSONObject profile=result.optJSONObject("user");if(profile==null||!user.equals(profile.optString("id"))){finish(g,"网络账号与本地空间不匹配，已暂停上传",15000);return;}
-    LocalRepository.IO.execute(()->{if(!valid(g))return;db.getWritableDatabase().execSQL("UPDATE sync_operations SET state='PENDING' WHERE space_id=? AND state='WAITING_AUTH'",new Object[]{captured});uploadMedia(g);});
-   },error->networkFailure(g,error));},error->networkFailure(g,error));});
+   main.post(()->{if(!valid(g))return;transport.json(0,"health",null,health->{if(!valid(g))return;
+    LocalRepository.IO.execute(()->{if(!valid(g))return;db.metadata("service-connected:"+captured,"1");main.post(()->{
+     if(!valid(g))return;
+     if(user.isEmpty()){finish(g,"服务已连接 · 关联原网络账号后上传本地修改",15000);return;}
+     SessionStore session=new SessionStore(context);
+     if(!BuildConfig.API_BASE_URL.equals(binding.optString("origin"))){finish(g,"服务地址与本地账号绑定不一致",15000);return;}
+     if(session.token().isEmpty()){finish(g,"服务已连接 · 登录原账号后同步个人数据",15000);return;}
+     transport.json(0,"auth/me",null,result->{if(!valid(g))return;JSONObject profile=result.optJSONObject("user");if(profile==null||!user.equals(profile.optString("id"))){finish(g,"网络账号与本地空间不匹配，已暂停上传",15000);return;}
+      LocalRepository.IO.execute(()->{if(!valid(g))return;db.getWritableDatabase().execSQL("UPDATE sync_operations SET state='PENDING' WHERE space_id=? AND state='WAITING_AUTH'",new Object[]{captured});uploadMedia(g);});
+     },error->networkFailure(g,error));
+    });});
+   },error->{LocalRepository.IO.execute(()->{if(valid(g))db.metadata("service-connected:"+captured,"0");});networkFailure(g,error);});});
   }catch(Exception e){finish(g,"同步准备失败："+e.getMessage(),15000);}});
  }
  private boolean valid(int g){return running&&generation==g&&space.equals(new SessionStore(context).localSpaceId());}

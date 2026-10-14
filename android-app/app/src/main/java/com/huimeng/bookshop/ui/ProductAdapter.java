@@ -6,7 +6,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
-import com.huimeng.bookshop.R;
+
 import com.huimeng.bookshop.core.ApiClient;
 import com.huimeng.bookshop.databinding.ItemProductBinding;
 import com.huimeng.bookshop.model.Product;
