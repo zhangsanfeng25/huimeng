@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,utimesSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { prepareProject } from '../html/launcher/prepare.mjs';
+
+const root=mkdtempSync(join(tmpdir(),'huimeng-prepare-'));
+for(const workspace of ['server','html']){
+  mkdirSync(join(root,workspace,'src'),{recursive:true});
+  writeFileSync(join(root,workspace,'src/main.ts'),'original');
+  writeFileSync(join(root,workspace,'package.json'),'{}');
+}
+writeFileSync(join(root,'package.json'),'{}');writeFileSync(join(root,'package-lock.json'),'{}');
+let builds=[],databases=0;
+const hooks={build(workspace){builds.push(workspace);mkdirSync(join(root,workspace,'dist'),{recursive:true});writeFileSync(join(root,workspace,'dist',workspace==='html'?'index.html':'main.js'),'valid');},async database(){databases++;}};
+assert.deepEqual((await prepareProject(root,hooks)).built,['server','html']);
+assert.deepEqual((await prepareProject(root,hooks)).built,[]);
+assert.equal(databases,2);
+writeFileSync(join(root,'html/src/main.ts'),'changed');
+assert.deepEqual((await prepareProject(root,hooks)).built,['html']);
+const file=join(root,'server/dist/main.js'),old=statSync(file);
+writeFileSync(file,'broken');utimesSync(file,old.atime,old.mtime);
+assert.deepEqual((await prepareProject(root,hooks)).built,['server']);
+const before=builds.length;
+writeFileSync(join(root,'html/src/main.ts'),'changed-again');
+await assert.rejects(prepareProject(root,{...hooks,async database(){throw new Error('migration failed');}}),/migration failed/);
+assert.equal(builds.length,before,'Database failure must block website preparation');
+assert.equal(readFileSync(join(root,'server/dist/main.js'),'utf8'),'valid');
+const project=fileURLToPath(new URL('..',import.meta.url));
+const Database=createRequire(new URL('../server/package.json',import.meta.url))('better-sqlite3');
+const databasePath=join(root,'seed-test.db');
+const seed=()=>{for(const script of ['migrate','seed']){const result=spawnSync(process.execPath,[`dist/scripts/${script}.js`],{cwd:join(project,'server'),env:{...process.env,DATABASE_PATH:databasePath,UPLOAD_DIR:join(root,'uploads')},encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stdout+result.stderr);}};
+seed();let db=new Database(databasePath);db.prepare("UPDATE users SET nickname='preserved' WHERE id='U10001'").run();db.prepare("UPDATE products SET stock_available=37 WHERE id='P0002'").run();db.close();seed();db=new Database(databasePath);
+assert.equal(db.prepare("SELECT nickname FROM users WHERE id='U10001'").get().nickname,'preserved');
+assert.equal(db.prepare("SELECT stock_available FROM products WHERE id='P0002'").get().stock_available,37);db.close();
+console.log('Startup preparation passed: verified reuse, targeted rebuild, content corruption, database failure, repeat seed preserves business edits; fixture retained:',root);

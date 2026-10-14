@@ -1,5 +1,5 @@
 import { resolve, join, dirname, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -49,8 +49,31 @@ export function ensureBuild(root, workspace, build) {
   writeFileSync(marker, JSON.stringify({ inputHash, outputHash:fingerprint(root,[`${workspace}/dist`]) }) + '\n');
   return true;
 }
+export async function prepareProject(root, hooks = {}) {
+  const stages = [], built = [];
+  async function stage(name, action) {
+    const started = performance.now();
+    await action();
+    const durationMs = Math.round((performance.now() - started) * 100) / 100;
+    stages.push({ name, durationMs });
+    console.log(`[${new Date().toISOString()}] ${name}: ${durationMs}ms`);
+  }
+  await stage('server', () => { if (ensureBuild(root, 'server', hooks.build ? () => hooks.build('server') : undefined)) built.push('server'); });
+  await stage('database', async () => {
+    if (hooks.database) return hooks.database();
+    const previous = process.cwd();
+    try {
+      process.chdir(resolve(root, 'server'));
+      await import(pathToFileURL(resolve(root, 'server/dist/scripts/migrate.js')).href);
+      await import(pathToFileURL(resolve(root, 'server/dist/scripts/seed.js')).href);
+    } finally { process.chdir(previous); }
+  });
+  await stage('html', () => { if (ensureBuild(root, 'html', hooks.build ? () => hooks.build('html') : undefined)) built.push('html'); });
+  return { stages, built };
+}
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv[2] === '--build') ensureBuild(projectRoot,process.argv[3]);
+  if (process.argv[2] === '--prepare') await prepareProject(projectRoot);
+  else if (process.argv[2] === '--build') ensureBuild(projectRoot,process.argv[3]);
   else {
     process.chdir(resolve(projectRoot,'server'));
     await import('../../server/dist/scripts/migrate.js');

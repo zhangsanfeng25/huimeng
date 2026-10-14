@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=html && npm run build --workspace=server",
-    "test": "npm run test --workspace=server && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-launcher-logs.ps1 && npm run test:realtime --workspace=server && node server/scripts/test-maintenance.mjs && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-launcher-layout.ps1 && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-launcher-responsiveness.ps1",
+    "test": "npm run test --workspace=server && node scripts/test-launcher-startup.mjs && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-launcher-logs.ps1 && npm run test:realtime --workspace=server && node server/scripts/test-maintenance.mjs && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-launcher-layout.ps1 && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-launcher-responsiveness.ps1",
     "lint": "npm run lint --workspaces --if-present",
     "db:init": "npm run db:migrate --workspace=server && npm run db:seed --workspace=server",
     "start": "npm run start --workspace=server"

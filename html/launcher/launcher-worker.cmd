@@ -52,30 +52,14 @@ if errorlevel 1 goto install_error
 
 :prepare
 if not exist "%SERVER_ROOT%\.env" copy "%SERVER_ROOT%\.env.example" "%SERVER_ROOT%\.env" >>"%LOG_FILE%" 2>&1
-goto build_api
+goto prepare_project
 
-:migrate
-echo [%date% %time%] Checking shared database and demo data...>>"%LOG_FILE%"
-cd /d "%SERVER_ROOT%"
-"%NODE_EXE%" "%HTML_ROOT%\launcher\prepare.mjs" >>"%LOG_FILE%" 2>&1
-if errorlevel 1 goto database_error
-
-goto build_site
-
-:build_api
-if not defined NPM_CMD goto npm_missing
-echo [%date% %time%] Building API...>>"%LOG_FILE%"
+:prepare_project
+echo [%date% %time%] Verifying builds and preparing shared database...>>"%LOG_FILE%"
 cd /d "%PROJECT_ROOT%"
-"%NODE_EXE%" "%HTML_ROOT%\launcher\prepare.mjs" --build server >>"%LOG_FILE%" 2>&1
+"%NODE_EXE%" "%HTML_ROOT%\launcher\prepare.mjs" --prepare >>"%LOG_FILE%" 2>&1
 if errorlevel 1 goto build_error
-goto migrate
-
-:build_site
-if not defined NPM_CMD goto npm_missing
-echo [%date% %time%] Building admin website...>>"%LOG_FILE%"
-cd /d "%PROJECT_ROOT%"
-"%NODE_EXE%" "%HTML_ROOT%\launcher\prepare.mjs" --build html >>"%LOG_FILE%" 2>&1
-if errorlevel 1 goto build_error
+goto start_service
 
 :start_service
 echo [%date% %time%] Shared service: http://127.0.0.1:3000 ; Android emulator: http://10.0.2.2:3000 >>"%LOG_FILE%"
