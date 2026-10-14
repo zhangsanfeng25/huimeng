@@ -1,0 +1,14 @@
+import {Router} from 'express';
+import {z} from 'zod';
+import {requireAuth} from '../core/http.js';
+import {executeOnce} from '../sync/receipts.js';
+import {SyncError,type SyncEnvelope} from '../sync/types.js';
+import express from 'express';
+import {saveMedia} from '../sync/media.js';
+import {snapshotPage} from '../sync/snapshots.js';
+export const syncRouter=Router();
+syncRouter.use('/sync',requireAuth('USER','MERCHANT'));
+const envelope=z.object({protocolVersion:z.literal(1),clientId:z.string().min(1).max(100),operationId:z.string().min(1).max(100),action:z.string().min(1).max(80),entityId:z.string().max(100).optional(),baseVersion:z.number().int().nonnegative().optional(),payload:z.record(z.string(),z.unknown()),payloadHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
+syncRouter.post('/sync/operations',(req,res,next)=>{const parsed=envelope.safeParse(req.body);if(!parsed.success)return res.status(400).json({code:'INVALID_OPERATION',message:'同步请求格式错误'});try{return res.json(executeOnce(req.actor!,parsed.data as SyncEnvelope));}catch(error){if(error instanceof SyncError)return res.status(error.status).json({code:error.code,message:error.message,detail:error.detail});return next(error);}});
+syncRouter.post('/sync/media',express.raw({type:'image/jpeg',limit:'3mb'}),(req,res,next)=>{try{res.json(saveMedia(req.actor!,String(req.headers['x-operation-id']||''),String(req.headers['x-media-purpose']||''),String(req.headers['x-content-sha256']||''),req.body));}catch(error){if(error instanceof SyncError)return res.status(error.status).json({code:error.code,message:error.message});return next(error);}});
+syncRouter.get('/sync/snapshots/:resource',(req,res,next)=>{try{res.json(snapshotPage(req.actor!,String(req.params.resource),Number(req.query.offset||0),Number(req.query.limit||100),req.query.snapshotId?String(req.query.snapshotId):undefined));}catch(error){if(error instanceof SyncError)return res.status(error.status).json({code:error.code,message:error.message});return next(error);}});

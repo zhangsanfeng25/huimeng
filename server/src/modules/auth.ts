@@ -1,3 +1,5 @@
+import {businessRoute} from '../services/context.js';
+import {profileAvatar,profileSave} from '../services/profile.js';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
@@ -6,7 +8,7 @@ import { asyncRoute, audit, requireAuth } from '../core/http.js';
 import { createToken, hashPassword, hashToken, verifyPassword } from '../core/security.js';
 import { config } from '../config.js';
 import { broadcast } from '../core/events.js';
-import { defaultAvatars, isDefaultAvatar, leastUsedDefaultAvatar } from '../core/default-avatars.js';
+import {defaultAvatars,leastUsedDefaultAvatar} from '../core/default-avatars.js';
 
 export const authRouter=Router();
 const loginLimit=rateLimit({windowMs:60_000,limit:8,standardHeaders:'draft-8',legacyHeaders:false,message:{message:'登录尝试过多，请稍后再试'}});
@@ -27,7 +29,7 @@ authRouter.post('/login',loginLimit,asyncRoute(async(req,res)=>{
   db.prepare('DELETE FROM sessions WHERE expires_at<=?').run(now());
   db.prepare('INSERT INTO sessions(token_hash,user_id,active_role,expires_at,created_at) VALUES(?,?,?,?,?)').run(hashToken(token),user.id,activeRole,expiresAt,now());
   audit(user.id,user.nickname,'账户','登录',user.username);
-  return res.json({token,expiresAt,user:{id:user.id,username:user.username,name:user.nickname,avatarUrl:user.avatar_url||'',roles,activeRole}});
+  return res.json({token,expiresAt,user:{id:user.id,username:user.username,name:user.nickname,avatarUrl:user.avatar_url||'',roles,activeRole,version:user.version}});
 }));
 
 authRouter.post('/register',loginLimit,asyncRoute(async(req,res)=>{
@@ -51,8 +53,8 @@ authRouter.post('/forgot-password',loginLimit,(_req,res)=>{
 });
 
 authRouter.get('/me',requireAuth(),(req,res)=>{
-  const profile=db.prepare('SELECT username,nickname,avatar_url FROM users WHERE id=?').get(req.actor!.id) as {username:string,nickname:string,avatar_url:string|null};
-  res.json({user:{...req.actor,username:profile.username,name:profile.nickname,avatarUrl:profile.avatar_url||''}});
+  const profile=db.prepare('SELECT username,nickname,avatar_url,version FROM users WHERE id=?').get(req.actor!.id) as {username:string,nickname:string,avatar_url:string|null,version:number};
+  res.json({user:{...req.actor,username:profile.username,name:profile.nickname,avatarUrl:profile.avatar_url||'',version:profile.version}});
 });
 
 authRouter.post('/switch-role',requireAuth(),(req,res)=>{
@@ -64,42 +66,8 @@ authRouter.post('/switch-role',requireAuth(),(req,res)=>{
   res.json({activeRole:parsed.data.role,roles:req.actor!.roles});
 });
 authRouter.get('/default-avatars',requireAuth(),(_req,res)=>res.json({data:defaultAvatars}));
-authRouter.put('/me/avatar',requireAuth(),asyncRoute(async(req,res)=>{
-  const parsed=z.object({avatarUrl:z.string().max(200)}).safeParse(req.body);
-  if(!parsed.success)return res.status(400).json({message:'请选择默认头像或上传裁剪后的头像'});
-  if(!isDefaultAvatar(parsed.data.avatarUrl)){
-    if(!/^\/public\/community-[a-f0-9-]+\.jpg$/.test(parsed.data.avatarUrl))return res.status(400).json({message:'请选择默认头像或上传裁剪后的头像'});
-    const owned=db.prepare('SELECT 1 FROM community_uploads WHERE path=? AND user_id=?').get(parsed.data.avatarUrl,req.actor!.id);
-    if(!owned)return res.status(403).json({message:'只能使用本人上传的图片'});
-  }
-  db.prepare('UPDATE users SET avatar_url=?,updated_at=? WHERE id=?').run(parsed.data.avatarUrl,now(),req.actor!.id);
-  broadcast('users','update');broadcast('merchants','update');broadcast('community','update');
-  res.json({avatarUrl:parsed.data.avatarUrl});
-}));
-authRouter.put('/me',requireAuth(),asyncRoute(async(req,res)=>{
-  const parsed=z.object({username:z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),nickname:z.string().trim().min(1).max(30),currentPassword:z.string().min(1).max(64).optional(),newPassword:z.string().min(8).max(64).optional()})
-    .refine(value=>(value.currentPassword===undefined)===(value.newPassword===undefined)).safeParse(req.body);
-  if(!parsed.success)return res.status(400).json({message:'用户名需为 3 至 32 位字母、数字或下划线，昵称需为 1 至 30 字'});
-  const {username,nickname,currentPassword,newPassword}=parsed.data;
-  if(newPassword){
-    const user=db.prepare('SELECT password_hash FROM users WHERE id=?').get(req.actor!.id) as {password_hash:string};
-    if(!verifyPassword(currentPassword!,user.password_hash))return res.status(400).json({message:'当前密码不正确，账户信息未更改'});
-  }
-  const conflict=db.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?').get(username,req.actor!.id);
-  if(conflict)return res.status(409).json({message:'用户名已被使用'});
-  const passwordHash=newPassword?hashPassword(newPassword):undefined;
-  try{db.transaction(()=>{
-    db.prepare('UPDATE users SET username=?,nickname=?,updated_at=? WHERE id=?').run(username,nickname,now(),req.actor!.id);
-    if(passwordHash){
-      db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(passwordHash,req.actor!.id);
-      db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.actor!.id);
-    }
-    audit(req.actor!.id,nickname,'账户',passwordHash?'编辑信息及修改密码':'编辑信息',req.actor!.id);
-  })();}
-  catch(error:any){if(error?.code==='SQLITE_CONSTRAINT_UNIQUE')return res.status(409).json({message:'用户名已被使用'});throw error;}
-  broadcast('users','update');broadcast('merchants','update');broadcast('community','update');
-  res.json({user:{id:req.actor!.id,username,name:nickname},passwordChanged:Boolean(passwordHash)});
-}));
+authRouter.put('/me/avatar',requireAuth(),businessRoute(profileAvatar));
+authRouter.put('/me',requireAuth(),businessRoute(profileSave));
 authRouter.post('/logout',requireAuth(),(req,res)=>{
   const raw=req.headers.authorization?.replace(/^Bearer\s+/i,'')||'';
   db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hashToken(raw));
