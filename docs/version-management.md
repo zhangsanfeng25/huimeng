@@ -66,4 +66,4 @@ APK 等交付物通过仓库的 Release 附件或指定交付渠道上传，不�
 
 每份发布说明列出相对上一版的新增、修复或调整，以及版本号、构建类型、适用环境、验证记录、未解决问题和 SHA-256。先完成并核对 APK 附件，再发布 Release；发布后核对附件名称、大小和下载入口。历史 APK、Release 和标签保留，不覆盖附件或强制移动旧标签。
 
-当前安装包：GitHub [Android 1.0.36 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.36)，改动说明见 [android-1.0.36.md](releases/android-1.0.36.md)。此包为 Debug 模拟器演示包；1.0.33 Release 和本地 1.0.34/1.0.35 APK 保留。
+当前安装包：GitHub [Android 1.1.5 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.1.5)，改动说明见 [android-1.1.5.md](releases/android-1.1.5.md)。此包为 Debug 模拟器演示包；既有 GitHub 发行版、附件及本地历史 APK 均保留。

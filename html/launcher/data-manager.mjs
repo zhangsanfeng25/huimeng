@@ -125,7 +125,7 @@ async function restore(source) {
   rmSync(oldDatabase, { force: true }); removeTree(oldUploads, dirname(uploadsPath));
   return { restored: true, safetyBackup: safety.path, message: '恢复成功，请重新打开服务，网页和手机需重新登录。' };
 }
-const exportTables = ['users','merchants','categories','products','product_revisions','orders','order_items','ratings','community_posts','comments','notifications','audit_logs'];
+const exportTables = ['users','merchants','categories','products','product_revisions','orders','order_items','ratings','community_posts','comments','notifications','audit_logs','after_sales','after_sale_events','refunds','conversations','chat_messages','conversation_reads','feedbacks','feedback_replies'];
 function csv(value) {
   let text = value == null ? '' : String(value);
   if (/^[\s]*[=+@-]/.test(text)) text = "'" + text;

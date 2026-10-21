@@ -4,6 +4,7 @@
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
         <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/ic_back" android:background="@drawable/bg_search" android:padding="10dp" android:contentDescription="返回"/>
         <TextView android:id="@+id/title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="14dp" android:textColor="@color/ink" android:textSize="23sp" android:textStyle="bold"/>
+        <ImageButton android:id="@+id/search" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:src="@drawable/ic_search" android:background="@drawable/bg_search" android:padding="13dp" android:contentDescription="@string/browse_search" android:visibility="gone"/>
     </LinearLayout>
     <TextView android:id="@+id/subtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="@color/muted" android:textSize="14sp"/>
     <LinearLayout android:id="@+id/controls" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="12dp"/>

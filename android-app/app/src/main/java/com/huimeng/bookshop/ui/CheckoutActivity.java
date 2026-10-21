@@ -52,7 +52,7 @@ public class CheckoutActivity extends AppCompatActivity {
         binding.back.setOnClickListener(v->finish());binding.addAddress.setOnClickListener(v->{if(!submitting)addressEditor.launch(new Intent(this,AddAddressActivity.class));});
         binding.editAddress.setOnClickListener(v->{if(!submitting&&selectedAddress!=null)addressEditor.launch(new Intent(this,AddAddressActivity.class).putExtra("copy_address",selectedAddress.toString()));});
         binding.changeAddress.setOnClickListener(v->{if(!submitting)addressPicker.launch(new Intent(this,AddressesActivity.class).putExtra("select_address",true));});
-        binding.submit.setOnClickListener(v->checkout());
+        binding.submit.setOnClickListener(v->ServiceEntries.account(this,this::checkout));
     }
     @Override protected void onSaveInstanceState(Bundle state){state.putString("checkout_key",checkoutKey);state.putString("payload_signature",payloadSignature);state.putString("address_id",addressId);super.onSaveInstanceState(state);}
     @Override protected void onResume(){super.onResume();if(!submitting)load();}

@@ -3,4 +3,5 @@
     <string name="login">登录</string>
     <string name="user_role">用户端</string>
     <string name="merchant_role">商家端</string>
+    <string name="browse_search">搜索绘本</string>
 </resources>

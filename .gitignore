@@ -47,3 +47,4 @@ Thumbs.db
 
 # Actual offline content is generated locally; never commit user data.
 android-app/app/src/main/assets/bootstrap/
+.gradle-user-home/

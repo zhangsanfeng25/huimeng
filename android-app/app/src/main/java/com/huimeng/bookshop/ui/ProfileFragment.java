@@ -29,6 +29,9 @@ public class ProfileFragment extends Fragment implements LocalDataRefresh {
             .putExtra("title","我的收藏").putExtra("subtitle","收藏的绘本都会保存在这里").putExtra("path","me/favorites")));
         binding.addresses.setOnClickListener(v->open(AddressesActivity.class));
         binding.settings.setOnClickListener(v->open(SettingsActivity.class));
+        ServiceEntries.menuBefore(binding.settings,"退款 / 售后",com.huimeng.bookshop.R.drawable.ic_orders,()->ServiceActivity.open(requireContext(),"after-sales"));
+        ServiceEntries.menuBefore(binding.settings,"商家消息",com.huimeng.bookshop.R.drawable.ic_community,()->ServiceActivity.open(requireContext(),"conversations"));
+        ServiceEntries.menuBefore(binding.settings,"意见反馈",com.huimeng.bookshop.R.drawable.ic_review,()->ServiceActivity.open(requireContext(),"feedback"));
         binding.switchRole.setOnClickListener(v->open(RoleSwitchActivity.class));
         binding.editAccount.setOnClickListener(v->open(EditAccountActivity.class));
         binding.logout.setOnClickListener(v->((MainActivity)requireActivity()).logout());

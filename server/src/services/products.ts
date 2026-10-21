@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {db,now} from '../core/db.js';
 import {audit} from '../core/http.js';
 import {input,details,images} from './product-data.js';
+import {readBookDetails,saveBookDetails} from './book-details.js';
 import type {BusinessContext,BusinessResult} from './context.js';
 export function productSave(ctx:BusinessContext):BusinessResult {const productId=ctx.params.productId;
 const parsed=input.safeParse(ctx.payload);if(!parsed.success)return ctx.reply(400,{message:'请完整填写绘本名称、简介、适龄、有效价格库存及最多 9 张图片'});
@@ -25,6 +26,7 @@ const parsed=input.safeParse(ctx.payload);if(!parsed.success)return ctx.reply(40
       .run(v.name,v.summary,v.ageRange,v.priceCents,cover||null,JSON.stringify(gallery),audio,old.revisionId);
     else db.prepare(`INSERT INTO product_revisions(id,product_id,version,name,summary,age_range,price_cents,cover_url,detail_images_json,audio_url,ar_enabled,review_status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,0,'DRAFT',?)`)
       .run(revisionId,id,old?old.version+1:1,v.name,v.summary,v.ageRange,v.priceCents,cover||null,JSON.stringify(gallery),audio,stamp);
+    saveBookDetails(old?.status==='DRAFT'?old.revisionId:revisionId,{...readBookDetails(old),...v});
     db.prepare("UPDATE products SET category_id=?,stock_available=?,status='DRAFT',updated_at=? WHERE id=?").run(v.categoryId,v.stock,stamp,id);
     audit(ctx.actor.id,ctx.actor.name,'商品',old?'编辑图文':'新增图文',id);
   })();

@@ -1,4 +1,5 @@
 import { db, now, tx } from '../src/core/db.js';
+import {fillFictionalBookDetails} from '../src/services/book-details.js';
 import { hashPassword } from '../src/core/security.js';
 
 const timestamp = now();
@@ -97,4 +98,5 @@ tx(() => {
   for(const [key,value] of Object.entries({theme:'light',accent:'violet',wallpaper:'none',siteName:'绘梦儿童管理网站'})) settingInsert.run(key,value,timestamp);
 });
 
+fillFictionalBookDetails(false);
 console.log('演示数据初始化完成：1 个管理员、2 个商家、3 个用户、20 本绘本');

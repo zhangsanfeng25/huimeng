@@ -24,6 +24,7 @@ type Order = {
   amount: number;
   status: string;
   orderedAt: string;
+  after_sale_state?: string;
 };
 
 type TrendPoint = { label: string; orders: number; turnover: number; products: number; users: number };
@@ -112,7 +113,7 @@ export function DashboardPage() {
     const amountSpark = trend.slice(-6).map(item => item.turnover);
     return [
     { label: '订单总量', value: metrics.orders.toLocaleString(), note: '全部订单', icon: ShoppingCart, color: '#45aaf2', values: recentSpark, trendLabel: '近6日每日订单量' },
-    { label: '成交金额', value: formatMoney(metrics.turnover), note: '已支付且未取消', icon: Banknote, color: '#ff7f5c', values: amountSpark, trendLabel: '近6日每日成交额' },
+    { label: '成交金额', value: formatMoney(metrics.turnover), note: '已支付，扣除已退款金额', icon: Banknote, color: '#ff7f5c', values: amountSpark, trendLabel: '近6日每日成交额' },
     { label: '在售商品', value: metrics.products.toLocaleString(), note: `${metrics.pendingReviews} 件待审核`, icon: BookOpen, color: '#2fca80', values: trend.slice(-6).map(item=>item.products), trendLabel: '近6日每日新增商品' },
     { label: '注册用户', value: metrics.users.toLocaleString(), note: '平台用户总数', icon: Users, color: '#8c67f6', values: trend.slice(-6).map(item=>item.users), trendLabel: '近6日每日注册用户' },
     ];
@@ -214,7 +215,7 @@ export function DashboardPage() {
           <table>
             <thead><tr><th>订单编号</th><th>购买用户</th><th>所属商家</th><th>订单金额</th><th>当前状态</th><th>下单时间</th></tr></thead>
             <tbody>{(data?.recentOrders ?? []).map(order => <tr key={order.id}>
-              <td><strong>{order.id}</strong></td><td>{order.buyer}</td><td>{order.shop}</td><td>{formatMoney(Number(order.amount || 0))}</td><td><StatusTag value={order.status} /></td><td>{new Date(order.orderedAt).toLocaleString('zh-CN')}</td>
+              <td><strong>{order.id}</strong></td><td>{order.buyer}</td><td>{order.shop}</td><td>{formatMoney(Number(order.amount || 0))}</td><td><StatusTag value={order.status} />{order.after_sale_state?<StatusTag value={order.after_sale_state}/>:null}</td><td>{new Date(order.orderedAt).toLocaleString('zh-CN')}</td>
             </tr>)}</tbody>
           </table>
           {!loading && !(data?.recentOrders?.length) ? <div className="dashboard-table-empty">暂无订单记录</div> : null}

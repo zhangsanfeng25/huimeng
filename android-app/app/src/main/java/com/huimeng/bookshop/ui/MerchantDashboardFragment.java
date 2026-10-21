@@ -18,6 +18,8 @@ public class MerchantDashboardFragment extends Fragment implements LocalDataRefr
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){binding=FragmentMerchantDashboardBinding.inflate(inflater,container,false);binding.name.setText("你好，"+new SessionStore(requireContext()).name());
         binding.newProduct.setOnClickListener(v->startActivity(new Intent(requireContext(),AddProductActivity.class)));
         binding.publishNote.setOnClickListener(v->startActivity(new Intent(requireContext(),PublishPostActivity.class)));
+        var service=ServiceEntries.before((View)binding.newProduct.getParent(),"待处理售后",()->ServiceActivity.open(requireContext(),"after-sales"));
+        new com.huimeng.bookshop.core.ServiceClient(requireContext()).get("service/after-sales",r->{if(binding==null)return;JSONArray rows=r.optJSONArray("data");int count=0;if(rows!=null)for(int i=0;i<rows.length();i++)if("MERCHANT_REVIEW".equals(rows.optJSONObject(i).optString("status")))count++;service.setText("待处理售后 · "+count);},e->{});
         binding.statProducts.getRoot().setOnClickListener(v->((MainActivity)requireActivity()).selectTab(2));
         binding.statPending.getRoot().setOnClickListener(v->((MainActivity)requireActivity()).selectTab(2));
         binding.statOrders.getRoot().setOnClickListener(v->((MainActivity)requireActivity()).selectTab(3));

@@ -7,6 +7,7 @@ import {config} from '../config.js';
 import {closePendingCheckout} from '../core/order-lifecycle.js';
 import {createOrderNotifications} from '../core/order-notifications.js';
 import {audit} from '../core/http.js';
+import {hasBlockingAfterSale} from './customer-services.js';
 import type {Statement} from 'better-sqlite3';
 import type {BusinessContext,BusinessResult} from './context.js';
 export function checkoutCreate(ctx:BusinessContext):BusinessResult {
@@ -105,6 +106,7 @@ export function checkoutPay(ctx:BusinessContext):BusinessResult {
 
 export function orderConfirm(ctx:BusinessContext):BusinessResult {
     const stamp = now(), orderId = String(ctx.params.orderId);
+    if(hasBlockingAfterSale(orderId))return ctx.reply(409,{message:'订单存在售后或已退款，请先处理售后'});
     const completed = db.transaction(() => {
         const changed = db.prepare(`UPDATE orders SET status='COMPLETED',logistics_status='COMPLETED',completed_at=?,updated_at=?,version=version+1 WHERE id=? AND user_id=? AND status='SHIPPED' AND logistics_status='OUT_FOR_DELIVERY'`).run(stamp, stamp, orderId, ctx.actor.id);
         if (changed.changes !== 1)
@@ -140,6 +142,7 @@ export function orderCancel(ctx:BusinessContext):BusinessResult {
 
 export function orderShip(ctx:BusinessContext):BusinessResult {
     const stamp = now(), orderId = String(ctx.params.orderId), trackingNo = `DEMO${Date.now()}`;
+    if(hasBlockingAfterSale(orderId))return ctx.reply(409,{message:'订单存在售后或已退款，不能发货'});
     const shipped = db.transaction(() => {
         const changed = db.prepare(`UPDATE orders SET status='SHIPPED',logistics_status='SHIPPED',shipped_at=?,updated_at=?,version=version+1 WHERE id=? AND merchant_id=? AND status='PAID'`).run(stamp, stamp, orderId, ctx.actor.merchantId);
         if (changed.changes !== 1)
@@ -158,6 +161,7 @@ export function orderShip(ctx:BusinessContext):BusinessResult {
 
 export function orderAdvance(ctx:BusinessContext):BusinessResult {
     const orderId = String(ctx.params.orderId), stamp = now(), order = db.prepare(`SELECT status,logistics_status logisticsStatus FROM orders WHERE id=? AND merchant_id=?`).get(orderId, ctx.actor.merchantId) as any;
+    if(hasBlockingAfterSale(orderId))return ctx.reply(409,{message:'订单存在售后或已退款，不能推进物流'});
     if (!order)
         return ctx.reply(404, { message: '订单不存在' });
     const next: Record<string, string> = { PREPARING: 'READY_TO_SHIP', READY_TO_SHIP: 'SHIPPED', SHIPPED: 'IN_TRANSIT', IN_TRANSIT: 'OUT_FOR_DELIVERY' }, to = next[order.logisticsStatus];

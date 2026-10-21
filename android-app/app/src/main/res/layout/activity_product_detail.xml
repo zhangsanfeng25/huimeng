@@ -1,33 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/milk_white">
-    <androidx.core.widget.NestedScrollView android:id="@+id/content" android:layout_width="match_parent" android:layout_height="match_parent" android:paddingBottom="88dp" android:visibility="gone">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-            <FrameLayout android:layout_width="match_parent" android:layout_height="320dp" android:background="@color/surface_soft">
-                <ImageView android:id="@+id/cover" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="绘本封面" android:padding="20dp" android:scaleType="fitCenter" />
-                <TextView android:id="@+id/imageCount" android:layout_width="wrap_content" android:layout_height="40dp" android:layout_gravity="end|bottom" android:layout_margin="18dp" android:background="@drawable/bg_search" android:gravity="center" android:paddingHorizontal="12dp" android:textColor="@color/ink" android:textSize="13sp" android:visibility="gone" />
-                <ImageButton android:id="@+id/back" android:layout_width="46dp" android:layout_height="46dp" android:layout_gravity="start|top" android:layout_margin="18dp" android:background="@drawable/bg_search" android:contentDescription="返回" android:padding="11dp" android:src="@drawable/ic_back" />
-            </FrameLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="22dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                    <TextView android:id="@+id/name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="@color/ink" android:textSize="24sp" android:textStyle="bold" />
-                    <TextView android:id="@+id/favorite" android:layout_width="wrap_content" android:layout_height="48dp" android:background="@drawable/bg_search" android:gravity="center" android:paddingHorizontal="13dp" android:text="收藏" android:drawableStart="@drawable/ic_heart" android:drawablePadding="6dp" android:clickable="true" android:focusable="true" android:textColor="@color/cool_green_dark" android:textStyle="bold" />
-                    <TextView android:id="@+id/ar" android:layout_width="wrap_content" android:layout_height="34dp" android:layout_marginStart="8dp" android:background="@drawable/bg_category" android:gravity="center" android:paddingHorizontal="13dp" android:text="3D / AR" android:textColor="@color/cool_green_dark" android:textStyle="bold" android:visibility="gone" />
-                </LinearLayout>
-                <TextView android:id="@+id/price" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="13dp" android:textColor="@color/price_red" android:textSize="25sp" android:textStyle="bold" />
-                <TextView android:id="@+id/tags" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/muted" android:textSize="14sp" />
-                <TextView android:id="@+id/galleryHint" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="左右滑动切换内页 · 点击放大" android:textColor="@color/muted" android:textSize="12sp" android:visibility="gone" />
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="20dp" android:background="@color/line_soft" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="内容简介" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
-                <TextView android:id="@+id/summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:lineSpacingExtra="5dp" android:textColor="@color/muted" android:textSize="15sp" />
-                <TextView android:id="@+id/shop" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:textColor="@color/cool_green_dark" android:textSize="14sp" />
-                <com.google.android.material.button.MaterialButton android:id="@+id/audio" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="18dp" android:text="试听绘本音频" android:visibility="gone" app:cornerRadius="16dp" />
-            </LinearLayout>
+  <androidx.core.widget.NestedScrollView android:id="@+id/content" android:layout_width="match_parent" android:layout_height="match_parent" android:paddingBottom="100dp" android:clipToPadding="false" android:visibility="gone">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="18dp" android:orientation="vertical">
+      <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp" android:background="@drawable/bg_search" android:contentDescription="返回" android:padding="11dp" android:src="@drawable/ic_back"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="绘本详情" android:textSize="21sp" android:textStyle="bold" android:textColor="@color/ink"/>
+      </LinearLayout>
+      <LinearLayout android:id="@+id/bookHero" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:gravity="top" android:orientation="horizontal">
+        <FrameLayout android:layout_width="108dp" android:layout_height="156dp" android:background="@drawable/bg_book_card">
+          <ImageView android:id="@+id/cover" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="6dp" android:contentDescription="绘本封面，点击查看大图" android:scaleType="fitCenter"/>
+          <TextView android:id="@+id/imageCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="24dp" android:layout_gravity="end|bottom" android:background="@drawable/bg_search" android:gravity="center" android:paddingHorizontal="6dp" android:textColor="@color/ink" android:textSize="11sp" android:visibility="gone"/>
+        </FrameLayout>
+        <LinearLayout android:id="@+id/bookHeroInfo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="14dp" android:orientation="vertical">
+          <TextView android:id="@+id/name" style="@style/BookHeading" android:textSize="22sp"/>
+          <TextView android:id="@+id/price" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="@color/price_red" android:textSize="24sp" android:textStyle="bold"/>
+          <TextView android:id="@+id/tags" style="@style/BookBody" android:textSize="12sp"/>
+          <TextView android:id="@+id/shop" style="@style/BookAction" android:minHeight="32dp" android:clickable="false" android:focusable="false" android:textSize="13sp"/>
+          <TextView android:id="@+id/favorite" android:layout_width="wrap_content" android:layout_height="48dp" android:background="@drawable/bg_search" android:gravity="center" android:paddingHorizontal="12dp" android:text="收藏" android:drawableStart="@drawable/ic_heart" android:drawablePadding="6dp" android:clickable="true" android:focusable="true" android:textColor="@color/cool_green_dark" android:textStyle="bold"/>
         </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
-    <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:indeterminateTint="@color/cool_green" />
-    <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center" android:padding="30dp" android:textColor="@color/muted" android:visibility="gone" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:layout_gravity="bottom" android:background="@color/surface_card" android:elevation="12dp" android:gravity="center" android:orientation="horizontal" android:paddingHorizontal="18dp">
-        <com.google.android.material.button.MaterialButton android:id="@+id/addCart" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="54dp" android:layout_weight="1" android:text="加入购物车" app:cornerRadius="18dp" />
-        <com.google.android.material.button.MaterialButton android:id="@+id/buyNow" android:layout_width="0dp" android:layout_height="54dp" android:layout_marginStart="12dp" android:layout_weight="1" android:text="立即购买" app:cornerRadius="18dp" />
+      </LinearLayout>
+      <TextView android:id="@+id/galleryHint" style="@style/BookBody" android:text="左右滑动切换内页 · 点击封面放大" android:textSize="12sp" android:visibility="gone"/>
+      <LinearLayout style="@style/BookCard">
+        <TextView android:id="@+id/bookMetadata" style="@style/BookBody" android:layout_marginTop="0dp" android:textSize="14sp"/>
+        <TextView android:id="@+id/demoHint" style="@style/BookBody" android:text="本项目虚构图书资料" android:textSize="12sp" android:visibility="gone"/>
+      </LinearLayout>
+      <LinearLayout style="@style/BookCard">
+        <TextView style="@style/BookHeading" android:text="图书简介"/>
+        <TextView android:id="@+id/summary" style="@style/BookBody" android:maxLines="4" android:ellipsize="end"/>
+        <TextView android:id="@+id/expandSummary" style="@style/BookAction" android:text="展开全文 ⌄"/>
+      </LinearLayout>
+      <LinearLayout android:id="@+id/bookPreviewCards" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <LinearLayout android:id="@+id/contentsCard" style="@style/BookCard" android:layout_width="0dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground" android:contentDescription="查看完整目录">
+          <TextView style="@style/BookHeading" android:text="目录"/>
+          <TextView android:id="@+id/contentsPreview" style="@style/BookBody" android:maxLines="4" android:ellipsize="end"/>
+          <TextView android:id="@+id/contentsAction" style="@style/BookAction" android:text="查看完整目录 ›" android:clickable="false" android:focusable="false"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/authorCard" style="@style/BookCard" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="6dp" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground" android:contentDescription="查看作者简介">
+          <TextView style="@style/BookHeading" android:text="作者"/>
+          <TextView android:id="@+id/authorPreview" style="@style/BookBody" android:maxLines="4" android:ellipsize="end"/>
+          <TextView android:id="@+id/authorAction" style="@style/BookAction" android:text="作者简介 ›" android:clickable="false" android:focusable="false"/>
+        </LinearLayout>
+      </LinearLayout>
+      <LinearLayout android:id="@+id/editorialCard" style="@style/BookCard"><TextView style="@style/BookHeading" android:text="编辑推荐"/><TextView android:id="@+id/editorialReview" style="@style/BookBody"/></LinearLayout>
+      <LinearLayout android:id="@+id/ratingsBox" style="@style/BookCard"/>
+      <LinearLayout android:id="@+id/similarCard" style="@style/BookCard"><TextView style="@style/BookHeading" android:text="相似推荐"/><LinearLayout android:id="@+id/recommendationsBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="vertical"/></LinearLayout>
     </LinearLayout>
+  </androidx.core.widget.NestedScrollView>
+  <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:indeterminateTint="@color/cool_green"/>
+  <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center" android:padding="30dp" android:textColor="@color/muted" android:visibility="gone"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:layout_gravity="bottom" android:background="@color/surface_card" android:elevation="12dp" android:gravity="center" android:orientation="horizontal" android:paddingHorizontal="18dp">
+    <com.google.android.material.button.MaterialButton android:id="@+id/addCart" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="54dp" android:layout_weight="1" android:minWidth="0dp" android:paddingHorizontal="8dp" android:singleLine="true" android:text="加入购物车" app:cornerRadius="18dp"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/buyNow" android:layout_width="0dp" android:layout_height="54dp" android:layout_marginStart="12dp" android:layout_weight="1" android:minWidth="0dp" android:paddingHorizontal="8dp" android:singleLine="true" android:text="立即购买" app:cornerRadius="18dp"/>
+  </LinearLayout>
 </FrameLayout>

@@ -1,4 +1,34 @@
-# 当前本地版本：1.1.1（2026-10-14，尚未发布）
+# 当前版本：1.1.5（2026-10-21）
+
+GitHub 正式发行版：https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.1.5 。此处“正式发行版”指 GitHub 发布状态，APK 构建类型仍为 Debug。
+
+安装包：../output/android-1.1.5/verified/huimeng-1.1.5.apk（versionCode 32，Debug）。SHA-256：AA1D2B0D215652E0B165CF3E679DCEA9A48F918291BDBE6A5A7CF850BE2C27BD。与 1.1.4 证书一致，覆盖安装保留原数据库及 WAL。
+
+修复付款登录恢复、断网重试、旧请求竞态和确认中重试；订单进度只显示真实订单／售后事件。设备回归 7 项、实际服务联调 2 项通过，管理网页自动出现新付款订单。构建与 lint 通过（零错误、511 警告），仍为 DEMO 支付。见 ../docs/releases/android-1.1.5.md。
+
+## 历史本地版本：1.1.4
+
+安装包：../output/android-1.1.4/verified/huimeng-1.1.4.apk（versionCode 31，Debug）。SHA-256：CA7C049CE3714CAD980FCEF787DE8F664299DD2552CE43DC38DB26B6DE62EC1A。v2 签名验证通过，与 1.1.3 证书一致；已覆盖安装到原模拟器并保留本地数据库。
+
+本次完善三端售后、聊天、反馈和购买同步提示，沿用已有界面。网页和服务端检查、Android 构建/lint、列明的设备回归通过。详细范围与限制见 ../docs/verification/2026-10-21-customer-services.md，数据库查看见 ../docs/customer-services-database.md。退款为 DEMO 整单退款，原离线订单仍需登录原账号后同步。
+
+# 历史本地版本：1.1.3（2026-10-17，尚未发布）
+
+安装包：../output/android-1.1.3/final/huimeng-1.1.3.apk（versionCode 30，Debug）。SHA-256：2CF32D5BD26C7AE9A4241A8AA9902AB76F2A0027EEB3977252DE4363E0F5A25D。内部版本及原 Debug v2 签名通过；保留历史安装包及本轮候选构建。
+
+完整显示六种背景入口，支持选择和再次取消；商品详情补齐出版资料、展开简介、目录/作者圆角弹层、编辑推荐、真实评价与相似推荐，移除试听入口。商家新增和编辑可维护相同资料，保存后随版本送审；管理网页与离线数据共用字段。20 本虚构资料已增量填充，受保护业务字段一致。
+
+完整 npm test（65 项服务端及启动、实时同步、维护、控制中心）、lint/build、Android assemble/lint 通过；原有 51 项设备回归通过，最终构建专项及相关旧流程 17 项通过。Lint 0 errors / 505 warnings。API 34 设备及网页实测详情见 [本次验证](../docs/verification/2026-10-17-book-details.md)。API 26 与实体手机未实测；未上传 GitHub。简短说明见 [1.1.3](../docs/releases/android-1.1.3.md)。
+
+# 上一本地版本：1.1.2（2026-10-14，尚未发布）
+
+安装包：../output/category-browse-1.1.2/huimeng-1.1.2.apk（versionCode 29，Debug）。SHA-256：836274ECE0D54C43B612E22762C8B3E96987E24F8163BBE5063AAABA2695CC54。内部版本与 v2 Debug 签名核对通过。
+
+首页年龄、主题及全部绘本入口采用紧凑列表：顶部返回、标题、右侧搜索图标；移除常驻搜索框、分类入口、搜索历史及清除筛选块；保留排序、分页与分类范围内搜索。点击图标展开搜索，提交后收起；普通搜索入口继续显示搜索历史。既有壁纸、商品卡片和本地数据保留。
+
+验证记录见 [分类页验证](../docs/verification/2026-10-14-category-browse.md)。
+
+# 上一本地版本：1.1.1（2026-10-14，尚未发布）
 
 安装包：../output/recovery-1.1.1/huimeng-1.1.1.apk（versionCode 28，Debug）。SHA-256：DABE5593043A24E3752B6F5915985FB2564E3A11FBEF621A82333BA46C3C8C7F。内部版本与 v2 Debug 签名核对通过。
 

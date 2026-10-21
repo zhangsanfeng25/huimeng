@@ -7,6 +7,7 @@ const ManagementPage = lazy(() => import('./pages/ManagementPage').then(module =
 const CommunityPage = lazy(() => import('./pages/CommunityPage').then(module => ({ default:module.CommunityPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default:module.SettingsPage })));
 const AccountPage = lazy(() => import('./pages/AccountPage').then(module => ({ default:module.AccountPage })));
+const ServicePage = lazy(() => import('./pages/ServicePage').then(module => ({default:module.ServicePage})));
 import { pageConfigs } from './data';
 import { session } from './api';
 
@@ -22,6 +23,8 @@ export default function App() {
     <Route path="/community" element={<Protected><CommunityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
     <Route path="/account" element={<Protected><AccountPage /></Protected>} />
+    <Route path="/after-sales" element={<Protected><ServicePage kind="after-sales" /></Protected>} />
+    <Route path="/feedback" element={<Protected><ServicePage kind="feedback" /></Protected>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Suspense>;
 }

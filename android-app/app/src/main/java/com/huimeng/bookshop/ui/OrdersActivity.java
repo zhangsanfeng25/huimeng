@@ -43,7 +43,8 @@ public class OrdersActivity extends AppCompatActivity{
                 String name=item.optString("productName","绘本订单");
                 if(name.isEmpty())name="绘本订单";
                 String action="PENDING_PAYMENT".equals(item.optString("status"))?"去付款":"COMPLETED".equals(logistics)?"评价":"查看";
-                String subtitle=item.optString("shop")+" · "+zh(logistics)+" · 实付 "+String.format(Locale.CHINA,"¥%.2f",item.optInt("total_cents")/100.0);
+                String afterSale=item.isNull("after_sale_state")?"":item.optString("after_sale_state");String displayState="COMPLETED".equals(afterSale)?"已退款":!afterSale.isEmpty()&&!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale)?"售后处理中":zh(logistics);String subtitle=item.optString("shop")+" · "+displayState+" · 实付 "+String.format(Locale.CHINA,"¥%.2f",item.optInt("total_cents")/100.0);
+                if(!afterSale.isEmpty()){subtitle+="\n售后："+ServiceActivity.label(afterSale);action="查看";}
                 if(item.optInt("itemCount")>1)subtitle+=" · 共 "+item.optInt("itemCount")+" 件";
                 String date=item.optString("created_at");if(date.length()>=16)subtitle+="\n下单 "+date.substring(0,16).replace('T',' ');
                 rows.add(new ActionAdapter.Row(item.optString("id"),name,subtitle,action,true,item.optString("coverUrl"),name));

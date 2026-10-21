@@ -43,6 +43,9 @@ try {
   db.prepare("INSERT INTO audit_logs(request_id,operator_id,operator_name,module,action,object_id,result,created_at) VALUES('maintenance-test','A0001','测试管理员','商品','查询','P0001','成功','2026-10-02T01:00:00Z')").run();
   db.prepare("INSERT INTO sessions(token_hash,user_id,active_role,expires_at,created_at) VALUES('old-token','U10001','USER','2099-01-01','2026-10-01')").run();
   db.prepare("INSERT INTO audit_logs(request_id,operator_id,operator_name,module,action,object_id,result,created_at) VALUES('local-day-test','A0001','测试管理员','商品','查询','P0001','成功','2026-10-01T18:00:00Z')").run();
+  const store = db.prepare('SELECT id FROM merchants ORDER BY id LIMIT 1').get().id;
+  db.prepare("INSERT INTO conversations(id,buyer_id,merchant_id,created_at,updated_at) VALUES('CVEXPORT','U10001',?,'2026-10-21','2026-10-21')").run(store);
+  db.prepare("INSERT INTO chat_messages(conversation_id,sender_id,sender_role,content,client_id,created_at) VALUES('CVEXPORT','U10001','USER','数据库查看测试消息','export-message','2026-10-21')").run();
   db.close();
   const backup = command('backup');
   assert.ok(backup.path); assert.equal(command('list').backups.length, 1);
@@ -51,6 +54,9 @@ try {
   const exported = command('export', ['--output', join(fixture, 'export')]);
   const users = readFileSync(join(exported.path, 'users.csv'), 'utf8');
   assert.ok(users.includes('备份时的昵称')); assert.ok(!users.includes('password_hash'));
+  const services = JSON.parse(readFileSync(join(exported.path, 'data.json'), 'utf8'));
+  for (const table of ['after_sales','after_sale_events','refunds','conversations','chat_messages','conversation_reads','feedbacks','feedback_replies']) assert.ok(Array.isArray(services[table]), '导出缺少 '+table);
+  assert.equal(services.chat_messages[0].content, '数据库查看测试消息');
   db = new Database(env.DATABASE_PATH); db.prepare("UPDATE users SET nickname='恢复前的昵称' WHERE id='U10001'").run(); db.close();
   writeFileSync(join(env.UPLOAD_DIR, 'avatar.jpg'), 'changed image');
   const blocked = command('restore', ['--source', backup.path], false); assert.match(blocked, /停止|stopped/);

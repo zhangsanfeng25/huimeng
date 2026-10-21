@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NotificationFragment extends Fragment implements LocalDataRefresh{
+    private com.google.android.material.button.MaterialButton chatEntry;private final android.os.Handler inboxHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable inboxTick=new Runnable(){public void run(){if(binding==null||!isAdded())return;new com.huimeng.bookshop.core.ServiceClient(requireContext()).get("service/conversations",r->{if(binding==null)return;JSONArray rows=r.optJSONArray("data");int count=0;if(rows!=null)for(int i=0;i<rows.length();i++)count+=rows.optJSONObject(i).optInt("unread");chatEntry.setText(count>0?"商家聊天 · "+count:"商家聊天");chatEntry.setContentDescription("商家聊天，"+count+"条未读消息");},e->{});inboxHandler.postDelayed(this,5000);}};
     private FragmentNotificationBinding binding;private NotificationAdapter adapter;private AccountSync sync;
     private boolean reading,queuedRead;private int requestId;
     private final androidx.activity.result.ActivityResultLauncher<Intent> detail=registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),result->{if(binding!=null)load();});
@@ -29,6 +31,7 @@ public class NotificationFragment extends Fragment implements LocalDataRefresh{
         adapter=new NotificationAdapter(item->{Intent intent=new Intent(requireContext(),NotificationDetailActivity.class);
             intent.putExtra("notice_id",item.id()).putExtra("title",item.title()).putExtra("content",item.content()).putExtra("created_at",item.createdAt()).putExtra("read",item.read());detail.launch(intent);},this::renderSelection);
         binding.list.setLayoutManager(new LinearLayoutManager(requireContext()));binding.list.setAdapter(adapter);
+        chatEntry=ServiceEntries.messageTabs(binding.loading,()->ServiceActivity.open(requireContext(),"conversations"));
         binding.selectAll.setOnClickListener(v->adapter.selectAll());
         binding.cancelSelection.setOnClickListener(v->adapter.exitSelection());
         binding.markRead.setOnClickListener(v->bulk("read"));
@@ -38,8 +41,8 @@ public class NotificationFragment extends Fragment implements LocalDataRefresh{
         return binding.getRoot();
     }
     @Override public void onViewCreated(@NonNull View view,@Nullable Bundle state){super.onViewCreated(view,state);binding.getRoot().setOnRefreshListener(this::load);}
-    @Override public void onResume(){super.onResume();if(sync!=null)sync.start();}
-    @Override public void onPause(){if(sync!=null)sync.stop();super.onPause();}
+    @Override public void onResume(){super.onResume();if(sync!=null)sync.start();inboxHandler.removeCallbacks(inboxTick);inboxHandler.post(inboxTick);}
+    @Override public void onPause(){if(sync!=null)sync.stop();inboxHandler.removeCallbacks(inboxTick);super.onPause();}
     private void renderSelection(){if(binding==null)return;boolean mode=adapter.selecting();binding.heading.setText(mode?"已选择 "+adapter.selectedCount()+" 条":"消息中心");
         binding.selectionBar.setVisibility(mode?View.VISIBLE:View.GONE);binding.selectAll.setVisibility(mode?View.VISIBLE:View.GONE);
         binding.markRead.setEnabled(adapter.selectedCount()>0);binding.deleteSelected.setEnabled(adapter.selectedCount()>0);}

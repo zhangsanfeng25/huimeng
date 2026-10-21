@@ -87,11 +87,12 @@ public class OptimizationPreservationTest extends RefreshNavigationTest {
         Activity first=null;
         try{
             first=getInstrumentation().startActivitySync(new Intent(activity,SearchActivity.class)
-                .putExtra("query","晚安").putExtra("category","age3").putExtra("category_name","启蒙")
+                .putExtra("search_mode",clear).putExtra("query","晚安").putExtra("category","age3").putExtra("category_name","启蒙")
                 .putExtra("age","3-6").putExtra("theme","bedtime").putExtra("browse_title","测试分类")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
             original.set(first);final Activity page=first;awaitFocused(page);
             runTestOnUiThread(()->{
+                if(!clear)page.findViewById(R.id.search).performClick();
                 findInput(page.getWindow().getDecorView()).setText("尚未搜索的草稿");
                 findText(page.getWindow().getDecorView(),"价格").performClick();
                 findText(page.getWindow().getDecorView(),"价格").performClick();
@@ -100,7 +101,7 @@ public class OptimizationPreservationTest extends RefreshNavigationTest {
                 assertEquals(clear?"全部绘本":"测试分类",((TextView)page.findViewById(R.id.title)).getText().toString());
             });
             getInstrumentation().waitForIdleSync();SystemClock.sleep(350);
-            assertSearchQuery(clear,Uri.parse(catalogPath));
+            awaitSearchQuery(clear);
             runTestOnUiThread(()->assertEquals("重建前草稿应仍存在","尚未搜索的草稿",findInput(page.getWindow().getDecorView()).getText().toString()));
             runTestOnUiThread(page::recreate);
             long deadline=SystemClock.uptimeMillis()+5000;
@@ -123,6 +124,15 @@ public class OptimizationPreservationTest extends RefreshNavigationTest {
             if(first!=null&&first!=finalPage){final Activity originalPage=first;runTestOnUiThread(originalPage::finish);}
             app.unregisterActivityLifecycleCallbacks(callbacks);
         }
+    }
+    private void awaitSearchQuery(boolean clear)throws Exception{
+        long deadline=SystemClock.uptimeMillis()+5000;
+        while(SystemClock.uptimeMillis()<deadline){
+            Uri value=Uri.parse(catalogPath);
+            if("price_desc".equals(value.getQueryParameter("sort"))&&(clear?"":"age3").equals(value.getQueryParameter("category"))){assertSearchQuery(clear,value);return;}
+            SystemClock.sleep(100);
+        }
+        assertSearchQuery(clear,Uri.parse(catalogPath));
     }
     private void assertSearchQuery(boolean clear,Uri query){
         assertEquals("晚安",query.getQueryParameter("q"));assertEquals("price_desc",query.getQueryParameter("sort"));

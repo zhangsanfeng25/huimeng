@@ -77,3 +77,21 @@
 .account-avatar{width:40px;height:40px;flex-shrink:0;object-fit:cover;border-radius:50%;border:1px solid var(--border)}.account-avatar-detail{width:80px;height:80px;display:block;margin:0 auto 16px}.account-avatar.media-missing{overflow:hidden}.account-avatar.media-missing small{display:none}
 
 .route-loading{min-height:60vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+
+/* Optional book metadata uses the existing form controls and full dialog width. */
+.book-information-editor{grid-column:1/-1;min-width:0}
+.book-information-editor summary{cursor:pointer;min-height:44px;align-content:center;color:var(--text)}
+.book-information-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;padding-top:8px}
+.book-information-fields textarea{min-height:110px}
+@media(max-width:700px){.book-information-fields{grid-template-columns:1fr}}
+/* Customer service uses the existing panel, form and button vocabulary. */
+.service-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+.service-workspace.has-detail{grid-template-columns:minmax(420px,1fr) minmax(340px,.85fr)}
+.service-detail{padding:24px;min-width:0;overflow-wrap:anywhere}.service-detail>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.service-detail h3{margin:22px 0 12px}.service-copy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}.service-selected{background:color-mix(in srgb,var(--primary) 8%,var(--surface))}
+.service-event{padding:14px 0;border-bottom:1px solid var(--border,#e2e8e4)}.service-event small{display:block;opacity:.7;margin-top:6px}.service-event p{margin:8px 0 0;white-space:pre-wrap}
+.service-action-form{margin-top:24px}.service-action-form label{display:grid;gap:8px;margin-bottom:14px}.service-action-form textarea{width:100%;min-height:100px;resize:vertical;padding:12px;border-radius:10px;border:1px solid var(--border,#d5ded8);background:var(--surface,#fff);color:inherit;font:inherit}.service-action-form .row-actions{flex-wrap:wrap;gap:10px}
+.service-notice{padding:14px;border-radius:12px;background:color-mix(in srgb,var(--primary) 8%,var(--surface));line-height:1.7}.service-evidence{display:flex;gap:12px;flex-wrap:wrap}
+@media(max-width:1200px){.service-workspace.has-detail{grid-template-columns:minmax(0,1fr)}}
+.page-recovery{display:grid;place-items:center;min-height:100vh;padding:24px}.page-recovery>.panel{max-width:520px;padding:32px}.page-recovery p{color:var(--muted);line-height:1.7}
+.service-workspace .data-panel table{width:100%;min-width:0;table-layout:fixed}.service-workspace .data-panel th:first-child{width:31%}.service-workspace .data-panel th:nth-child(2){width:20%}.service-workspace .data-panel th:nth-child(3){width:15%}.service-workspace .data-panel th:nth-child(4){width:20%}.service-workspace .data-panel th:last-child{width:14%}.service-workspace .data-panel td{white-space:normal;padding:16px 12px}.service-workspace .data-panel td p{overflow-wrap:anywhere}.service-workspace .data-panel .link{padding:4px;font-size:12px}@media(max-width:600px){.service-workspace .data-panel table{min-width:560px}}

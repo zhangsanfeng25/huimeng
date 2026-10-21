@@ -12,6 +12,7 @@ import { config } from '../config.js';
 
 export const merchantProductsRouter=Router();
 import {details,images} from '../services/product-data.js';
+import {readBookDetails} from '../services/book-details.js';
 merchantProductsRouter.post('/merchant/media/uploads',requireAuth('MERCHANT'),express.raw({type:'image/jpeg',limit:'3mb'}),(req,res)=>{
   const bytes=req.body as Buffer;
   if(!Buffer.isBuffer(bytes)||bytes.length<100||bytes.length>3*1024*1024||bytes[0]!==255||bytes[1]!==216||bytes.at(-2)!==255||bytes.at(-1)!==217)
@@ -23,7 +24,7 @@ merchantProductsRouter.post('/merchant/media/uploads',requireAuth('MERCHANT'),ex
 merchantProductsRouter.get('/merchant/products/:productId',requireAuth('MERCHANT'),(req,res)=>{
   const data=details(String(req.params.productId),req.actor!.merchantId!);
   if(!data)return res.status(404).json({message:'商品不存在'});
-  res.json({data:{...data,detailImages:images(data.detailImages)}});
+  res.json({data:{...data,...readBookDetails(data),detailImages:images(data.detailImages)}});
 });
 merchantProductsRouter.post('/merchant/products',requireAuth('MERCHANT'),businessRoute(productSave));
 merchantProductsRouter.put('/merchant/products/:productId',requireAuth('MERCHANT'),businessRoute(productSave));

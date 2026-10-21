@@ -17,7 +17,7 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 public class OrderDetailActivity extends AppCompatActivity{
-    private ActivityOrderDetailBinding binding;
+    private ActivityOrderDetailBinding binding;private com.google.android.material.button.MaterialButton serviceSale;
     private String orderId,itemId="",status="",logistics="",groupId="";
     private int totalCents;
     private final Handler handler=new Handler(Looper.getMainLooper());private boolean loading;
@@ -25,7 +25,8 @@ public class OrderDetailActivity extends AppCompatActivity{
     private final java.util.List<JSONObject> reviewItems=new java.util.ArrayList<>();
     private final Runnable refresh=new Runnable(){@Override public void run(){load(false);handler.postDelayed(this,5000);}};
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityOrderDetailBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
-        orderId=getIntent().getStringExtra("order_id");binding.back.setOnClickListener(v->finish());binding.action.setOnClickListener(v->act());}
+        orderId=getIntent().getStringExtra("order_id");binding.back.setOnClickListener(v->finish());binding.action.setOnClickListener(v->act());
+        serviceSale=ServiceEntries.orderActions(binding.timeline,"联系商家",()->com.huimeng.bookshop.core.ServiceClient.remoteOrder(this,orderId,remote->new com.huimeng.bookshop.core.ServiceClient(this).get("me/orders/"+remote,r->{JSONObject d=r.optJSONObject("data");if(d!=null)ServiceActivity.contact(this,d.optString("merchant_id"),remote,null);},this::error),this::error),"申请售后",()->ServiceActivity.sale(this,orderId))[1];}
     @Override protected void onResume(){super.onResume();handler.removeCallbacks(refresh);load(displayed.isEmpty());handler.postDelayed(refresh,5000);}
     @Override protected void onPause(){handler.removeCallbacks(refresh);super.onPause();}
     private void load(boolean showLoading){if(loading)return;loading=true;if(showLoading)binding.loading.setVisibility(View.VISIBLE);
@@ -51,17 +52,13 @@ public class OrderDetailActivity extends AppCompatActivity{
                 binding.itemList.addView(line.getRoot());
             }
             if("PENDING_PAYMENT".equals(status))addCancelButton();
-            StringBuilder timeline=new StringBuilder();JSONArray events=data.optJSONArray("events");
-            if(events!=null)for(int i=events.length()-1;i>=0;i--){JSONObject event=events.optJSONObject(i);if(event==null)continue;
-                if(timeline.length()>0)timeline.append("\n\n");timeline.append("● ").append(zh(event.optString("toStatus")))
-                    .append(event.isNull("note")||event.optString("note").isEmpty()?"":"  ·  "+event.optString("note"))
-                    .append("\n   ").append(event.optString("createdAt").replace('T',' ').replace("Z",""));}
-            binding.timeline.setText(timeline.length()==0?"暂无物流动态":timeline);
+            binding.timeline.setText(OrderProgress.format(data));
             binding.action.setEnabled(true);
             if("PENDING_PAYMENT".equals(status)){binding.action.setText("去付款");binding.action.setVisibility(View.VISIBLE);}
             else if("OUT_FOR_DELIVERY".equals(logistics)){binding.action.setText("确认收货");binding.action.setVisibility(View.VISIBLE);}
             else if("COMPLETED".equals(logistics)){binding.action.setText(reviewItems.isEmpty()?"全部商品已评价":"评价商品");binding.action.setVisibility(View.VISIBLE);binding.action.setEnabled(!reviewItems.isEmpty());}
             else binding.action.setVisibility(View.GONE);
+            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(!afterSale.isEmpty()||java.util.Arrays.asList("PAID","SHIPPED","COMPLETED").contains(status)?View.VISIBLE:View.GONE);serviceSale.setText(afterSale.isEmpty()?"申请售后":"售后进度");if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.setText("已退款 · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.action.setVisibility(View.GONE);}
         },this::error);
     }
     private void act(){if("PENDING_PAYMENT".equals(status))startActivity(new Intent(this,PaymentActivity.class)

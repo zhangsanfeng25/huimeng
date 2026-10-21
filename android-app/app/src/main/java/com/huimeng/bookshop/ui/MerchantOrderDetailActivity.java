@@ -16,12 +16,13 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 public class MerchantOrderDetailActivity extends AppCompatActivity {
-    private ActivityOrderDetailBinding binding;private String orderId,logistics="";private boolean loading;
+    private ActivityOrderDetailBinding binding;private String orderId,logistics="";private boolean loading;private com.google.android.material.button.MaterialButton serviceSale;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private String displayed="";
     private final Runnable refresh=new Runnable(){@Override public void run(){load(false);handler.postDelayed(this,5000);}};
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityOrderDetailBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
-        orderId=getIntent().getStringExtra("order_id");binding.back.setOnClickListener(v->finish());binding.action.setOnClickListener(v->advance());}
+        orderId=getIntent().getStringExtra("order_id");binding.back.setOnClickListener(v->finish());binding.action.setOnClickListener(v->advance());
+        serviceSale=ServiceEntries.orderActions(binding.timeline,"联系买家",()->ServiceActivity.contact(this,null,orderId,null),"查看售后",()->ServiceActivity.sale(this,orderId))[1];}
     @Override protected void onResume(){super.onResume();handler.removeCallbacks(refresh);load(displayed.isEmpty());handler.postDelayed(refresh,5000);}
     @Override protected void onPause(){handler.removeCallbacks(refresh);super.onPause();}
     private void load(boolean showLoading){if(loading)return;loading=true;if(showLoading)binding.loading.setVisibility(View.VISIBLE);
@@ -42,14 +43,10 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
                 Glide.with(line.cover).load(ApiClient.assetUrl(item.optString("coverUrl")))
                     .placeholder(new BookCoverDrawable(name)).error(new BookCoverDrawable(name)).centerCrop().into(line.cover);
                 binding.itemList.addView(line.getRoot());}
-            StringBuilder timeline=new StringBuilder();JSONArray events=data.optJSONArray("events");
-            if(events!=null)for(int i=events.length()-1;i>=0;i--){JSONObject event=events.optJSONObject(i);if(event==null)continue;
-                if(timeline.length()>0)timeline.append("\n\n");timeline.append("● ").append(zh(event.optString("toStatus")))
-                    .append(event.isNull("note")||event.optString("note").isEmpty()?"":"  ·  "+event.optString("note"))
-                    .append("\n   ").append(event.optString("createdAt").replace('T',' ').replace("Z",""));}
-            binding.timeline.setText(timeline.length()==0?"暂无订单动态":timeline);
+            binding.timeline.setText(OrderProgress.format(data));
             String action=action(logistics);binding.action.setVisibility(action.isEmpty()?View.GONE:View.VISIBLE);
             binding.action.setText(action);
+            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(afterSale.isEmpty()?View.GONE:View.VISIBLE);if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.setText("已退款 · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.action.setVisibility(View.GONE);}
         },this::error);
     }
     private void advance(){new ApiClient(this).post("merchant/orders/"+orderId+"/advance",new JSONObject(),result->{

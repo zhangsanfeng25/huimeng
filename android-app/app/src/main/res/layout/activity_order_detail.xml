@@ -24,8 +24,8 @@
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp" android:text="物流动态" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
-            <TextView android:id="@+id/timeline" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/bg_search" android:lineSpacingExtra="3dp" android:padding="16dp" android:text="暂无物流动态" android:textColor="@color/muted" android:textSize="14sp" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp" android:text="订单进度" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
+            <TextView android:id="@+id/timeline" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/bg_search" android:lineSpacingExtra="3dp" android:padding="16dp" android:text="正在读取订单进度" android:textColor="@color/muted" android:textSize="14sp" />
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="本项目支付和物流均为模拟操作，不产生真实费用。" android:textColor="@color/muted" android:textSize="13sp" />
             <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="28dp" android:indeterminateTint="@color/cool_green" />
         </LinearLayout>

@@ -1,0 +1,9 @@
+ALTER TABLE product_revisions ADD COLUMN author_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN illustrator_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN publisher TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN publication_date TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN author_bio TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN illustrator_bio TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN contents_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE product_revisions ADD COLUMN editorial_review TEXT NOT NULL DEFAULT '';
+ALTER TABLE product_revisions ADD COLUMN metadata_source TEXT NOT NULL DEFAULT '';

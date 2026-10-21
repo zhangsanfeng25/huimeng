@@ -9,6 +9,7 @@ import { adminRouter } from './modules/admin.js';
 import { shopRouter } from './modules/shop.js';
 import { communityRouter } from './modules/community.js';
 import { syncRouter } from './modules/sync.js';
+import { customerServicesRouter } from './modules/customer-services.js';
 import './core/db.js';
 
 mkdirSync(config.uploadDir,{recursive:true});
@@ -32,6 +33,7 @@ app.use('/api/v1/auth',authRouter);
 app.use('/api/v1',shopRouter);
 app.use('/api/v1',communityRouter);
 app.use('/api/v1',syncRouter);
+app.use('/api/v1',customerServicesRouter);
 app.use('/api/v1',adminRouter);
 
 const webDist=resolve(process.cwd(),'../html/dist');

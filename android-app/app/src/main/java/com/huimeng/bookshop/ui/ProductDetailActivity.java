@@ -2,7 +2,6 @@ package com.huimeng.bookshop.ui;
 
 import android.animation.ValueAnimator;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -23,16 +22,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ProductDetailActivity extends AppCompatActivity{
-    private ActivityProductDetailBinding binding;private String productId,audioUrl="";
-    private boolean favorite,busy,adding;
+    private ActivityProductDetailBinding binding;private String productId;private BookDetailsView bookDetails;
+    private boolean favorite,busy,adding;private String serviceMerchant="";
     private final List<String> images=new ArrayList<>();private int imageIndex;private String bookName="绘本";private Product product;
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityProductDetailBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
-        productId=getIntent().getStringExtra("product_id");
+        bookDetails=new BookDetailsView(this,binding,state);productId=getIntent().getStringExtra("product_id");
         binding.addCart.setEnabled(false);binding.buyNow.setEnabled(false);binding.favorite.setEnabled(false);
         binding.back.setOnClickListener(v->finish());binding.favorite.setOnClickListener(v->toggleFavorite());
         binding.addCart.setOnClickListener(v->addCart(null));
         binding.buyNow.setOnClickListener(v->buyNow());
-        binding.audio.setOnClickListener(v->openAudio());
+        ServiceEntries.compactBefore(binding.galleryHint,"联系商家",()->{if(!serviceMerchant.isEmpty())ServiceActivity.contact(this,serviceMerchant,null,productId);});
         GestureDetector gestures=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
             @Override public boolean onDown(MotionEvent event){return true;}
             @Override public boolean onSingleTapUp(MotionEvent event){zoomImage();return true;}
@@ -40,22 +39,20 @@ public class ProductDetailActivity extends AppCompatActivity{
         });
         binding.cover.setOnTouchListener((view,event)->gestures.onTouchEvent(event));
         TapMotion.attach(binding.back);TapMotion.attach(binding.favorite);TapMotion.attach(binding.addCart);
-        TapMotion.attach(binding.buyNow);TapMotion.attach(binding.audio);
+        TapMotion.attach(binding.buyNow);
         renderFavorite();load();
     }
     @Override protected void onResume(){super.onResume();loadFavorite();}
     private void load(){new ApiClient(this).get("catalog/products/"+productId,result->{JSONObject data=result.optJSONObject("data");if(data==null)return;
-        Product item=Product.from(data);product=item;bookName=item.name();binding.favorite.setEnabled(true);binding.loading.setVisibility(View.GONE);binding.content.setVisibility(View.VISIBLE);
+        Product item=Product.from(data);product=item;serviceMerchant=data.optString("merchantId");bookName=item.name();binding.favorite.setEnabled(true);binding.loading.setVisibility(View.GONE);binding.content.setVisibility(View.VISIBLE);
         binding.name.setText(item.name());binding.summary.setText(item.summary());binding.price.setText(item.price());binding.shop.setText(item.shop());
         StringBuilder tags=new StringBuilder();if(!item.ageRange().isEmpty())tags.append("适读 ").append(item.ageRange());if(!item.category().isEmpty()){if(tags.length()>0)tags.append("  ·  ");tags.append(item.category());}if(tags.length()>0)tags.append("  ·  ");tags.append("库存 ").append(item.stock());binding.tags.setText(tags);
         binding.addCart.setEnabled(item.stock()>0);binding.buyNow.setEnabled(item.stock()>0);binding.buyNow.setText(item.stock()>0?"立即购买":"已售罄");
-        binding.ar.setVisibility(View.GONE);audioUrl=item.audioUrl();
-        binding.audio.setVisibility(audioUrl.trim().isEmpty()?View.GONE:View.VISIBLE);
         images.clear();if(!item.coverUrl().isEmpty())images.add(item.coverUrl());
         JSONArray detail=data.optJSONArray("detailImages");if(detail==null)try{detail=new JSONArray(data.optString("detailImages","[]"));}catch(Exception ignored){}
         if(detail!=null)for(int i=0;i<detail.length();i++){String url=detail.optString(i);if(!url.isEmpty()&&!images.contains(url))images.add(url);}
         imageIndex=0;showImage();binding.galleryHint.setVisibility(images.size()>1?View.VISIBLE:View.GONE);
-        showRatings(data.optJSONArray("ratings"));
+        bookDetails.bind(data);
     },error->{binding.loading.setVisibility(View.GONE);binding.error.setText(error);binding.error.setVisibility(View.VISIBLE);});}
     private void loadFavorite(){new ApiClient(this).get("me/favorites",result->{JSONArray rows=result.optJSONArray("data");
         boolean found=false;if(rows!=null)for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&productId.equals(row.optString("id"))){found=true;break;}}
@@ -93,8 +90,6 @@ public class ProductDetailActivity extends AppCompatActivity{
         int w=Math.round(72*getResources().getDisplayMetrics().density),h=Math.round(96*getResources().getDisplayMetrics().density);
         android.widget.FrameLayout.LayoutParams params=new android.widget.FrameLayout.LayoutParams(w,h);params.leftMargin=start[0]-origin[0]+binding.cover.getWidth()/2-w/2;params.topMargin=start[1]-origin[1]+binding.cover.getHeight()/2-h/2;root.addView(copy,params);
         copy.animate().x(end[0]-origin[0]+binding.addCart.getWidth()/2-24).y(end[1]-origin[1]+12).scaleX(.4f).scaleY(.4f).alpha(.2f).setDuration(450).withEndAction(()->root.removeView(copy)).start();}
-    private void openAudio(){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(ApiClient.assetUrl(audioUrl))));}
-        catch(Exception error){Toast.makeText(this,"当前设备无法播放该音频",Toast.LENGTH_SHORT).show();}}
     private void buyNow(){if(product==null||product.stock()<1)return;android.widget.NumberPicker quantity=new android.widget.NumberPicker(this);quantity.setMinValue(1);quantity.setMaxValue(Math.min(99,product.stock()));quantity.setWrapSelectorWheel(false);new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("选择购买数量").setView(quantity).setNegativeButton("取消",null).setPositiveButton("确认购买",(dialog,which)->startActivity(new Intent(this,CheckoutActivity.class).putExtra("product_id",productId).putExtra("quantity",quantity.getValue()))).show();}
-    private void showRatings(JSONArray ratings){android.widget.LinearLayout parent=(android.widget.LinearLayout)binding.summary.getParent();android.widget.TextView section=new android.widget.TextView(this);section.setTextColor(ContextCompat.getColor(this,R.color.ink));section.setTextSize(18);section.setTypeface(null,android.graphics.Typeface.BOLD);int count=ratings==null?0:ratings.length();section.setText("读者评价 · "+count+" 条");parent.addView(section);android.widget.TextView body=new android.widget.TextView(this);body.setTextColor(ContextCompat.getColor(this,R.color.muted));body.setTextSize(14);int pad=Math.round(12*getResources().getDisplayMetrics().density);body.setPadding(0,pad,0,pad);StringBuilder text=new StringBuilder();if(ratings!=null)for(int i=0;i<Math.min(3,ratings.length());i++){JSONObject row=ratings.optJSONObject(i);if(row==null)continue;if(text.length()>0)text.append("\n\n");text.append(row.optString("user")).append(" · ").append(row.optInt("stars")).append(" 分\n").append(row.optString("content"));}body.setText(text.length()==0?"暂时没有评价，期待你的阅读感受":text);parent.addView(body);com.google.android.material.button.MaterialButton all=new com.google.android.material.button.MaterialButton(this);all.setText("查看全部评价");all.setOnClickListener(v->startActivity(new Intent(this,RatingsActivity.class).putExtra("product_id",productId)));parent.addView(all);}
+    @Override protected void onSaveInstanceState(Bundle state){bookDetails.save(state);super.onSaveInstanceState(state);}
 }

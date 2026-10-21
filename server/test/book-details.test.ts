@@ -1,0 +1,70 @@
+import test,{after} from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+const temporary=mkdtempSync(join(tmpdir(),'huimeng-books-'));
+process.env.DATABASE_PATH=join(temporary,'books.db');
+const {db}=await import('../src/core/db.js');
+await import('../scripts/migrate.js');
+await import('../scripts/seed.js');
+const {bookInput,readBookDetails,saveBookDetails,fillFictionalBookDetails}=await import('../src/services/book-details.js');
+const {shopRouter}=await import('../src/modules/shop.js');
+const app=express();app.use(express.json());app.use(shopRouter);
+const {authRouter}=await import('../src/modules/auth.js');const {adminRouter}=await import('../src/modules/admin.js');app.use('/auth',authRouter);app.use('/admin',adminRouter);
+const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
+const address=server.address();assert.ok(address&&typeof address!=='string');const base=`http://127.0.0.1:${address.port}`;
+after(async()=>{await new Promise<void>(r=>server.close(()=>r()));db.close();rmSync(temporary,{recursive:true,force:true});});
+
+test('二十本演示资料完整且逐书不同，不修改交易数据',()=>{
+ const rows=db.prepare('SELECT r.* FROM products p JOIN product_revisions r ON r.id=p.published_revision_id ORDER BY p.id').all() as any[];
+ assert.equal(rows.length,20);assert.equal(new Set(rows.map(r=>r.summary)).size,20);
+ for(const row of rows){assert.ok(row.summary.length>=150);assert.ok(row.author_name);assert.ok(row.publisher);assert.equal(row.metadata_source,'fictional_demo');assert.ok(JSON.parse(row.contents_json).length>=5);assert.ok(row.author_bio.length>=50);}
+ const before=db.prepare('SELECT id,price_cents,cover_url FROM product_revisions ORDER BY id').all();
+ assert.equal(fillFictionalBookDetails().length,0);assert.deepEqual(db.prepare('SELECT id,price_cents,cover_url FROM product_revisions ORDER BY id').all(),before);
+});
+test('日期、目录和长度验证，省略与清空分开处理',()=>{
+ assert.equal(bookInput.safeParse({publicationDate:'2025-02-30'}).success,false);
+ assert.equal(bookInput.safeParse({publicationDate:'2024-02-29',tableOfContents:['开篇']}).success,true);
+ assert.equal(bookInput.safeParse({tableOfContents:['']}).success,false);
+ assert.equal(bookInput.safeParse({authorName:'a'.repeat(101)}).success,false);
+ const original=readBookDetails(db.prepare('SELECT * FROM product_revisions WHERE id=?').get('PR0001'));
+ saveBookDetails('PR0001',{});assert.deepEqual(readBookDetails(db.prepare('SELECT * FROM product_revisions WHERE id=?').get('PR0001')),original);
+ saveBookDetails('PR0001',{illustratorName:'',tableOfContents:[]});
+ const cleared=readBookDetails(db.prepare('SELECT * FROM product_revisions WHERE id=?').get('PR0001'));
+ assert.equal(cleared.illustratorName,'');assert.deepEqual(cleared.tableOfContents,[]);assert.equal(cleared.authorName,original.authorName);
+ saveBookDetails('PR0001',original);
+});
+test('公开详情、同步资料和推荐一致，排除本书、重复、下架与无库存',async()=>{
+ const response=await fetch(base+'/catalog/products/P0001');assert.equal(response.status,200);
+ const {data}=await response.json() as any;assert.ok(data.authorName);assert.ok(Array.isArray(data.tableOfContents));assert.ok(data.recommendations.length>0);
+ const ids=data.recommendations.map((row:any)=>row.id);assert.equal(new Set(ids).size,ids.length);assert.ok(!ids.includes('P0001'));assert.ok(ids.length<=4);
+ db.prepare("UPDATE products SET status='OFFLINE' WHERE id=?").run(ids[0]);
+ db.prepare('UPDATE products SET stock_available=0 WHERE id=?').run(ids[1]);
+ const next=(await (await fetch(base+'/catalog/products/P0001')).json() as any).data.recommendations;
+ assert.ok(next.every((row:any)=>row.id!==ids[0]&&row.id!==ids[1]));
+ const {readSyncResources}=await import('../src/sync/snapshots.js');
+ const snapshot=readSyncResources({id:'U10001',name:'星星妈妈',roles:['USER']},'products').find((row:any)=>row.id==='P0001');
+ assert.equal(snapshot.authorName,data.authorName);assert.deepEqual(snapshot.tableOfContents,data.tableOfContents);
+});
+test('商家旧版请求继承资料，新版审核和管理维护保留并可清空字段',async()=>{
+ const {runBusiness}=await import('../src/services/context.js');const {productSave}=await import('../src/services/products.js');const {productSubmit}=await import('../src/services/product-status.js');
+ const actor={id:'MUSER01',name:'童书优选',roles:['USER','MERCHANT'],merchantId:'M20001',activeRole:'MERCHANT'};
+ const old=db.prepare('SELECT * FROM product_revisions WHERE id=?').get('PR0001') as any;
+ const body={name:old.name,summary:old.summary,categoryId:'C01',ageRange:old.age_range,priceCents:old.price_cents,stock:30};
+ const first=runBusiness(productSave,actor,body,{productId:'P0001'});assert.equal(first.status,200);const revision=first.data.revisionId;
+ assert.equal((db.prepare('SELECT author_name FROM product_revisions WHERE id=?').get(revision) as any).author_name,old.author_name);
+ assert.equal(runBusiness(productSave,actor,{...body,publicationDate:'2025-02-30'},{productId:'P0001'}).status,400);
+ assert.equal(runBusiness(productSave,actor,{...body,authorName:'修改后的虚构作者',tableOfContents:['新的开篇']},{productId:'P0001'}).status,200);
+ assert.equal((db.prepare('SELECT author_name FROM product_revisions WHERE id=?').get('PR0001') as any).author_name,old.author_name);
+ assert.equal(runBusiness(productSubmit,actor,{}, {productId:'P0001'}).status,200);
+ const login=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:'huimeng123',role:'ADMIN'})});assert.equal(login.status,200);const token=(await login.json() as any).token;
+ const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};
+ const review=(await (await fetch(base+`/admin/reviews/${revision}/details`,{headers})).json() as any).data;assert.equal(review.authorName,'修改后的虚构作者');assert.deepEqual(review.tableOfContents,['新的开篇']);
+ const approved=await fetch(base+`/admin/reviews/${revision}`,{method:'PUT',headers,body:JSON.stringify({status:'已通过',note:''})});assert.equal(approved.status,200);
+ const published=(await (await fetch(base+'/catalog/products/P0001')).json() as any).data;assert.equal(published.authorName,'修改后的虚构作者');assert.deepEqual(published.tableOfContents,['新的开篇']);
+ const details=(await (await fetch(base+'/admin/products/P0001/details',{headers})).json() as any).data;
+ const edited=await fetch(base+'/admin/products/P0001/content',{method:'PUT',headers,body:JSON.stringify({...details,coverUrl:details.coverUrl||'',images:details.images||[],illustratorName:'',tableOfContents:[]})});assert.equal(edited.status,200);
+ const final=(await (await fetch(base+'/catalog/products/P0001')).json() as any).data;assert.equal(final.authorName,'修改后的虚构作者');assert.equal(final.illustratorName,'');assert.deepEqual(final.tableOfContents,[]);
+});

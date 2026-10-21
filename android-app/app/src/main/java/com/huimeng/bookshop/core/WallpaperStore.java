@@ -19,7 +19,7 @@ import com.huimeng.bookshop.ui.LoginActivity;
 import com.huimeng.bookshop.ui.RegisterActivity;
 
 public final class WallpaperStore{
-    public static final String DEFAULT="DEFAULT",MINT="MINT",TWILIGHT="TWILIGHT",SUNRISE="SUNRISE",OCEAN="OCEAN",GARDEN="GARDEN";
+    public static final String DEFAULT="DEFAULT",SOLID="SOLID",MINT="MINT",TWILIGHT="TWILIGHT",SUNRISE="SUNRISE",OCEAN="OCEAN",GARDEN="GARDEN";
     private final SharedPreferences preferences;
     public WallpaperStore(Context context){preferences=context.getSharedPreferences("huimeng_appearance",Context.MODE_PRIVATE);}
     public String wallpaper(){return preferences.getString("wallpaper",DEFAULT);}
@@ -27,7 +27,7 @@ public final class WallpaperStore{
     public void apply(Activity activity){
         if (activity instanceof WelcomeActivity || activity instanceof LoginActivity || activity instanceof RegisterActivity) return;
         String choice=wallpaper();
-        boolean selected=!DEFAULT.equals(choice);
+        boolean selected=!DEFAULT.equals(choice)&&!SOLID.equals(choice);
         if(selected){
             int resource=switch(choice){
                 case MINT->R.drawable.wallpaper_mint_small;

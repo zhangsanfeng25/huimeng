@@ -11,7 +11,8 @@ export function PageHeader({ title, description, action, onAction }: {
 export function StatusTag({ value }: {
     value: string | number;
 }) {
-    const text = String(value);
+    const saleLabels:Record<string,string>={MERCHANT_REVIEW:'待商家初审',ADMIN_REVIEW:'待平台审核',WAITING_RETURN:'待买家退货',RETURNING:'退货运输中',REFUND_PENDING:'待确认退款',COMPLETED:'售后完成',REJECTED:'已驳回',CANCELLED:'已撤销'};
+    const text = saleLabels[String(value)]||String(value);
     const tone = /正常|通过|启用|公开|成功|完成|营业|销售|发送/.test(text) ? 'success' : /停用|隐藏|驳回|异常/.test(text) ? 'danger' : /待|未/.test(text) ? 'warning' : 'neutral';
     return <span className={`status ${tone}`}><i />{text}</span>;
 }

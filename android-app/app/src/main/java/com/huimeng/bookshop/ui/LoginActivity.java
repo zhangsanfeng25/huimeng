@@ -36,6 +36,7 @@ public class LoginActivity extends AppCompatActivity {
         binding.forgotPassword.setText("账号帮助");
         binding.forgotPassword.setOnClickListener(v->new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("账号帮助").setMessage("忘记密码时，请联系系统管理员协助处理。自助找回将在接入身份验证后开放；已有账号可登录后在设置中修改密码。").setPositiveButton("知道了",null).show());
         String notice=getIntent().getStringExtra("login_notice");if(notice!=null)binding.message.setText(notice);
+        if(getIntent().getBooleanExtra("return_to_payment",false)){binding.accountInput.setText(getIntent().getStringExtra("login_account"));binding.merchantTab.setEnabled(false);binding.roleSwitch.setVisibility(android.view.View.GONE);}
     }
     @Override protected void onSaveInstanceState(Bundle state){state.putString(EXTRA_ROLE,role);super.onSaveInstanceState(state);}
     private void openAuthPage(Class<?> target){startActivity(new Intent(this,target).putExtra(EXTRA_ROLE,role));}
@@ -56,6 +57,7 @@ public class LoginActivity extends AppCompatActivity {
         return super.dispatchTouchEvent(event);
     }
     private void setRole(String newRole){
+        if(getIntent().getBooleanExtra("return_to_payment",false))newRole="USER";
         if(!newRole.equals(role)){
             binding.accountInput.setText("");
             binding.passwordInput.setText("");
@@ -83,7 +85,7 @@ public class LoginActivity extends AppCompatActivity {
     private void setLoginBusy(boolean busy) {
         binding.loginButton.setEnabled(!busy);
         binding.buyerTab.setEnabled(!busy);
-        binding.merchantTab.setEnabled(!busy);
+        binding.merchantTab.setEnabled(!busy&&!getIntent().getBooleanExtra("return_to_payment",false));
         binding.roleSwitch.setEnabled(!busy);
         binding.register.setEnabled(!busy);
         binding.forgotPassword.setEnabled(!busy);
@@ -106,6 +108,7 @@ public class LoginActivity extends AppCompatActivity {
                     for(int i=0;i<user.optJSONArray("roles").length();i++)
                         if("MERCHANT".equals(user.optJSONArray("roles").optString(i)))canMerchant=true;
                 if(user==null||user.optString("id").isEmpty()||result.optString("token").isEmpty()){setLoginBusy(false);binding.message.setText("网络账号验证结果不完整");return;}
+                String required=getIntent().getStringExtra("required_account_id");if(getIntent().getBooleanExtra("return_to_payment",false)&&required!=null&&!required.isEmpty()&&!required.equals(user.optString("id"))){setLoginBusy(false);binding.message.setText("请登录本订单所属的原账号，当前账号不能继续这笔付款");return;}
                 final boolean merchantAllowed=canMerchant;
                 new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("关联网络账号")
                     .setMessage("已验证账号："+user.optString("username",account)+"\n确认后，本地空间将关联此账号并同步待上传内容。切换其他账号会使用独立空间。")
@@ -118,7 +121,7 @@ public class LoginActivity extends AppCompatActivity {
             });
         }catch(Exception error){setLoginBusy(false);binding.message.setText("登录参数错误");}
     }
-    private void openMain(){startActivity(new Intent(this,MainActivity.class));finish();}
+    private void openMain(){if(getIntent().getBooleanExtra("return_to_payment",false)){setResult(RESULT_OK);finish();return;}startActivity(new Intent(this,MainActivity.class));finish();}
     private void associate(JSONObject result,JSONObject user,String requestedRole,boolean canMerchant,boolean remember){
         com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{try{
             SessionStore session=new SessionStore(this);com.huimeng.bookshop.core.local.LocalDatabase db=com.huimeng.bookshop.core.local.LocalDatabase.get(this);com.huimeng.bookshop.core.local.LocalSpaceStore spaces=new com.huimeng.bookshop.core.local.LocalSpaceStore(db);

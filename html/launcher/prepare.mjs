@@ -28,7 +28,7 @@ function fingerprint(root, paths) {
 export function ensureBuild(root, workspace, build) {
   if (!['html','server'].includes(workspace)) throw new Error('Unknown build workspace');
   const inputs = ['package.json','package-lock.json', `${workspace}/package.json`, `${workspace}/tsconfig.json`, `${workspace}/src`];
-  if (workspace === 'server') inputs.push('server/scripts/migrate.ts','server/scripts/seed.ts');
+  if (workspace === 'server') inputs.push('server/scripts/migrate.ts','server/scripts/seed.ts','server/assets');
   if (workspace === 'html') inputs.push('html/index.html','html/vite.config.ts','html/scripts','html/public','html/.env','html/.env.local','html/.env.production','html/.env.production.local');
   const outputDir = resolve(root,workspace,'dist');
   const marker = join(outputDir,'launcher-build.json');

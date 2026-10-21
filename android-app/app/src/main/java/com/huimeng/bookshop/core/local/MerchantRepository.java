@@ -9,8 +9,8 @@ public final class MerchantRepository extends BusinessRepository {
         if(method==0)return data(p.length>2?require("merchantProducts",p[2]):db.list(space,"merchantProducts"));
         String id=p.length>2?p[2]:id();
         if(p.length>3){JSONObject product=require("merchantProducts",id);String action=p[3];product.put("pendingAction",action);return save("merchantProducts",id,action.equals("submit")?"product.submit":"product.offline",product,new JSONObject().put("id",id));}
-        text(body,"name",1,100);text(body,"summary",1,5000);text(body,"ageRange",1,40);if(body.optInt("priceCents",-1)<0||body.optInt("stock",-1)<0)throw new IllegalArgumentException("价格和库存不能小于零");
-        JSONObject old=p.length>2?require("merchantProducts",id):null;JSONObject value=new JSONObject(body.toString()).put("status",old==null?"DRAFT":old.optString("status","DRAFT")).put("reviewStatus",old==null?"DRAFT":old.optString("reviewStatus","DRAFT")).put("pendingAction","save");
+        com.huimeng.bookshop.model.BookDetails.validate(body);text(body,"name",1,100);text(body,"summary",1,5000);text(body,"ageRange",1,40);if(body.optInt("priceCents",-1)<0||body.optInt("stock",-1)<0)throw new IllegalArgumentException("价格和库存不能小于零");
+        JSONObject old=p.length>2?require("merchantProducts",id):null;JSONObject value=com.huimeng.bookshop.model.BookDetails.inherit(old,body).put("status",old==null?"DRAFT":old.optString("status","DRAFT")).put("reviewStatus",old==null?"DRAFT":old.optString("reviewStatus","DRAFT")).put("pendingAction","save");
         return save("merchantProducts",id,"product.save",value,new JSONObject(body.toString()).put("id",id)).put("productId",id);
     }
 }

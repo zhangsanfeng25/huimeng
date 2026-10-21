@@ -15,9 +15,11 @@ public final class LocalBootstrap {
         }catch(java.io.FileNotFoundException absent){return;}
         media=snapshot.optJSONObject("media")==null?new JSONObject():snapshot.getJSONObject("media");
         // Never overwrite a later network snapshot with the bundled historical baseline.
-        if(!db.metadata("bootstrap:"+space).isEmpty())return;
-        if(db.metadata("last-sync:"+space).isEmpty()&&db.metadata("data-import:"+space).isEmpty())new LocalDataImporter(db).apply(space,snapshot,"");
-        db.metadata("bootstrap:"+space,snapshot.optString("revision"));
+        if(db.metadata("bootstrap:"+space).isEmpty()){
+            if(db.metadata("last-sync:"+space).isEmpty()&&db.metadata("data-import:"+space).isEmpty())new LocalDataImporter(db).apply(space,snapshot,"");
+            db.metadata("bootstrap:"+space,snapshot.optString("revision"));
+        }
+        LocalBookUpgrade.apply(context,db,space);
     }
     public static String asset(String original){String file=media.optString(original);return file.isEmpty()?"":"file:///android_asset/bootstrap/"+file;}
 }

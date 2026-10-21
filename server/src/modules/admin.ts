@@ -1,3 +1,4 @@
+import {bookInput,bookColumns,readBookDetails,saveBookDetails} from '../services/book-details.js';
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
@@ -12,6 +13,7 @@ import { broadcast, subscribe } from '../core/events.js';
 import { hashPassword } from '../core/security.js';
 import { categoryOptions } from '../core/category-options.js';
 import { closePendingCheckout } from '../core/order-lifecycle.js';
+import { afterSaleColumns, hasBlockingAfterSale } from '../services/customer-services.js';
 import { createOrderNotifications } from '../core/order-notifications.js';
 import { leastUsedDefaultAvatar } from '../core/default-avatars.js';
 import { merchantApplication } from './merchant-applications.js';
@@ -40,7 +42,7 @@ function rows(resource:string){
     case 'categories': return (db.prepare(`SELECT c.id,c.name,c.parent_name parent,c.sort_order sort,c.status,COUNT(p.id) products FROM categories c LEFT JOIN products p ON p.category_id=c.id GROUP BY c.id ORDER BY c.sort_order`).all() as any[]).map(x=>({...x,status:toZh(x.status)}));
     case 'reviews': return (db.prepare(`SELECT r.id,r.name product,m.shop_name merchant,c.name category,COALESCE(r.submitted_at,r.created_at) submittedAt,r.review_status status,COALESCE(r.rejection_reason,'') note FROM product_revisions r JOIN products p ON p.id=r.product_id JOIN merchants m ON m.id=p.merchant_id JOIN categories c ON c.id=p.category_id WHERE r.review_status IN ('PENDING','APPROVED','REJECTED') ORDER BY r.created_at DESC`).all() as any[]).map(x=>({...x,status:toZh(x.status)}));
     case 'products': return (db.prepare(`SELECT p.id,r.name,m.shop_name shop,c.name category,r.cover_url coverUrl,r.price_cents/100.0 price,p.stock_available stock,r.review_status approval,p.status FROM products p JOIN product_revisions r ON r.id=COALESCE(p.published_revision_id,(SELECT id FROM product_revisions WHERE product_id=p.id ORDER BY version DESC LIMIT 1)) JOIN merchants m ON m.id=p.merchant_id JOIN categories c ON c.id=p.category_id ORDER BY p.updated_at DESC`).all() as any[]).map(x=>({...x,approval:toZh(x.approval),status:toZh(x.status)}));
-    case 'orders': return (db.prepare(`SELECT o.id,m.shop_name shop,u.nickname buyer,o.total_cents/100.0 amount,o.logistics_status status,o.created_at orderedAt,COALESCE(o.paid_at,'') paidAt FROM orders o JOIN merchants m ON m.id=o.merchant_id JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC`).all() as any[]).map(x=>({...x,status:toZh(x.status)}));
+    case 'orders': return (db.prepare(`SELECT o.id,${afterSaleColumns},m.shop_name shop,u.nickname buyer,o.total_cents/100.0 amount,o.logistics_status status,o.created_at orderedAt,COALESCE(o.paid_at,'') paidAt FROM orders o JOIN merchants m ON m.id=o.merchant_id JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC`).all() as any[]).map(x=>({...x,status:toZh(x.status)}));
     case 'ratings': return (db.prepare(`SELECT r.id,pr.name product,u.nickname user,r.stars,r.content,substr(r.created_at,1,16) createdAt,r.status FROM ratings r JOIN users u ON u.id=r.user_id JOIN products p ON p.id=r.product_id JOIN product_revisions pr ON pr.id=p.published_revision_id WHERE r.deleted_at IS NULL ORDER BY r.created_at DESC`).all() as any[]).map(x=>({...x,status:toZh(x.status)}));
     case 'community': return (db.prepare(`SELECT cp.id,cp.author_user_id authorId,u.username authorAccount,u.nickname authorName,CASE cp.author_role WHEN 'MERCHANT' THEN '商家' ELSE '用户' END role,cp.title,cp.content,cp.cover_url coverUrl,cp.images_json images,COALESCE(pr.name,'') product,substr(cp.created_at,1,16) publishedAt,cp.status,cp.report_count reports,
       (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=cp.id) likeCount,
@@ -60,9 +62,9 @@ adminRouter.get('/events',(_req,res)=>{res.set({'Content-Type':'text/event-strea
 adminRouter.get('/dashboard',(req,res)=>{
   const days=Number(req.query.days)===30?30:7;
   const orderRows=rows('orders') as any[],productRows=rows('products') as any[],reviewRows=rows('reviews') as any[],userRows=rows('users') as any[];
-  const metrics={orders:orderRows.length,turnover:orderRows.filter(x=>x.paidAt&&x.status!=='已取消').reduce((n,x)=>n+Number(x.amount||0),0),products:productRows.filter(x=>x.status==='销售中').length,users:userRows.length,pendingReviews:reviewRows.filter(x=>x.status==='待审核').length,pendingShipment:orderRows.filter(x=>x.status==='准备出库'||x.status==='待发货').length};
+  const metrics={orders:orderRows.length,turnover:orderRows.filter(x=>x.paidAt&&x.status!=='已取消').reduce((n,x)=>n+Number(x.amount||0)-Number(x.refunded_cents||0)/100,0),products:productRows.filter(x=>x.status==='销售中').length,users:userRows.length,pendingReviews:reviewRows.filter(x=>x.status==='待审核').length,pendingShipment:orderRows.filter(x=>(x.status==='准备出库'||x.status==='待发货')&&(!x.after_sale_state||['REJECTED','CANCELLED'].includes(x.after_sale_state))).length};
   const grouped=new Map<string,{orders:number;turnover:number}>();
-  for(const order of orderRows){const key=String(order.orderedAt||'').slice(0,10);if(!key)continue;const point=grouped.get(key)||{orders:0,turnover:0};point.orders+=1;if(order.paidAt&&order.status!=='已取消')point.turnover+=Number(order.amount||0);grouped.set(key,point)}
+  for(const order of orderRows){const key=String(order.orderedAt||'').slice(0,10);if(!key)continue;const point=grouped.get(key)||{orders:0,turnover:0};point.orders+=1;if(order.paidAt&&order.status!=='已取消')point.turnover+=Number(order.amount||0)-Number(order.refunded_cents||0)/100;grouped.set(key,point)}
   const registrations=db.prepare(`SELECT substr(created_at,1,10) day,COUNT(*) count FROM users WHERE EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=users.id AND r.role='USER') GROUP BY day`).all() as {day:string;count:number}[];
   const additions=db.prepare('SELECT substr(created_at,1,10) day,COUNT(*) count FROM products GROUP BY day').all() as {day:string;count:number}[];
   const userCounts=new Map(registrations.map(row=>[row.day,row.count]));
@@ -179,21 +181,21 @@ adminRouter.get('/users/:id/details',(req,res)=>{
   res.json({data:{...user,roles,...accountContent(id)}});
 });
 adminRouter.get('/products/:id/details',(req,res)=>{
-  const data=db.prepare(`SELECT p.id,p.status,p.stock_available stock,p.stock_reserved reserved,r.id revisionId,r.version,r.created_at revisionCreatedAt,r.submitted_at submittedAt,r.reviewed_at reviewedAt,r.rejection_reason rejectionReason,r.name,r.summary,r.age_range ageRange,r.price_cents/100.0 price,r.cover_url coverUrl,r.detail_images_json images,r.audio_url audioUrl,r.review_status approval,m.shop_name shop,m.id merchantId,c.name category
+  const data=db.prepare(`SELECT p.id,p.status,p.stock_available stock,p.stock_reserved reserved,r.id revisionId,r.version,r.created_at revisionCreatedAt,r.submitted_at submittedAt,r.reviewed_at reviewedAt,r.rejection_reason rejectionReason,${bookColumns},r.name,r.summary,r.age_range ageRange,r.price_cents/100.0 price,r.cover_url coverUrl,r.detail_images_json images,r.audio_url audioUrl,r.review_status approval,m.shop_name shop,m.id merchantId,c.name category
     FROM products p JOIN product_revisions r ON r.id=COALESCE(p.published_revision_id,(SELECT id FROM product_revisions WHERE product_id=p.id ORDER BY version DESC LIMIT 1))
     JOIN merchants m ON m.id=p.merchant_id JOIN categories c ON c.id=p.category_id WHERE p.id=?`).get(String(req.params.id)) as any;
   if(!data)return res.status(404).json({message:'商品不存在'});
-  res.json({data:{...data,images:JSON.parse(data.images||'[]')}});
+  res.json({data:{...data,...readBookDetails(data),images:JSON.parse(data.images||'[]')}});
 });
 adminRouter.get('/reviews/:id/details',(req,res)=>{
-  const data=db.prepare(`SELECT r.id revisionId,r.product_id id,r.version,r.name,r.summary,r.age_range ageRange,r.price_cents/100.0 price,r.cover_url coverUrl,r.detail_images_json images,r.audio_url audioUrl,r.review_status approval,r.rejection_reason rejectionReason,r.submitted_at submittedAt,r.reviewed_at reviewedAt,p.status,p.stock_available stock,p.stock_reserved reserved,m.shop_name shop,c.name category,
+  const data=db.prepare(`SELECT r.id revisionId,r.product_id id,r.version,${bookColumns},r.name,r.summary,r.age_range ageRange,r.price_cents/100.0 price,r.cover_url coverUrl,r.detail_images_json images,r.audio_url audioUrl,r.review_status approval,r.rejection_reason rejectionReason,r.submitted_at submittedAt,r.reviewed_at reviewedAt,p.status,p.stock_available stock,p.stock_reserved reserved,m.shop_name shop,c.name category,
     (SELECT MAX(version) FROM product_revisions WHERE product_id=p.id) latestVersion
     FROM product_revisions r JOIN products p ON p.id=r.product_id JOIN merchants m ON m.id=p.merchant_id JOIN categories c ON c.id=p.category_id WHERE r.id=?`).get(String(req.params.id)) as any;
   if(!data)return res.status(404).json({message:'审核版本不存在'});
-  res.json({data:{...data,images:JSON.parse(data.images||'[]')}});
+  res.json({data:{...data,...readBookDetails(data),images:JSON.parse(data.images||'[]')}});
 });
 adminRouter.put('/products/:id/content',(req,res)=>{
-  const parsed=z.object({revisionId:z.string(),name:z.string().trim().min(1).max(100),summary:z.string().trim().min(1).max(4000),ageRange:z.string().trim().min(1).max(50),coverUrl:z.string().max(1000),images:z.array(z.string().max(1000)).max(9)}).safeParse(req.body);
+  const parsed=z.object({revisionId:z.string(),name:z.string().trim().min(1).max(100),summary:z.string().trim().min(1).max(4000),ageRange:z.string().trim().min(1).max(50),coverUrl:z.string().max(1000),images:z.array(z.string().max(1000)).max(9)}).extend(bookInput.shape).safeParse(req.body);
   if(!parsed.success)return res.status(400).json({message:'请完整填写商品名称、简介、适龄范围和图片'});
   const value=parsed.data,product=db.prepare('SELECT published_revision_id,(SELECT id FROM product_revisions WHERE product_id=? ORDER BY version DESC LIMIT 1) latest_revision_id FROM products WHERE id=?').get(String(req.params.id),String(req.params.id)) as any;
   if(!product)return res.status(404).json({message:'商品不存在'});
@@ -203,12 +205,15 @@ adminRouter.put('/products/:id/content',(req,res)=>{
   const existing=[revision.cover_url,...JSON.parse(revision.detail_images_json||'[]')];
   const urls=[value.coverUrl,...value.images].filter(Boolean);
   if(urls.some(url=>!existing.includes(url)&&!db.prepare('SELECT 1 FROM community_uploads WHERE path=? AND user_id=?').get(url,req.actor!.id)))return res.status(400).json({message:'新增图片必须通过当前管理员上传'});
-  db.prepare('UPDATE product_revisions SET name=?,summary=?,age_range=?,cover_url=?,detail_images_json=? WHERE id=?').run(value.name,value.summary,value.ageRange,value.coverUrl||null,JSON.stringify(value.images),value.revisionId);
-  db.prepare('UPDATE products SET updated_at=? WHERE id=?').run(now(),String(req.params.id));
-  audit(req.actor!.id,req.actor!.name,'products','维护图文',String(req.params.id));broadcast('products','update');broadcast('reviews','update');res.json({ok:true});
+  db.transaction(()=>{
+    db.prepare('UPDATE product_revisions SET name=?,summary=?,age_range=?,cover_url=?,detail_images_json=? WHERE id=?').run(value.name,value.summary,value.ageRange,value.coverUrl||null,JSON.stringify(value.images),value.revisionId);
+    saveBookDetails(value.revisionId,value);
+    db.prepare('UPDATE products SET version=version+1,updated_at=? WHERE id=?').run(now(),String(req.params.id));
+    audit(req.actor!.id,req.actor!.name,'products','维护图文',String(req.params.id));
+  })();broadcast('products','update');broadcast('reviews','update');res.json({ok:true});
 });
 adminRouter.get('/orders/:id/details',(req,res)=>{
-  const id=String(req.params.id),order=db.prepare(`SELECT o.*,u.username buyerAccount,u.nickname buyerName,m.shop_name shop FROM orders o JOIN users u ON u.id=o.user_id JOIN merchants m ON m.id=o.merchant_id WHERE o.id=?`).get(id) as any;
+  const id=String(req.params.id),order=db.prepare(`SELECT o.*,${afterSaleColumns},u.username buyerAccount,u.nickname buyerName,m.shop_name shop FROM orders o JOIN users u ON u.id=o.user_id JOIN merchants m ON m.id=o.merchant_id WHERE o.id=?`).get(id) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
   const items=db.prepare(`SELECT product_id productId,product_name name,cover_url coverUrl,quantity,unit_price_cents/100.0 price,subtotal_cents/100.0 subtotal FROM order_items WHERE order_id=?`).all(id);
   const events=db.prepare(`SELECT action,from_status fromStatus,to_status toStatus,note,created_at createdAt FROM order_events WHERE order_id=? ORDER BY created_at`).all(id);
@@ -225,6 +230,7 @@ adminRouter.put('/orders/:id/manage',(req,res)=>{
   const order=db.prepare('SELECT * FROM orders WHERE id=?').get(id) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
   if(order.version!==value.version)return res.status(409).json({message:'订单已更新，请重新查看'});
+  if(hasBlockingAfterSale(id))return res.status(409).json({message:'订单存在售后或已退款，请在售后管理处理'});
   if(value.action==='cancel'){
     if(order.status!=='PENDING_PAYMENT')return res.status(409).json({message:'仅未付款订单可取消，已付款订单须走售后流程'});
     if(!closePendingCheckout(order.checkout_group_id,req.actor!.id,value.note))return res.status(409).json({message:'订单已处理'});

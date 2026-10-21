@@ -21,6 +21,9 @@ public class MerchantProfileFragment extends Fragment implements LocalDataRefres
         binding.publish.setOnClickListener(v->open(PublishPostActivity.class));
         binding.notifications.setOnClickListener(v->open(NotificationsActivity.class));
         binding.settings.setOnClickListener(v->open(SettingsActivity.class));
+        ServiceEntries.menuBefore(binding.settings,"售后管理",com.huimeng.bookshop.R.drawable.ic_orders,()->ServiceActivity.open(requireContext(),"after-sales"));
+        ServiceEntries.menuBefore(binding.settings,"买家消息",com.huimeng.bookshop.R.drawable.ic_community,()->ServiceActivity.open(requireContext(),"conversations"));
+        ServiceEntries.menuBefore(binding.settings,"意见反馈",com.huimeng.bookshop.R.drawable.ic_review,()->ServiceActivity.open(requireContext(),"feedback"));
         binding.switchRole.setOnClickListener(v->open(RoleSwitchActivity.class));
         binding.editAccount.setOnClickListener(v->open(EditAccountActivity.class));
         binding.logout.setOnClickListener(v->((MainActivity)requireActivity()).logout());
