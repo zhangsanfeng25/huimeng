@@ -1,7 +1,7 @@
 import { SyncStatus } from './SyncStatus';
 import { ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, ChevronLeft, ChevronRight, ClipboardList, FolderTree, Gauge, LogOut, Menu, MessageSquare, PackageCheck, Settings, ShieldCheck, ShoppingBag, Star, Store, Users } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FolderTree, Gauge, LogOut, Menu, MessageSquare, PackageCheck, Settings, ShieldCheck, ShoppingBag, Star, Store, Users } from 'lucide-react';
 import { api, realtime, session } from '../api';
 import { applyAppearance, readAppearance } from '../theme';
 
@@ -18,6 +18,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => window.innerWidth <= 1100);
   const [adminName,setAdminName]=useState('管理员');
   const location = useLocation();
+  const [expandedGroups,setExpandedGroups]=useState<Record<string,boolean>>(()=>{
+    let saved:Record<string,boolean>={};
+    try{saved=JSON.parse(localStorage.getItem('huimeng:sidebar-groups:v1')||'{}');}catch{ /* use the current route */ }
+    const active=navGroups.find(group=>group.label&&group.items.some(item=>item.to===window.location.pathname));
+    return {...saved,...(active?{[active.label]:true}:{})};
+  });
+  useEffect(()=>{
+    const active=navGroups.find(group=>group.label&&group.items.some(item=>item.to===location.pathname));
+    if(active)setExpandedGroups(value=>value[active.label]?value:{...value,[active.label]:true});
+  },[location.pathname]);
+  useEffect(()=>{try{localStorage.setItem('huimeng:sidebar-groups:v1',JSON.stringify(expandedGroups));}catch{ /* storage is optional */ }},[expandedGroups]);
   const navigate = useNavigate();
   const current = location.pathname === '/account' ? '账户安全' : navGroups.flatMap(group => group.items).find(item => item.to === location.pathname)?.label ?? '经营工作台';
   useEffect(() => { applyAppearance(readAppearance()); }, []);
@@ -34,13 +45,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><img src="/images/app_icon-c3.webp" alt="绘梦儿童管理网站图标" /></span><span className="brand-copy"><strong>绘梦儿童管理网站</strong><small>让好绘本，陪伴更多孩子</small></span></div>
       <nav>
-        {navGroups.map(group => <div className="nav-group" key={group.label || 'main'}>
-          {group.label ? <p>{group.label}</p> : null}
-          {group.items.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} aria-label={label} title={label}><Icon size={18} /><span>{label}</span></NavLink>)}
-        </div>)}
+        {navGroups.map((group,index) => {
+          const expanded=!group.label||Boolean(expandedGroups[group.label]),GroupIcon=group.items[0].icon;
+          const active=group.items.some(item=>item.to===location.pathname);
+          return <div className={`nav-group ${active?'is-current':''}`} key={group.label || 'main'}>
+            {group.label?<button type="button" className="sidebar-group-trigger" title={group.label} aria-label={group.label} aria-expanded={expanded} aria-controls={`nav-group-${index}`} onClick={()=>{
+              if(collapsed){setCollapsed(false);setExpandedGroups(value=>({...value,[group.label]:true}));}
+              else setExpandedGroups(value=>({...value,[group.label]:!value[group.label]}));
+            }}><GroupIcon size={18} aria-hidden="true"/><span>{group.label}</span><ChevronDown size={16} className={expanded?'is-open':''} aria-hidden="true"/></button>:null}
+            <div id={`nav-group-${index}`} className={group.label?'sidebar-submenu':''} hidden={!expanded}>
+              {group.items.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} aria-label={label} title={label} onClick={()=>{if(window.innerWidth<=1100)setCollapsed(true);}}><Icon size={18} /><span>{label}</span></NavLink>)}
+            </div>
+          </div>;
+        })}
       </nav>
       <div className="sidebar-art"><img src="/images/app_icon-c3.webp" alt="绘梦软件图标" /><span>用绘本<br />点亮孩子更大的世界</span></div>
     </aside>
+    {!collapsed?<button className="sidebar-backdrop" aria-label="关闭导航菜单" onClick={()=>setCollapsed(true)}/>:null}
     <header className="topbar">
       <button className="icon-button" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? '展开侧栏' : '收起侧栏'}>{collapsed ? <ChevronRight /> : <Menu />}</button>
       <div className="breadcrumb">工作台 <span>/</span> <strong>{current}</strong></div>

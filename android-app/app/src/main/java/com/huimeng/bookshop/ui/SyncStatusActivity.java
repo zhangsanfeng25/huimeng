@@ -14,7 +14,7 @@ public class SyncStatusActivity extends AppCompatActivity {
     private void refresh(){SessionStore session=new SessionStore(this);String space=session.localSpaceId();LocalRepository.IO.execute(()->{try{
         LocalDatabase db=LocalDatabase.get(this);JSONObject info=new LocalSpaceStore(db).info(space);JSONArray pending=db.pending(space);String status=db.metadata("status:"+space),last=db.metadata("last-sync:"+space);
         runOnUiThread(()->{if(isFinishing()||isDestroyed()||!space.equals(session.localSpaceId()))return;
-            binding.status.setText((info.optString("userId").isEmpty()?"本地模式 · 尚未关联网络账号":"网络账号："+info.optString("userId"))+"\n"+status+"\n待同步 / 需要处理："+pending.length()+" 条"+(last.isEmpty()?"":"\n最近完成同步："+last.replace('T',' ').replace("Z"," UTC"))+"\n关闭服务仍可使用；未确认的修改会继续保留本地。");
+            binding.status.setText((info.optString("userId").isEmpty()?"当前未登录":"当前账号："+session.username())+"\n"+status+"\n待同步 / 需要处理："+pending.length()+" 条"+(last.isEmpty()?"":"\n最近完成同步："+last.replace('T',' ').replace("Z"," UTC"))+"\n连接服务器后自动更新，尚未提交的修改会保留。");
             binding.operations.removeAllViews();for(int i=0;i<pending.length();i++)addOperation(pending.optJSONObject(i),space);
         });
     }catch(Exception e){runOnUiThread(()->binding.status.setText("读取本地状态失败："+e.getMessage()));}});}

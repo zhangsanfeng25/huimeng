@@ -67,7 +67,7 @@ public final class ApiClient {
         String token=session.token();
         JsonObjectRequest request=new JsonObjectRequest(method, BuildConfig.API_BASE_URL+path,body,success::accept,error->{
             if(unauthorized(path,error.networkResponse==null?0:error.networkResponse.statusCode,token))return;
-            String message="网络连接失败，请确认本地服务已启动";
+            String message="无法连接服务器，请启动控制服务后重试";
             if(error.networkResponse!=null&&error.networkResponse.data!=null){try{message=new JSONObject(new String(error.networkResponse.data)).optString("message",message);}catch(Exception ignored){}}
             failure.accept(message);
         }){
@@ -80,7 +80,7 @@ public final class ApiClient {
     private boolean unauthorized(String path,int status,String requestToken){
         if(status!=401||path.startsWith("auth/"))return false;
         if(!session.token().equals(requestToken))return true;
-        if(session.hasLocalSpace()){session.clearNetworkSession();return false;}
+        if(session.hasLocalSpace()){session.invalidateNetworkCredentials(context);return false;}
         session.clear();
         synchronized(ApiClient.class){if(redirecting)return true;redirecting=true;}
         Intent intent=new Intent(context,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);

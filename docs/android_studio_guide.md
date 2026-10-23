@@ -6,7 +6,16 @@
 2. 启动 Android Studio，选择 **Open**。
 3. 只选择 `huimeng\android-app` 文件夹，不要选择 `huimeng`、`html` 或 `app` 子文件夹。
 4. 等待 Gradle 同步完成。首次同步需要下载项目指定的 Gradle、Android Gradle Plugin 和 Android 依赖。
-5. 如果提示缺少 SDK，请安装 Android SDK 35，并确保使用 JDK 17。
+5. 如果提示缺少 SDK，请安装 Android SDK 35。当前工程的 Gradle Daemon JVM Criteria 指定 **JetBrains JDK 21**，Java 源码级别仍为 17；两者不是同一设置。当前机器已有 `C:\Users\Hugo-Gao\.jdks\jbr-21.0.11`。不要直接改成新版 Android Studio 内置的 JBR 25。
+
+### 打开或同步较慢时
+
+- 保留 `.gradle` 和用户级 Gradle 缓存；频繁清理会重新下载依赖、重新配置和编译。`.gitignore` 只控制上传，不控制 IDE 索引。
+- 只打开 `android-app`，避免将父目录下的网页依赖、服务端、历史 APK 和输出目录一起作为 Android 工程导入。
+- 工程已启用本地构建缓存与配置缓存。配置缓存服务于重复 Gradle 任务，不等同于 Android Studio 的模型同步缓存；首次运行和修改构建脚本后仍需生成缓存。
+- 当前使用固定版本依赖；依赖已完整下载时，可临时使用 Gradle 的离线模式排查网络影响。新增依赖、缺少 SDK 或缺少 JDK 时需恢复联网，不建议永久强制离线。
+- 若提示找不到匹配的 JDK，先核对 JDK 21 的安装及 Gradle 设置；保留工程的 Daemon JVM Criteria，它优先于 `JAVA_HOME`。本工程不声明 Java toolchain，已去除额外的 Foojay resolver 插件；Criteria 自带的 JDK 下载地址仍保留。
+- IDE 启动、Gradle 同步、APK 编译、模拟器启动应分别计时。第三方 IDE 插件或模拟器冷启动的延迟，无法靠减少业务代码解决。可查看 **Help → Show Log in Explorer** 中对应时间段的 `idea.log`。
 
 ## 二、先启动服务端
 

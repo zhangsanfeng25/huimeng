@@ -29,10 +29,7 @@ public final class ServiceEntries {
         parent.addView(button,parent.indexOfChild(anchor),new LinearLayout.LayoutParams(-1,-2));return button;
     }
     public static void account(android.app.Activity activity,Runnable then){
-        if(!new com.huimeng.bookshop.core.SessionStore(activity).token().isEmpty()){then.run();return;}
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle("当前操作仅会保存在手机")
-            .setMessage("当前网络账号未登录。仅在本地保存的订单不会显示在管理员端。登录原账号后才能上传并确认订单与付款；也可以继续保存离线意向。")
-            .setNegativeButton("继续保存本地",(d,w)->then.run())
-            .setPositiveButton("登录原账号并同步",(d,w)->activity.startActivity(new android.content.Intent(activity,LoginActivity.class).putExtra("login_notice","登录原账号后继续同步本地订单"))).show();
+        if(new com.huimeng.bookshop.core.SessionStore(activity).authenticated()){then.run();return;}
+        activity.startActivity(new android.content.Intent(activity,LoginActivity.class).putExtra("login_notice","请先登录后继续操作"));
     }
 }

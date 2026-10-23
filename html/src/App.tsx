@@ -23,8 +23,8 @@ export default function App() {
     <Route path="/community" element={<Protected><CommunityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
     <Route path="/account" element={<Protected><AccountPage /></Protected>} />
-    <Route path="/after-sales" element={<Protected><ServicePage kind="after-sales" /></Protected>} />
-    <Route path="/feedback" element={<Protected><ServicePage kind="feedback" /></Protected>} />
+    <Route path="/after-sales" element={<Protected><ServicePage key="after-sales" kind="after-sales" /></Protected>} />
+    <Route path="/feedback" element={<Protected><ServicePage key="feedback" kind="feedback" /></Protected>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Suspense>;
 }

@@ -1,4 +1,10 @@
-# 当前版本：1.1.5（2026-10-21）
+# 当前版本：1.1.6（2026-10-24）
+
+GitHub正式发行版：https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.1.6 。正常包名，versionCode 33，Debug模拟器演示包。SHA-256：C1D68FE6E7EAE533CFE1D74B685C1161C1D3A2F46CDCB672E24D570182206DFD。
+
+安装包：../output/android-1.1.6/huimeng-1.1.6.apk。实际改动、验证结果、SHA-256及限制见 ../docs/releases/android-1.1.6.md。本版为后续局部界面优化前的备份基线，保持现有风格。
+
+# 历史正式版本：1.1.5（2026-10-21）
 
 GitHub 正式发行版：https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.1.5 。此处“正式发行版”指 GitHub 发布状态，APK 构建类型仍为 Debug。
 

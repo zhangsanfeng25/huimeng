@@ -47,9 +47,21 @@ authRouter.post('/register',loginLimit,asyncRoute(async(req,res)=>{
   return res.status(201).json({id,message:'注册成功'});
 }));
 
-// Re-enable only after a verified, expiring recovery credential is implemented.
 authRouter.post('/forgot-password',loginLimit,(_req,res)=>{
-  res.status(501).json({message:'自助找回尚未接入身份验证，请联系管理员协助处理'});
+  if(!config.demoMode)return res.status(403).json({message:'直接重置仅限本地演示模式，当前服务未开放'});
+  const parsed=z.object({account:z.string().trim().min(1).max(254),newPassword:z.string().min(8).max(64)}).safeParse(_req.body);
+  if(!parsed.success)return res.status(400).json({message:'请输入已绑定的邮箱或手机号，以及 8 至 64 位新密码'});
+  const {account,newPassword}=parsed.data;
+  const matches=db.prepare("SELECT id,nickname FROM users WHERE status='ACTIVE' AND (email=? OR phone=?)").all(account,account) as Array<{id:string;nickname:string}>;
+  if(!matches.length)return res.status(404).json({message:'该邮箱或手机号未绑定账号'});
+  if(matches.length!==1)return res.status(409).json({message:'联系方式关联多个账号，请联系管理员处理'});
+  const user=matches[0];
+  db.transaction(()=>{
+   db.prepare('UPDATE users SET password_hash=?,updated_at=?,version=version+1 WHERE id=?').run(hashPassword(newPassword),now(),user.id);
+   db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);
+   audit(user.id,user.nickname,'账户','演示找回密码',user.id,'成功','通过已保存联系方式重置');
+  })();
+  broadcast('users','update');return res.json({ok:true,userId:user.id,message:'密码已重置，请使用新密码登录'});
 });
 
 authRouter.get('/me',requireAuth(),(req,res)=>{

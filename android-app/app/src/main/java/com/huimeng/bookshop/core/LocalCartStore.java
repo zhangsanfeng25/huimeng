@@ -22,6 +22,7 @@ public final class LocalCartStore {
 
     public static void resolve(Context context,Consumer<LocalCartStore> ready,Consumer<String> failure){
         SessionStore session=new SessionStore(context);
+        if(!session.authenticated()){ready.accept(new LocalCartStore(context,"guest:"+session.localSpaceId()));return;}
         if(!session.accountId().isEmpty()){refresh(context,new LocalCartStore(context,session.accountId()),ready,failure);return;}
         new ApiClient(context).get("auth/me",result->{JSONObject user=result.optJSONObject("user");String id=user==null?"":user.optString("id");
             if(id.isEmpty()){failure.accept("无法确认当前账号，请重新登录");return;}

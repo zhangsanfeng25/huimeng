@@ -30,7 +30,6 @@ public class PaymentActivity extends AppCompatActivity {
         groupId=getIntent().getStringExtra("group_id");if(groupId==null||groupId.isEmpty()){finish();return;}
         SessionStore session=new SessionStore(this);space=session.localSpaceId();owner=session.accountId();awaitingConfirmation=state!=null&&state.getBoolean("awaiting_payment",false);
         binding.amount.setText(String.format(Locale.CHINA,"¥%.2f",getIntent().getIntExtra("amount_cents",0)/100.0));binding.order.setText("结算单号  "+groupId);
-        ServiceEntries.before(binding.order,"查看账号与同步状态",()->startActivity(new Intent(this,SyncStatusActivity.class)));
         binding.back.setOnClickListener(v->finish());binding.confirm.setOnClickListener(v->confirmPayment());binding.confirm.setEnabled(false);
         com.huimeng.bookshop.core.sync.SyncStatusStore.observe(this,value->{if(active&&awaitingConfirmation&&!paying)checkPendingPayment();});
     }
@@ -78,7 +77,7 @@ public class PaymentActivity extends AppCompatActivity {
         },message->{checking=false;error(message);});}
     private void schedule(){if(!active||!alive())return;if(SystemClock.uptimeMillis()>=deadline){render("服务端尚未确认付款。可以重新确认，或在账号与同步状态中查看需处理的订单；不会重复扣款。");return;}handler.removeCallbacks(poll);handler.postDelayed(poll,1200);}
     private void networkError(SyncTransport.TransportError failure){checking=false;if(!alive())return;if(failure.status==401){new SessionStore(this).clearNetworkSession();error("网络登录已失效，请登录本订单所属账号后继续付款。");}else error(failure.status==0?"无法连接商城服务，请确认控制中心已启动且模拟器能访问服务，再点击重试。":failure.message);}
-    private void showSuccess(){if(!alive())return;paying=false;paid=true;awaitingConfirmation=false;canPay=false;handler.removeCallbacks(poll);render("服务端已确认模拟付款。");if(!active){successReady=true;return;}successReady=false;LocalCartStore.resolve(this,cart->{},ignored->{});startActivity(new Intent(this,PaymentSuccessActivity.class).putExtra("group_id",groupId));finish();}
+    private void showSuccess(){if(!alive())return;paying=false;paid=true;awaitingConfirmation=false;canPay=false;handler.removeCallbacks(poll);render("服务端已确认模拟付款。");if(!active){successReady=true;return;}successReady=false;LocalCartStore.resolve(this,cart->{},ignored->{});startActivity(new Intent(this,PaymentSuccessActivity.class).putExtra("group_id",groupId).putExtra("return_product_id",getIntent().getStringExtra("return_product_id")).putExtra("return_to_cart",getIntent().getBooleanExtra("return_to_cart",false)));finish();}
     private void error(String message){if(!alive())return;paying=false;handler.removeCallbacks(poll);render(message);}
     @Override protected void onResume(){super.onResume();active=true;generation++;paying=false;checking=false;reading=false;if(binding==null||space==null)return;SessionStore session=new SessionStore(this);if(!space.equals(session.localSpaceId())){if(!owner.isEmpty()&&!owner.equals(session.accountId())){finish();return;}space=session.localSpaceId();reading=false;checking=false;}if(successReady){showSuccess();return;}if(session.hasLocalSpace())SyncCoordinator.get(this).start(space);loadCheckout();}
     @Override protected void onPause(){active=false;generation++;paying=false;checking=false;reading=false;handler.removeCallbacks(poll);super.onPause();}

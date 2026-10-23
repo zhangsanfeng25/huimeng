@@ -6,9 +6,10 @@ import type {BusinessContext} from './context.js';
 import type {Actor} from '../sync/types.js';
 import {SyncError} from '../sync/types.js';
 import {broadcastPrivate} from '../core/events.js';
+import {refundableItems,selectSaleItems,saleItems,refundedAmount} from './after-sale-items.js';
 
 type Row=Record<string,any>;
-export const afterSaleColumns=`COALESCE((SELECT status FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_state,COALESCE((SELECT id FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_id,COALESCE((SELECT amount_cents FROM refunds WHERE order_id=o.id),0) refunded_cents`;
+export const afterSaleColumns=`COALESCE((SELECT status FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_state,COALESCE((SELECT id FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_id,COALESCE((SELECT SUM(amount_cents) FROM refunds WHERE order_id=o.id),0) refunded_cents`;
 /** Recorded actions only. Order ownership must be checked by the caller before exposing them. */
 export function orderServiceEvents(orderId:string){
  return db.prepare('SELECT e.id,e.action,e.note,e.created_at createdAt,a.type FROM after_sale_events e JOIN after_sales a ON a.id=e.after_sale_id WHERE a.order_id=? ORDER BY e.created_at,e.id').all(orderId);
@@ -33,10 +34,10 @@ function saleEvent(a:Actor,sale:Row,action:string,note=''){
  db.prepare('INSERT INTO after_sale_events(after_sale_id,actor_id,action,note,created_at) VALUES(?,?,?,?,?)').run(sale.id,a.id,action,note,now());
  notify(sale.buyer_id,'售后进度更新',`售后单 ${sale.id}：${note||action}`);notify(owner(sale.merchant_id),'售后进度更新',`售后单 ${sale.id}：${note||action}`);
 }
-export function hasBlockingAfterSale(orderId:string){return !!db.prepare("SELECT 1 FROM after_sales WHERE order_id=? AND status NOT IN ('REJECTED','CANCELLED')").get(orderId);}
+export function hasBlockingAfterSale(orderId:string){return !!db.prepare("SELECT 1 FROM after_sales WHERE order_id=? AND status NOT IN ('REJECTED','CANCELLED','COMPLETED')").get(orderId)||!!db.prepare('SELECT 1 FROM orders WHERE id=? AND total_cents>0 AND total_cents<=(SELECT COALESCE(SUM(amount_cents),0) FROM refunds WHERE order_id=?)').get(orderId,orderId);}
 export function orderAfterSale(a:Actor,orderId:string){
  const order=get('orders',orderId);canSee(a,'after-sales',{buyer_id:order.user_id,merchant_id:order.merchant_id});
- return {order:{id:order.id,status:order.status,total_cents:order.total_cents,merchant_id:order.merchant_id},sale:db.prepare('SELECT * FROM after_sales WHERE order_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(orderId)||null};
+ return {order:{id:order.id,status:order.status,total_cents:order.total_cents,refunded_cents:refundedAmount(orderId),merchant_id:order.merchant_id},items:refundableItems(orderId),sale:db.prepare('SELECT * FROM after_sales WHERE order_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(orderId)||null};
 }
 
 export function serviceList(a:Actor,kind:string,admin=false):Row[]{
@@ -55,7 +56,11 @@ export function serviceList(a:Actor,kind:string,admin=false):Row[]{
 export function serviceDetail(a:Actor,kind:string,key:string,admin=false,before=0):Row{
  const table=kind==='after-sales'?'after_sales':kind==='feedback'?'feedbacks':kind==='conversations'?'conversations':'';if(!table)fail('未知服务类型',404);
  const row=get(table,key);canSee(a,kind,row,admin);
- if(kind==='after-sales')return {...row,images:JSON.parse(row.images_json),events:db.prepare('SELECT e.*,u.nickname actor FROM after_sale_events e JOIN users u ON u.id=e.actor_id WHERE after_sale_id=? ORDER BY e.id').all(key),items:db.prepare('SELECT * FROM order_items WHERE order_id=?').all(row.order_id),refund:db.prepare('SELECT * FROM refunds WHERE after_sale_id=?').get(key)||null};
+ if(kind==='after-sales'){
+  const order=get('orders',row.order_id);
+  const canApplyAgain=['REJECTED','CANCELLED','COMPLETED'].includes(row.status)&&['PAID','SHIPPED','COMPLETED'].includes(order.status)&&!hasBlockingAfterSale(order.id)&&refundableItems(order.id).some(item=>item.refundable_cents>0&&item.returnable_quantity>0);
+  return {...row,can_apply_again:canApplyAgain,images:JSON.parse(row.images_json),events:db.prepare('SELECT e.*,u.nickname actor FROM after_sale_events e JOIN users u ON u.id=e.actor_id WHERE after_sale_id=? ORDER BY e.id').all(key),items:saleItems(key),refund:db.prepare('SELECT * FROM refunds WHERE after_sale_id=?').get(key)||null};
+ }
  if(kind==='feedback')return {...row,replies:db.prepare('SELECT r.*,u.nickname sender FROM feedback_replies r JOIN users u ON u.id=r.sender_id WHERE feedback_id=? ORDER BY r.id').all(key)};
  if(admin)fail('无权通过管理接口读取私人聊天',403);
  const messages=db.prepare(`SELECT x.*,u.nickname sender,p.name product_name,oi.product_name order_product FROM chat_messages x JOIN users u ON u.id=x.sender_id LEFT JOIN product_revisions p ON p.id=(SELECT published_revision_id FROM products WHERE id=x.product_id) LEFT JOIN order_items oi ON oi.id=(SELECT id FROM order_items WHERE order_id=x.order_id LIMIT 1) WHERE x.conversation_id=? AND (?=0 OR x.id<?) ORDER BY x.id DESC LIMIT 50`).all(key,before,before) as Row[];
@@ -66,15 +71,18 @@ function saleAction(ctx:BusinessContext):Row{
  const {actor:a,payload:b,params}=ctx,key=params.id,action=String(b.action);
  if(action==='create'){
   if(merchant(a)||!a.roles.includes('USER'))fail('请以买家身份申请售后',403);
-  const v=input(z.object({orderId:client,type:z.enum(['REFUND_ONLY','RETURN_REFUND']),reason:z.string().trim().min(1).max(200),description:z.string().trim().max(2000).default(''),images:z.array(z.string()).max(3).default([]),clientId:client}),b);
+  const v=input(z.object({orderId:client,type:z.enum(['REFUND_ONLY','RETURN_REFUND']),reason:z.string().trim().min(1).max(200),description:z.string().trim().max(2000).default(''),images:z.array(z.string()).max(3).default([]),clientId:client,items:z.array(z.object({orderItemId:client,quantity:z.number().int().positive(),amountCents:z.number().int().positive()})).min(1).max(100).optional()}),b);
   const previous=db.prepare('SELECT * FROM after_sales WHERE buyer_id=? AND client_id=?').get(a.id,v.clientId) as Row|undefined;
-  if(previous){if(previous.order_id!==v.orderId||previous.type!==v.type||previous.reason!==v.reason||previous.description!==v.description||previous.images_json!==JSON.stringify(v.images))fail('同一请求标识不能用于不同申请');return {data:previous,reused:true};}
+  if(previous){const oldItems=saleItems(previous.id);const changed=v.items&&(v.items.length!==oldItems.length||v.items.some(i=>!oldItems.some(o=>o.id===i.orderItemId&&o.quantity===i.quantity&&o.amount_cents===i.amountCents)));if(previous.order_id!==v.orderId||previous.type!==v.type||previous.reason!==v.reason||previous.description!==v.description||previous.images_json!==JSON.stringify(v.images)||changed)fail('同一请求标识不能用于不同申请');return {data:previous,reused:true};}
   const order=get('orders',v.orderId);if(order.user_id!==a.id)fail('无权为此订单申请售后',403);
   if(!['PAID','SHIPPED','COMPLETED'].includes(order.status))fail('仅已付款订单可申请售后');
-  if(hasBlockingAfterSale(order.id))fail('此订单已有进行中或已退款的售后');
-  if((v.type==='REFUND_ONLY')!==(order.status==='PAID'))fail('未发货选择仅退款，已发货选择退货退款');
+  if(hasBlockingAfterSale(order.id))fail('此订单已有进行中或已全额退款的售后');
+  if(v.type==='RETURN_REFUND'&&order.status==='PAID')fail('未发货订单请选择仅退款');
+  const items=selectSaleItems(order,v.type,v.items),amount=items.reduce((sum,i)=>sum+i.amountCents,0);
   if(v.images.some(url=>!db.prepare('SELECT 1 FROM community_uploads WHERE path=? AND user_id=?').get(url,a.id)))fail('凭证必须使用本人上传的图片',400);
-  const stamp=now(),sid=id('AS');db.prepare("INSERT INTO after_sales(id,order_id,buyer_id,merchant_id,type,amount_cents,reason,description,images_json,status,client_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'MERCHANT_REVIEW',?,?,?)").run(sid,order.id,a.id,order.merchant_id,v.type,order.total_cents,v.reason,v.description,JSON.stringify(v.images),v.clientId,stamp,stamp);
+  const stamp=now(),sid=id('AS');db.prepare("INSERT INTO after_sales(id,order_id,buyer_id,merchant_id,type,amount_cents,reason,description,images_json,status,client_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'MERCHANT_REVIEW',?,?,?)").run(sid,order.id,a.id,order.merchant_id,v.type,amount,v.reason,v.description,JSON.stringify(v.images),v.clientId,stamp,stamp);
+  const insert=db.prepare('INSERT INTO after_sale_items(after_sale_id,order_item_id,quantity,amount_cents,restock_quantity) VALUES(?,?,?,?,?)');
+  for(const item of items)insert.run(sid,item.orderItemId,item.quantity,item.amountCents,item.restockQuantity);
   const row=get('after_sales',sid);saleEvent(a,row,'CREATE','买家提交售后');return {data:row};
  }
  const row=get('after_sales',key),isAdmin=writer(a);canSee(a,'after-sales',row,isAdmin);
@@ -104,9 +112,10 @@ function saleAction(ctx:BusinessContext):Row{
   const order=get('orders',row.order_id);const payment=db.prepare('SELECT method FROM payments WHERE checkout_group_id=?').get(order.checkout_group_id) as Row|undefined;
   if(payment&&!String(payment.method).startsWith('DEMO'))fail('真实支付不能使用演示退款');
   db.prepare("INSERT INTO refunds(id,after_sale_id,order_id,amount_cents,method,status,created_at) VALUES(?,?,?,?,'DEMO','COMPLETED',?)").run(id('RF'),key,row.order_id,row.amount_cents,now());
-  for(const item of db.prepare('SELECT product_id,quantity FROM order_items WHERE order_id=?').all(row.order_id) as Row[]){
-   db.prepare('UPDATE products SET stock_available=stock_available+?,updated_at=? WHERE id=?').run(item.quantity,now(),item.product_id);
-   db.prepare("INSERT INTO stock_movements(product_id,order_id,type,available_delta,reserved_delta,created_at) VALUES(?,?,'REFUND_RETURN',?,0,?)").run(item.product_id,row.order_id,item.quantity,now());
+  for(const item of saleItems(key)){
+   if(!item.restock_quantity)continue;
+   db.prepare('UPDATE products SET stock_available=stock_available+?,updated_at=? WHERE id=?').run(item.restock_quantity,now(),item.product_id);
+   db.prepare("INSERT INTO stock_movements(product_id,order_id,type,available_delta,reserved_delta,created_at) VALUES(?,?,'REFUND_RETURN',?,0,?)").run(item.product_id,row.order_id,item.restock_quantity,now());
   }
   next='COMPLETED';note='演示退款完成，金额 '+(row.amount_cents/100).toFixed(2)+' 元';
  }else fail('不支持的售后操作',400);

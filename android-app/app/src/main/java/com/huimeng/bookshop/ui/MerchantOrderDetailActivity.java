@@ -38,7 +38,7 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
             if(items!=null)for(int i=0;i<items.length();i++){JSONObject item=items.optJSONObject(i);if(item==null)continue;
                 ItemOrderProductBinding line=ItemOrderProductBinding.inflate(LayoutInflater.from(this),binding.itemList,false);
                 String name=item.optString("productName","绘本");line.name.setText(name);
-                line.quantity.setText("单价 "+String.format(Locale.CHINA,"¥%.2f",item.optInt("unitPriceCents")/100.0)+"  ·  数量 × "+item.optInt("quantity",1));
+                line.quantity.setText("单价 "+String.format(Locale.CHINA,"¥%.2f",item.optInt("unitPriceCents")/100.0)+"  ·  数量 × "+item.optInt("quantity",1)+(item.optInt("cancelledQuantity")>0?"\n已取消 "+item.optInt("cancelledQuantity")+" 件 · 剩余履约 "+item.optInt("fulfillableQuantity")+" 件":""));
                 line.price.setText(String.format(Locale.CHINA,"¥%.2f",item.optInt("subtotalCents")/100.0));
                 Glide.with(line.cover).load(ApiClient.assetUrl(item.optString("coverUrl")))
                     .placeholder(new BookCoverDrawable(name)).error(new BookCoverDrawable(name)).centerCrop().into(line.cover);
@@ -46,7 +46,7 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
             binding.timeline.setText(OrderProgress.format(data));
             String action=action(logistics);binding.action.setVisibility(action.isEmpty()?View.GONE:View.VISIBLE);
             binding.action.setText(action);
-            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(afterSale.isEmpty()?View.GONE:View.VISIBLE);if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.setText("已退款 · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.action.setVisibility(View.GONE);}
+            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(afterSale.isEmpty()?View.GONE:View.VISIBLE);if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.append("\n"+AfterSaleState.refundLabel(data)+" · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(AfterSaleState.blocked(data))binding.action.setVisibility(View.GONE);}
         },this::error);
     }
     private void advance(){new ApiClient(this).post("merchant/orders/"+orderId+"/advance",new JSONObject(),result->{

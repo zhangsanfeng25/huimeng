@@ -38,7 +38,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
     private String previousTemporaryToken;
     private final Map<String,Map<String,?>> auxiliaryPreferences=new HashMap<>();
     private final AtomicInteger calls = new AtomicInteger();
-    private final AtomicInteger nonNoticeCalls = new AtomicInteger();
+    private final AtomicInteger nonMessageCalls = new AtomicInteger();
     private final AtomicInteger logisticsVersion = new AtomicInteger();
     private volatile String lastCatalog="";
     private final AtomicInteger addedQuantity=new AtomicInteger();
@@ -68,7 +68,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         previousQueue = (RequestQueue)requests.get(app);
         fixtureQueue = new RequestQueue(new NoCache(), request -> {
             calls.incrementAndGet();
-            if(!request.getUrl().endsWith("me/notifications"))nonNoticeCalls.incrementAndGet();
+            if(!request.getUrl().endsWith("me/notifications")&&!request.getUrl().endsWith("service/conversations"))nonMessageCalls.incrementAndGet();
             if(request.getUrl().endsWith("auth/me")&&request.getMethod()==com.android.volley.Request.Method.PUT)try{savedAccount=new JSONObject(new String(request.getBody(),StandardCharsets.UTF_8));accountWrites.incrementAndGet();}catch(Exception error){throw new RuntimeException(error);}
             if(request.getUrl().endsWith("auth/me/avatar"))try{savedAvatar=new JSONObject(new String(request.getBody(),StandardCharsets.UTF_8)).getString("avatarUrl");}catch(Exception error){throw new RuntimeException(error);}
             if(request.getUrl().endsWith("community/posts"))communityReads.incrementAndGet();
@@ -269,10 +269,12 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
             }catch(org.json.JSONException error){throw new AssertionError(error);}
         });
     }
-    public void testLoginHelpExplainsRecoveryWithoutOfferingUnverifiedReset() throws Throwable {
+    public void testLoginRecoveryOpensDemoContactReset() throws Throwable {
         Activity login=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));getInstrumentation().waitForIdleSync();
         Instrumentation.ActivityMonitor recovery=getInstrumentation().addMonitor(ForgotPasswordActivity.class.getName(),null,false);
-        runTestOnUiThread(()->{android.widget.TextView help=login.findViewById(R.id.forgotPassword);assertEquals("账号帮助",help.getText().toString());help.performClick();});getInstrumentation().waitForIdleSync();assertEquals(0,recovery.getHits());getInstrumentation().removeMonitor(recovery);runTestOnUiThread(login::finish);
+        Activity page=null;
+        try{runTestOnUiThread(()->{android.widget.TextView help=login.findViewById(R.id.forgotPassword);assertEquals("忘记密码",help.getText().toString());help.performClick();});page=getInstrumentation().waitForMonitorWithTimeout(recovery,5000);assertNotNull("应打开已确认的演示找回密码页面",page);assertNotNull(page.findViewById(R.id.confirmPassword));}
+        finally{getInstrumentation().removeMonitor(recovery);if(page!=null){Activity opened=page;runTestOnUiThread(opened::finish);}runTestOnUiThread(login::finish);}
     }
 
     public void testAuthorAvatarAndNameOpenProfileAndPost() throws Throwable {
@@ -435,7 +437,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
     public void testSwitchTabsRetainsHomeAndDoesNotReload() throws Throwable {
         final Fragment[] home = new Fragment[1];
         runTestOnUiThread(() -> home[0] = activity.getSupportFragmentManager().getPrimaryNavigationFragment());
-        int initialCalls = nonNoticeCalls.get();
+        int initialCalls = nonMessageCalls.get();
         runTestOnUiThread(() -> activity.selectTab(2)); getInstrumentation().waitForIdleSync();
         runTestOnUiThread(() -> activity.selectTab(3)); getInstrumentation().waitForIdleSync();
         runTestOnUiThread(() -> activity.selectTab(4)); getInstrumentation().waitForIdleSync();
@@ -445,7 +447,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
             assertFalse("首页应重新显示", home[0].isHidden());
         });
         SystemClock.sleep(5500);
-        assertEquals("切换时保留现有页面数据；消息页允许实时刷新", initialCalls, nonNoticeCalls.get());
+        assertEquals("切换时保留现有页面数据；系统通知与会话消息允许实时刷新", initialCalls, nonMessageCalls.get());
     }
 
     public void testPullIndicatorFollowsClampsAndRefreshesOnlyOnRelease() throws Throwable {

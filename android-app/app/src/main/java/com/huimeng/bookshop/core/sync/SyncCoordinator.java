@@ -27,7 +27,7 @@ public final class SyncCoordinator {
    main.post(()->{if(!valid(g))return;transport.json(0,"health",null,health->{if(!valid(g))return;
     LocalRepository.IO.execute(()->{if(!valid(g))return;db.metadata("service-connected:"+captured,"1");main.post(()->{
      if(!valid(g))return;
-     if(user.isEmpty()){finish(g,"服务已连接 · 关联原网络账号后上传本地修改",15000);return;}
+     if(user.isEmpty()){finish(g,"服务器已连接，登录后同步个人数据",15000);return;}
      SessionStore session=new SessionStore(context);
      if(!BuildConfig.API_BASE_URL.equals(binding.optString("origin"))){finish(g,"服务地址与本地账号绑定不一致",15000);return;}
      if(session.token().isEmpty()){finish(g,"服务已连接 · 登录原账号后同步个人数据",15000);return;}
@@ -40,7 +40,7 @@ public final class SyncCoordinator {
  }
  private boolean valid(int g){return running&&generation==g&&space.equals(new SessionStore(context).localSpaceId());}
  public static long retryDelay(int attempts,long retryAfter){if(retryAfter>0)return retryAfter;long[] steps={2000,5000,15000,30000,60000,120000,240000,300000};return steps[Math.max(0,Math.min(steps.length-1,attempts-1))];}
- private void networkFailure(int g,SyncTransport.TransportError error){if(!valid(g))return;if(error.status==401)new SessionStore(context).clearNetworkSession();long delay=retryDelay(++failures,error.retryAfterMs);finish(g,error.message,delay==300000?delay:Math.min(300000,delay+(long)(Math.random()*500)));}
+ private void networkFailure(int g,SyncTransport.TransportError error){if(!valid(g))return;if(error.status==401)new SessionStore(context).invalidateNetworkCredentials(context);long delay=retryDelay(++failures,error.retryAfterMs);finish(g,error.message,delay==300000?delay:Math.min(300000,delay+(long)(Math.random()*500)));}
  private void finish(int g,String message,long delay){LocalRepository.IO.execute(()->{if(!valid(g))return;LocalDatabase db=LocalDatabase.get(context);db.metadata("status:"+space,message);int pending=db.pending(space).length();main.post(()->{if(!valid(g))return;busy=false;SyncStatusStore.publish(message,pending);main.postDelayed(this::requestSync,delay);});});}
  private void uploadMedia(int g){if(!valid(g))return;LocalDatabase db=LocalDatabase.get(context);String id,purpose,path,hash;try(Cursor c=db.getReadableDatabase().rawQuery("SELECT id,purpose,path,sha256 FROM local_media WHERE space_id=? AND state='PENDING' ORDER BY rowid LIMIT 1",new String[]{space})){if(!c.moveToFirst()){uploadOperations(g);return;}id=c.getString(0);purpose=c.getString(1);path=c.getString(2);hash=c.getString(3);}
   try{byte[] bytes=Files.readAllBytes(new File(path).toPath());main.post(()->{if(!valid(g))return;transport.media(bytes,id,purpose,hash,result->LocalRepository.IO.execute(()->{if(!valid(g))return;ContentValues v=new ContentValues();v.put("state","READY");v.put("url",result.optString("url"));db.getWritableDatabase().update("local_media",v,"space_id=? AND id=?",new String[]{space,id});uploadMedia(g);}),error->{if(!valid(g))return;if(error.status==0||error.status==401||error.status>=500||error.status==429){networkFailure(g,error);return;}LocalRepository.IO.execute(()->{if(!valid(g))return;ContentValues v=new ContentValues();v.put("state","BLOCKED");db.getWritableDatabase().update("local_media",v,"space_id=? AND id=?",new String[]{space,id});uploadMedia(g);});});});

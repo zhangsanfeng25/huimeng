@@ -1,3 +1,4 @@
+import {withFulfillment} from '../services/after-sale-items.js';
 import {bookInput,bookColumns,readBookDetails,saveBookDetails} from '../services/book-details.js';
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
@@ -62,7 +63,7 @@ adminRouter.get('/events',(_req,res)=>{res.set({'Content-Type':'text/event-strea
 adminRouter.get('/dashboard',(req,res)=>{
   const days=Number(req.query.days)===30?30:7;
   const orderRows=rows('orders') as any[],productRows=rows('products') as any[],reviewRows=rows('reviews') as any[],userRows=rows('users') as any[];
-  const metrics={orders:orderRows.length,turnover:orderRows.filter(x=>x.paidAt&&x.status!=='已取消').reduce((n,x)=>n+Number(x.amount||0)-Number(x.refunded_cents||0)/100,0),products:productRows.filter(x=>x.status==='销售中').length,users:userRows.length,pendingReviews:reviewRows.filter(x=>x.status==='待审核').length,pendingShipment:orderRows.filter(x=>(x.status==='准备出库'||x.status==='待发货')&&(!x.after_sale_state||['REJECTED','CANCELLED'].includes(x.after_sale_state))).length};
+  const metrics={orders:orderRows.length,turnover:orderRows.filter(x=>x.paidAt&&x.status!=='已取消').reduce((n,x)=>n+Number(x.amount||0)-Number(x.refunded_cents||0)/100,0),products:productRows.filter(x=>x.status==='销售中').length,users:userRows.length,pendingReviews:reviewRows.filter(x=>x.status==='待审核').length,pendingShipment:orderRows.filter(x=>(x.status==='准备出库'||x.status==='待发货')&&(!x.after_sale_state||['REJECTED','CANCELLED','COMPLETED'].includes(x.after_sale_state))&&Number(x.refunded_cents||0)<Number(x.amount||0)*100).length};
   const grouped=new Map<string,{orders:number;turnover:number}>();
   for(const order of orderRows){const key=String(order.orderedAt||'').slice(0,10);if(!key)continue;const point=grouped.get(key)||{orders:0,turnover:0};point.orders+=1;if(order.paidAt&&order.status!=='已取消')point.turnover+=Number(order.amount||0)-Number(order.refunded_cents||0)/100;grouped.set(key,point)}
   const registrations=db.prepare(`SELECT substr(created_at,1,10) day,COUNT(*) count FROM users WHERE EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=users.id AND r.role='USER') GROUP BY day`).all() as {day:string;count:number}[];
@@ -215,7 +216,7 @@ adminRouter.put('/products/:id/content',(req,res)=>{
 adminRouter.get('/orders/:id/details',(req,res)=>{
   const id=String(req.params.id),order=db.prepare(`SELECT o.*,${afterSaleColumns},u.username buyerAccount,u.nickname buyerName,m.shop_name shop FROM orders o JOIN users u ON u.id=o.user_id JOIN merchants m ON m.id=o.merchant_id WHERE o.id=?`).get(id) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
-  const items=db.prepare(`SELECT product_id productId,product_name name,cover_url coverUrl,quantity,unit_price_cents/100.0 price,subtotal_cents/100.0 subtotal FROM order_items WHERE order_id=?`).all(id);
+  const items=withFulfillment(db.prepare(`SELECT id,product_id productId,product_name name,cover_url coverUrl,quantity,unit_price_cents/100.0 price,subtotal_cents/100.0 subtotal FROM order_items WHERE order_id=?`).all(id));
   const events=db.prepare(`SELECT action,from_status fromStatus,to_status toStatus,note,created_at createdAt FROM order_events WHERE order_id=? ORDER BY created_at`).all(id);
   res.json({data:{...order,address:JSON.parse(order.address_snapshot_json||'{}'),items,events}});
 });

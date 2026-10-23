@@ -22,12 +22,12 @@ const base = `http://127.0.0.1:${address.port}`;
 after(async () => { await new Promise<void>(resolve => server.close(() => resolve())); db.close(); rmSync(fixture, { recursive: true, force: true }); });
 async function login(username: string) { const response = await fetch(`${base}/auth/login`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password:'demo12345',role:'USER'})}); return (await response.json() as {token:string}).token; }
 const token = await login('xingxing'), other = await login('xiaoxiong');
-test('未验证身份的密码找回不能直接修改账号密码',async()=>{
+test('演示找回拒绝仅凭用户名修改密码',async()=>{
   await fetch(base+'/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'recovery-test',nickname:'找回验证测试',password:'original123'})});
   const before=db.prepare("SELECT password_hash FROM users WHERE username='recovery-test'").get();
   assert.ok(before);
   const response=await fetch(base+'/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:'recovery-test',newPassword:'replacement123'})});
-  assert.equal(response.status,501);assert.deepEqual(db.prepare("SELECT password_hash FROM users WHERE username='recovery-test'").get(),before);
+  assert.equal(response.status,404);assert.deepEqual(db.prepare("SELECT password_hash FROM users WHERE username='recovery-test'").get(),before);
 });
 async function call(path: string, method='GET', body?: unknown, actor=token, key?: string) { return fetch(base+path,{method,headers:{Authorization:`Bearer ${actor}`,'Content-Type':'application/json',...(key?{'Idempotency-Key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)}); }
 

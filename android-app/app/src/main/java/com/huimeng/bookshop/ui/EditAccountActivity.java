@@ -96,6 +96,8 @@ public final class EditAccountActivity extends AppCompatActivity{
                 if(isFinishing()||isDestroyed()||!requestedToken.equals(session.token()))return;
                 session.updateProfile(username,nickname);
                 if(result.optBoolean("passwordChanged")){
+                    String changedAccount=session.accountId();com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{try{new com.huimeng.bookshop.core.OfflineAccounts(this).forgetAccount(com.huimeng.bookshop.BuildConfig.API_BASE_URL,changedAccount);}catch(Exception e){android.util.Log.w("HuiMengLogin","Offline login cache invalidation failed");}});
+                    com.huimeng.bookshop.core.sync.SyncCoordinator.get(this).stop();
                     session.clear();toast("修改成功，请重新登录");startActivity(new Intent(this,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK));
                 }else{restoreSave();toast("账户信息已保存");}
             },error->{if(!isFinishing()&&!isDestroyed()&&requestedToken.equals(session.token())){restoreSave();toast(error);}});

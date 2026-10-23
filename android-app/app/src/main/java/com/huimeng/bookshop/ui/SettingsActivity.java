@@ -13,8 +13,8 @@ public class SettingsActivity extends AppCompatActivity{
     private ActivitySettingsBinding binding;private AppearanceStore store;private WallpaperStore wallpapers;private boolean ready;
     @Override protected void onCreate(Bundle state){super.onCreate(state);
         binding=ActivitySettingsBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
-        binding.localSync.setOnClickListener(v->startActivity(new android.content.Intent(this,SyncStatusActivity.class)));
-        binding.changeAvatar.setOnClickListener(v->startActivity(new android.content.Intent(this,EditAccountActivity.class)));
+        binding.localSync.setOnClickListener(v->startActivity(new android.content.Intent(this,new com.huimeng.bookshop.core.SessionStore(this).authenticated()?SyncStatusActivity.class:LoginActivity.class)));
+        binding.changeAvatar.setOnClickListener(v->startActivity(new android.content.Intent(this,new com.huimeng.bookshop.core.SessionStore(this).authenticated()?EditAccountActivity.class:LoginActivity.class)));
         store=new AppearanceStore(this);wallpapers=new WallpaperStore(this);binding.back.setOnClickListener(v->finish());
         String value=store.theme();binding.themeGroup.check(AppearanceStore.LIGHT.equals(value)?binding.light.getId():AppearanceStore.DARK.equals(value)?binding.dark.getId():binding.system.getId());
         binding.wallpaperDefault.setOnClickListener(v->chooseWallpaper(WallpaperStore.SOLID));

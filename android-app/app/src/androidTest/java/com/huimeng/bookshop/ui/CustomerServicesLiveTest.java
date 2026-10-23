@@ -39,6 +39,7 @@ public class CustomerServicesLiveTest extends InstrumentationTestCase {
     private View clickable(View v,String text){if(v.isClickable()&&v instanceof TextView t&&text.equals(t.getText().toString()))return v;if(v instanceof ViewGroup g)for(int i=0;i<g.getChildCount();i++){View x=clickable(g.getChildAt(i),text);if(x!=null)return x;}return null;}
     private void click(Activity a,String text)throws Exception{waitFor(()->clickable(a.getWindow().getDecorView(),text)!=null,15000,"缺少按钮 "+text);getInstrumentation().runOnMainSync(()->clickable(a.getWindow().getDecorView(),text).performClick());}
     private EditText input(View v,String hint){if(v instanceof EditText e&&hint.equals(String.valueOf(e.getHint())))return e;if(v instanceof ViewGroup g)for(int i=0;i<g.getChildCount();i++){EditText e=input(g.getChildAt(i),hint);if(e!=null)return e;}return null;}
+    private void selectSaleItems(View view){if(view instanceof android.widget.CheckBox box)box.setChecked(true);if(view instanceof ViewGroup group)for(int i=0;i<group.getChildCount();i++)selectSaleItems(group.getChildAt(i));}
     private void fill(Activity a,String hint,String value){getInstrumentation().runOnMainSync(()->input(a.getWindow().getDecorView(),hint).setText(value));}
     private interface Check{boolean ready()throws Exception;}
     private void waitFor(Check condition,long timeout,String message)throws Exception{long end=SystemClock.uptimeMillis()+timeout;while(SystemClock.uptimeMillis()<end){if(condition.ready())return;SystemClock.sleep(200);}fail(message);}
@@ -56,7 +57,7 @@ public class CustomerServicesLiveTest extends InstrumentationTestCase {
         waitFor(()->find(chat.getWindow().getDecorView(),"输入消息…")!=null,12000,"聊天未建立");fill(chat,"输入消息…","QA购买后咨询：请确认订单");click(chat,"发送");
         waitFor(()->find(chat.getWindow().getDecorView(),"QA购买后咨询：请确认订单")!=null,10000,"聊天未显示已发送内容");capture(chat,"qa-buyer-chat");
         Activity feedback=open(ServiceActivity.class,new Intent().putExtra("kind","feedback").putExtra("mode","create"));fill(feedback,"反馈标题","QA三端联调反馈");fill(feedback,"问题描述","验证模拟器提交后管理员自动出现并可回复。");click(feedback,"提交反馈");waitFor(()->find(feedback.getWindow().getDecorView(),"待处理")!=null,10000,"反馈未创建");capture(feedback,"qa-feedback");
-        Activity sale=open(ServiceActivity.class,new Intent().putExtra("kind","after-sales").putExtra("order_id",order[0]));waitFor(()->find(sale.getWindow().getDecorView(),"申请原因")!=null,10000,"售后表单未打开");fill(sale,"申请原因","QA整单退款验证");fill(sale,"补充说明（选填）","只在隔离测试数据库中验证流程。");click(sale,"提交售后申请");waitFor(()->find(sale.getWindow().getDecorView(),"待商家初审")!=null,10000,"售后未创建");capture(sale,"qa-buyer-after-sale");
+        Activity sale=open(ServiceActivity.class,new Intent().putExtra("kind","after-sales").putExtra("order_id",order[0]));waitFor(()->find(sale.getWindow().getDecorView(),"申请原因")!=null,10000,"售后表单未打开");getInstrumentation().runOnMainSync(()->selectSaleItems(sale.getWindow().getDecorView()));fill(sale,"申请原因","QA整单退款验证");fill(sale,"补充说明（选填）","只在隔离测试数据库中验证流程。");click(sale,"提交售后申请");waitFor(()->find(sale.getWindow().getDecorView(),"待商家初审")!=null,10000,"售后未创建");capture(sale,"qa-buyer-after-sale");
         JSONObject output=new JSONObject().put("orderId",order[0]).put("afterSaleId",http("GET","service/after-sales",null).getJSONArray("data").getJSONObject(0).getString("id")).put("feedbackId",http("GET","service/feedback",null).getJSONArray("data").getJSONObject(0).getString("id")).put("conversationId",http("GET","service/conversations",null).getJSONArray("data").getJSONObject(0).getString("id"));
         try(var out=new java.io.FileOutputStream(new java.io.File(context().getExternalFilesDir(null),"qa-records.json"))){out.write(output.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));}
     }
@@ -76,7 +77,7 @@ public class CustomerServicesLiveTest extends InstrumentationTestCase {
         login("xiaoxiong","USER");Activity main=open(MainActivity.class,null);
         getInstrumentation().runOnMainSync(()->((MainActivity)main).selectTab(4));
         waitFor(()->find(main.getWindow().getDecorView(),"退款 / 售后")!=null,12000,"买家个人页售后入口缺失");
-        assertNotNull(find(main.getWindow().getDecorView(),"商家消息"));assertNotNull(find(main.getWindow().getDecorView(),"意见反馈"));capture(main,"qa-profile-"+theme);
+        View messageEntry=find(main.getWindow().getDecorView(),"商家消息");assertTrue("个人页不应显示消息页中保留的商家消息按钮",messageEntry==null||!messageEntry.isShown());assertNotNull(find(main.getWindow().getDecorView(),"意见反馈"));capture(main,"qa-profile-"+theme);
         Activity product=open(ProductDetailActivity.class,new Intent().putExtra("product_id","P0001"));
         waitFor(()->find(product.getWindow().getDecorView(),"联系商家")!=null,12000,"商品页联系入口缺失");SystemClock.sleep(700);capture(product,"qa-product-"+theme);
         Activity order=open(OrderDetailActivity.class,new Intent().putExtra("order_id",records.getString("orderId")));
@@ -101,7 +102,6 @@ public class CustomerServicesLiveTest extends InstrumentationTestCase {
         waitFor(()->find(auth.getWindow().getDecorView(),"请登录本订单所属的原账号，当前账号不能继续这笔付款")!=null,12000,"付款必须拒绝切换到其他买家账号");
         assertTrue("错误账号不能替换会话",new SessionStore(context()).token().isEmpty());
         getInstrumentation().runOnMainSync(()->{((EditText)auth.findViewById(R.id.accountInput)).setText("xiaoxiong");((EditText)auth.findViewById(R.id.passwordInput)).setText("demo12345");auth.findViewById(R.id.loginButton).performClick();});
-        waitFor(()->{var root=getInstrumentation().getUiAutomation().getRootInActiveWindow();if(root==null)return false;var nodes=root.findAccessibilityNodeInfosByText("确认关联");if(nodes.isEmpty())return false;var node=nodes.get(0);while(node!=null&&!node.isClickable())node=node.getParent();return node!=null&&node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);},12000,"登录关联确认未出现");
         waitFor(auth::isFinishing,15000,"登录未完成");assertFalse("付款页应保留",payment.isFinishing());
         waitFor(()->payment.findViewById(R.id.confirm).isEnabled(),10000,"登录后应恢复付款按钮");getInstrumentation().runOnMainSync(()->payment.findViewById(R.id.confirm).performClick());
         final JSONObject[] paid={null};waitFor(()->{JSONArray rows=http("GET","me/orders",null).getJSONArray("data");for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(!prior.contains(row.optString("id"))&&row.optString("status").equals("PAID")){paid[0]=row;return true;}}return false;},45000,"重新登录后付款未进入服务端");

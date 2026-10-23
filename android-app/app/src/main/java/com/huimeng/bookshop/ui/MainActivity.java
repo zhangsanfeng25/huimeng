@@ -18,13 +18,14 @@ public class MainActivity extends AppCompatActivity {
     private int selectedTab=1;
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);session=new SessionStore(this);
+        if(!session.authenticated()&&!session.accountId().isEmpty()){session.clear();startActivity(new Intent(this,WelcomeActivity.class));finish();return;}
         if(!session.hasLocalSpace()&&session.token().isEmpty()){startActivity(new Intent(this,WelcomeActivity.class));finish();return;}
         binding=ActivityMainBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
         com.huimeng.bookshop.core.sync.SyncStatusStore.observe(this,status->refreshVisibleLocalData());
         buildNavigation(binding.bottomNav,session.role());
         binding.bottomNav.setBackgroundTintList(null);
         binding.bottomNav.setItemActiveIndicatorColor(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(this,R.color.nav_indicator)));
-        int initial=state==null?1:state.getInt("selected_tab",1);
+        int initial=state==null?(getIntent().getBooleanExtra("show_guest_profile",false)?4:1):state.getInt("selected_tab",1);
         binding.bottomNav.setSelectedItemId(tabId(initial));
         binding.bottomNav.setOnItemSelectedListener(item->{show(tabPosition(item.getItemId()));return true;});
         binding.bottomNav.setOnItemReselectedListener(item->{});
@@ -68,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
     public void selectTab(int item){if(binding!=null)binding.bottomNav.setSelectedItemId(tabId(item));}
     @Override protected void onResume(){super.onResume();refreshVisibleLocalData();}
     private void refreshVisibleLocalData(){if(binding==null||session==null||!session.hasLocalSpace())return;Fragment fragment=getSupportFragmentManager().getPrimaryNavigationFragment();if(fragment instanceof LocalDataRefresh)((LocalDataRefresh)fragment).refreshLocalData();}
-    public void logout(){new ApiClient(this).post("auth/logout",new org.json.JSONObject(),result->logoutLocal(),error->logoutLocal());}
-    private void logoutLocal(){if(session.hasLocalSpace()){session.clearNetworkSession();recreate();return;}session.clear();startActivity(new Intent(this,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK));finish();}
+    public void logout(){if(!session.token().isEmpty())new ApiClient(this).post("auth/logout",new org.json.JSONObject(),result->{},error->{});
+        com.huimeng.bookshop.core.sync.SyncCoordinator.get(this).stop();session.clear();
+        startActivity(new Intent(this,WelcomeActivity.class).putExtra("show_guest_profile",true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK));finish();}
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,6 +89,17 @@ try {
   const repeated=await fetch(base+`/reviews/${submission.revisionId}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:`Bearer ${admin}`},body:JSON.stringify({status:'已通过'})});assert.equal(repeated.status,409);
   assert.equal((await call(`/products/${productId}/details`,admin)).data.name,review.data.name);
   const missing=await fetch(`http://127.0.0.1:${port}/public/missing.jpg`);assert.equal(missing.status,404);
+  for(let n=1;n<=20;n++){
+    const name=`p${String(n).padStart(4,'0')}.png`,response=await fetch(`http://127.0.0.1:${port}/public/books/${name}`);
+    assert.equal(response.status,200,name);assert.match(response.headers.get('content-type'),/image\/png/);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()),readFileSync(join(cwd,'assets/books',name)));
+  }
+  const uploadedCover=join(env.UPLOAD_DIR,'books/p0001.png'),uploadedBytes=readFileSync(join(cwd,'assets/books/p0002.png'));
+  mkdirSync(join(env.UPLOAD_DIR,'books'),{recursive:true});writeFileSync(uploadedCover,uploadedBytes);
+  assert.deepEqual(Buffer.from(await (await fetch(`http://127.0.0.1:${port}/public/books/p0001.png`)).arrayBuffer()),uploadedBytes,'Merchant upload must override bundled artwork');
+  unlinkSync(uploadedCover);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/public/books/unknown.png`)).status,404);
+  console.log('Default covers passed: 20 PNG URLs, uploaded cover priority and unknown cover 404.');
   const forged=await fetch(base+`/products/${productId}/content`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:`Bearer ${admin}`},body:JSON.stringify({...review.data,coverUrl:'/public/not-owned.jpg',images:[]})});assert.equal(forged.status,400);
   console.log('Admin details passed: exact pending revision, rejection reason, duplicate approval, unauthorized media and missing image 404.');
   let post;

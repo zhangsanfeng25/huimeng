@@ -21,10 +21,10 @@ public final class ServiceClient {
         String captured=scope(),token=session.token(),key="service-cache:"+captured+"|"+path;
         var cache=context.getSharedPreferences("huimeng_services",0);
         Consumer<String> failure=message->{if(!captured.equals(scope()))return;if(method==Request.Method.GET){String saved=cache.getString(key,"");if(!saved.isEmpty())try{JSONObject value=new JSONObject(saved);value.put("cached",true);ok.accept(value);return;}catch(Exception ignored){}}fail.accept(message);};
-        if(token.isEmpty()){failure.accept("请先关联并登录原网络账号，聊天、售后和反馈需联网确认");return;}
+        if(token.isEmpty()){failure.accept(session.authenticated()?"登录已过期，请连接服务器后重新登录":"请先登录后操作");return;}
         JsonObjectRequest request=new JsonObjectRequest(method,BuildConfig.API_BASE_URL+path,body,result->{if(!captured.equals(scope()))return;if(method==Request.Method.GET)cache.edit().putString(key,result.toString()).apply();ok.accept(result);},error->{
-            if(!captured.equals(scope()))return;String message="服务未连接，内容尚未提交，请检查网络后重试";
-            if(error.networkResponse!=null){try{message=new JSONObject(new String(error.networkResponse.data,java.nio.charset.StandardCharsets.UTF_8)).optString("message",message);}catch(Exception ignored){}if(error.networkResponse.statusCode==401){if(token.equals(session.token()))session.clearNetworkSession();message="网络登录已失效，请重新登录原账号；本地内容已保留";}}
+            if(!captured.equals(scope()))return;String message="无法连接服务器，请启动控制服务后重试";
+            if(error.networkResponse!=null){try{message=new JSONObject(new String(error.networkResponse.data,java.nio.charset.StandardCharsets.UTF_8)).optString("message",message);}catch(Exception ignored){}if(error.networkResponse.statusCode==401){if(token.equals(session.token()))session.invalidateNetworkCredentials(context);message="网络登录已失效，请重新登录原账号；本地内容已保留";}}
             failure.accept(message);
         }){@Override public Map<String,String> getHeaders(){Map<String,String> headers=new HashMap<>();headers.put("Authorization","Bearer "+token);headers.put("X-Service-Role",session.role());return headers;}};
         request.setShouldCache(false);request.setRetryPolicy(new com.android.volley.DefaultRetryPolicy(7000,0,1));((HuiMengApp)context).requests().add(request);

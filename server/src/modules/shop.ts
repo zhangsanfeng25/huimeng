@@ -1,3 +1,4 @@
+import {withFulfillment} from '../services/after-sale-items.js';
 import {afterSaleColumns,orderServiceEvents} from '../services/customer-services.js';
 import {businessRoute} from '../services/context.js';
 import {favoriteEnable,favoriteDisable,cartSet,cartRemove,addressCreate,addressUpdate,addressDelete} from '../services/buyer.js';
@@ -87,7 +88,7 @@ shopRouter.get('/me/orders',requireAuth('USER'),(req,res)=>res.json({data:db.pre
 shopRouter.get('/me/orders/:orderId',requireAuth('USER'),(req,res)=>{
   const order=db.prepare(`SELECT o.*,${afterSaleColumns},m.shop_name shop FROM orders o JOIN merchants m ON m.id=o.merchant_id WHERE o.id=? AND o.user_id=?`).get(String(req.params.orderId),req.actor!.id) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
-  const items=db.prepare(`SELECT oi.id,oi.product_id productId,oi.product_name productName,oi.cover_url coverUrl,oi.unit_price_cents unitPriceCents,oi.quantity,oi.subtotal_cents subtotalCents,EXISTS(SELECT 1 FROM ratings r WHERE r.order_item_id=oi.id AND r.user_id=?) rated FROM order_items oi WHERE oi.order_id=?`).all(req.actor!.id,order.id);
+  const items=withFulfillment(db.prepare(`SELECT oi.id,oi.product_id productId,oi.product_name productName,oi.cover_url coverUrl,oi.unit_price_cents unitPriceCents,oi.quantity,oi.subtotal_cents subtotalCents,EXISTS(SELECT 1 FROM ratings r WHERE r.order_item_id=oi.id AND r.user_id=?) rated FROM order_items oi WHERE oi.order_id=?`).all(req.actor!.id,order.id));
   const events=db.prepare(`SELECT action,from_status fromStatus,to_status toStatus,note,created_at createdAt FROM order_events WHERE order_id=? ORDER BY created_at`).all(order.id);
   res.json({data:{...order,items,events,serviceEvents:orderServiceEvents(order.id)}});
 });
@@ -102,7 +103,7 @@ shopRouter.get('/merchant/orders',requireAuth('MERCHANT'),(req,res)=>res.json({d
 shopRouter.get('/merchant/orders/:orderId',requireAuth('MERCHANT'),(req,res)=>{
   const order=db.prepare(`SELECT o.*,${afterSaleColumns},u.nickname buyer FROM orders o JOIN users u ON u.id=o.user_id WHERE o.id=? AND o.merchant_id=?`).get(String(req.params.orderId),req.actor!.merchantId) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
-  const items=db.prepare('SELECT id,product_id productId,product_name productName,cover_url coverUrl,unit_price_cents unitPriceCents,quantity,subtotal_cents subtotalCents FROM order_items WHERE order_id=?').all(order.id);
+  const items=withFulfillment(db.prepare('SELECT id,product_id productId,product_name productName,cover_url coverUrl,unit_price_cents unitPriceCents,quantity,subtotal_cents subtotalCents FROM order_items WHERE order_id=?').all(order.id));
   const events=db.prepare('SELECT action,from_status fromStatus,to_status toStatus,note,created_at createdAt FROM order_events WHERE order_id=? ORDER BY created_at').all(order.id);
   res.json({data:{...order,items,events,serviceEvents:orderServiceEvents(order.id)}});
 });

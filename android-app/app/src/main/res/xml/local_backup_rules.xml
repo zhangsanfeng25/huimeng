@@ -4,4 +4,5 @@
     <exclude domain="file" path="offline-media/"/>
     <exclude domain="sharedpref" path="huimeng_session.xml"/>
     <exclude domain="sharedpref" path="huimeng_cart.xml"/>
+    <exclude domain="sharedpref" path="huimeng_offline_accounts.xml"/>
 </full-backup-content>

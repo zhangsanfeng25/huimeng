@@ -18,7 +18,7 @@ import java.util.Locale;
 
 public class OrderDetailActivity extends AppCompatActivity{
     private ActivityOrderDetailBinding binding;private com.google.android.material.button.MaterialButton serviceSale;
-    private String orderId,itemId="",status="",logistics="",groupId="";
+    private String orderId,itemId="",status="",logistics="",groupId="",returnProductId="";
     private int totalCents;
     private final Handler handler=new Handler(Looper.getMainLooper());private boolean loading;
     private String displayed="";
@@ -38,14 +38,15 @@ public class OrderDetailActivity extends AppCompatActivity{
             binding.status.setText(zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":""));binding.total.setText(String.format(Locale.CHINA,"¥%.2f",totalCents/100.0));
             JSONObject address=data.optJSONObject("address_snapshot_json");if(address==null){try{address=new JSONObject(data.optString("address_snapshot_json"));}catch(Exception ignored){}}
             if(address!=null&&!address.optString("recipient").isEmpty()){binding.address.setText("收货信息  "+address.optString("recipient")+"  "+address.optString("phone")+"\n"+address.optString("region")+address.optString("detail"));binding.address.setVisibility(View.VISIBLE);}else binding.address.setVisibility(View.GONE);
-            binding.itemList.removeAllViews();itemId="";reviewItems.clear();
+            binding.itemList.removeAllViews();itemId="";returnProductId="";reviewItems.clear();
             JSONArray items=data.optJSONArray("items");if(items!=null)for(int i=0;i<items.length();i++){
                 JSONObject item=items.optJSONObject(i);if(item==null)continue;
                 if(itemId.isEmpty())itemId=item.optString("id");
+                if(returnProductId.isEmpty())returnProductId=item.optString("productId",item.optString("product_id"));
                 if(item.optInt("rated",0)==0)reviewItems.add(item);
                 ItemOrderProductBinding line=ItemOrderProductBinding.inflate(LayoutInflater.from(this),binding.itemList,false);
                 String name=item.optString("productName","绘本");line.name.setText(name);
-                line.quantity.setText("单价 "+String.format(Locale.CHINA,"¥%.2f",item.optInt("unitPriceCents")/100.0)+"  ·  数量 × "+item.optInt("quantity",1));
+                line.quantity.setText("单价 "+String.format(Locale.CHINA,"¥%.2f",item.optInt("unitPriceCents")/100.0)+"  ·  数量 × "+item.optInt("quantity",1)+(item.optInt("cancelledQuantity")>0?"\n已取消 "+item.optInt("cancelledQuantity")+" 件 · 剩余履约 "+item.optInt("fulfillableQuantity")+" 件":""));
                 line.price.setText(String.format(Locale.CHINA,"¥%.2f",item.optInt("subtotalCents")/100.0));
                 Glide.with(line.cover).load(ApiClient.assetUrl(item.optString("coverUrl")))
                     .placeholder(new BookCoverDrawable(name)).error(new BookCoverDrawable(name)).centerCrop().into(line.cover);
@@ -58,11 +59,11 @@ public class OrderDetailActivity extends AppCompatActivity{
             else if("OUT_FOR_DELIVERY".equals(logistics)){binding.action.setText("确认收货");binding.action.setVisibility(View.VISIBLE);}
             else if("COMPLETED".equals(logistics)){binding.action.setText(reviewItems.isEmpty()?"全部商品已评价":"评价商品");binding.action.setVisibility(View.VISIBLE);binding.action.setEnabled(!reviewItems.isEmpty());}
             else binding.action.setVisibility(View.GONE);
-            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(!afterSale.isEmpty()||java.util.Arrays.asList("PAID","SHIPPED","COMPLETED").contains(status)?View.VISIBLE:View.GONE);serviceSale.setText(afterSale.isEmpty()?"申请售后":"售后进度");if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.setText("已退款 · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.action.setVisibility(View.GONE);}
+            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(!afterSale.isEmpty()||java.util.Arrays.asList("PAID","SHIPPED","COMPLETED").contains(status)?View.VISIBLE:View.GONE);serviceSale.setText(afterSale.isEmpty()?"申请售后":"售后进度");if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.append("\n"+AfterSaleState.refundLabel(data)+" · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(AfterSaleState.blocked(data))binding.action.setVisibility(View.GONE);}
         },this::error);
     }
     private void act(){if("PENDING_PAYMENT".equals(status))startActivity(new Intent(this,PaymentActivity.class)
-            .putExtra("group_id",groupId).putExtra("amount_cents",totalCents));
+            .putExtra("group_id",groupId).putExtra("amount_cents",totalCents).putExtra("return_product_id",returnProductId));
         else if("OUT_FOR_DELIVERY".equals(logistics))new ApiClient(this).post("me/orders/"+orderId+"/confirm",new JSONObject(),result->{Toast.makeText(this,result.optBoolean("pending")?"收货意向已保存，待联网确认":"已确认收货",Toast.LENGTH_SHORT).show();load(false);},this::error);
         else if("COMPLETED".equals(logistics)){if(reviewItems.isEmpty())return;String[] names=new String[reviewItems.size()];for(int i=0;i<names.length;i++)names[i]=reviewItems.get(i).optString("productName");new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("选择要评价的绘本").setItems(names,(dialog,index)->startActivity(new Intent(this,RatingActivity.class).putExtra("order_item_id",reviewItems.get(index).optString("id")))).show();}}
     private void addCancelButton(){

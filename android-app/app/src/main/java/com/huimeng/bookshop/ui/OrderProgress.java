@@ -27,9 +27,9 @@ final class OrderProgress {
             String note=e.isNull("note")?"":e.optString("note").trim();if(note.equals(title)||note.matches("[A-Z_]+"))note="";
             rows.add(new Step(title,note,e.optString("createdAt"),rows.size()));}
     }
-    private static String current(JSONObject order){String sale=order.isNull("after_sale_state")?"":order.optString("after_sale_state");if(sale.equals("COMPLETED"))return "已退款";
-        if(!sale.isEmpty()&&!sale.equals("REJECTED")&&!sale.equals("CANCELLED"))return ServiceActivity.label(sale);
-        return switch(order.optString("logistics_status",order.optString("status"))){case "PENDING_PAYMENT","WAITING_PAYMENT"->"待付款";case "PAID","PREPARING"->"准备出库";case "READY_TO_SHIP"->"待发货";case "SHIPPED"->"已发货";case "IN_TRANSIT"->"正在运输";case "OUT_FOR_DELIVERY"->"正在派送";case "COMPLETED"->"订单已完成";case "CANCELLED","EXPIRED"->"订单已关闭";default->"状态待确认";};
+    private static String current(JSONObject order){String sale=order.isNull("after_sale_state")?"":order.optString("after_sale_state");if(AfterSaleState.full(order))return "已全额退款";
+        if(AfterSaleState.active(order))return ServiceActivity.label(sale);
+        return AfterSaleState.describe(order,switch(order.optString("logistics_status",order.optString("status"))){case "PENDING_PAYMENT","WAITING_PAYMENT"->"待付款";case "PAID","PREPARING"->"准备出库";case "READY_TO_SHIP"->"待发货";case "SHIPPED"->"已发货";case "IN_TRANSIT"->"正在运输";case "OUT_FOR_DELIVERY"->"正在派送";case "COMPLETED"->"订单已完成";case "CANCELLED","EXPIRED"->"订单已关闭";default->"状态待确认";});
     }
     private static String orderTitle(JSONObject e){return switch(e.optString("toStatus")){
         case "PENDING_PAYMENT","WAITING_PAYMENT"->"订单已提交，待付款";case "PAID","PREPARING"->"付款已完成，商家准备出库";

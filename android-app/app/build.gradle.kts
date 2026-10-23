@@ -7,8 +7,8 @@ android {
         applicationId = providers.gradleProperty("qaApplicationId").getOrElse("com.huimeng.bookshop")
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "1.1.5"
+        versionCode = 33
+        versionName = "1.1.6"
         testInstrumentationRunner = "android.test.InstrumentationTestRunner"
         buildConfigField("String", "API_BASE_URL", "\"${providers.gradleProperty("apiBaseUrl").getOrElse("http://10.0.2.2:3000/api/v1/")}\"")
     }

@@ -2,9 +2,9 @@
 
 本工程按《绘梦儿童绘本商城完整实施说明》组织，包含管理员网页端、Node.js API、SQLite 数据库和 Android 原生 Java/XML 用户与商家端。
 
-## 三端服务完善（2026-10-21）
+## 当前版本 1.1.6（2026-10-24）
 
-新增买家与店铺聊天、整单演示售后、留言反馈及管理端审核回复。当前 Android 版本为 1.1.5，修复付款登录恢复与订单进度显示。数据库查看、聊天导出及只读查询见 [数据库说明](docs/customer-services-database.md)，安装包与验收范围见 [版本说明](docs/releases/android-1.1.5.md)。
+新增买家与店铺聊天、部分/全额演示售后、留言反馈及管理端审核回复。当前 Android 版本为 1.1.6，包含账号/消息/付款修复、部分售后和本地演示找回密码，作为后续局部界面优化前的备份基线。数据库查看、聊天导出及只读查询见 [数据库说明](docs/customer-services-database.md)，安装包与验收范围见 [版本说明](docs/releases/android-1.1.6.md)。
 
 ## 1.1.3 图书资料与背景更新（本地版）
 
@@ -60,7 +60,7 @@
 
 源码上传范围、日常提交与发布标签规则见 [源码上传与版本管理](docs/version-management.md)。业务数据库、备份及用户上传图片只保留在本机或独立备份中，不通过 Git 同步。
 
-正式发行版 APK 和对应简短改动说明见 [Android 1.0.36 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.0.36)，最新正式版入口为 [releases/latest](https://github.com/zhangsanfeng25/huimeng/releases/latest)。下载附件 `huimeng-1.0.36.apk`；当前 APK 为 Debug 模拟器演示包，使用方式与验证限制见该版本说明。仓库为私有，下载需登录有访问权限的 GitHub 账号。各版本独立发布，历史安装包和 Release 保留。
+正式发行版 APK 和对应简短改动说明见 [Android 1.1.6 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.1.6)，最新正式版入口为 [releases/latest](https://github.com/zhangsanfeng25/huimeng/releases/latest)。下载附件 `huimeng-1.1.6.apk`；当前 APK 为 Debug 模拟器演示包，使用方式与验证限制见该版本说明。仓库为私有，下载需登录有访问权限的 GitHub 账号。各版本独立发布，历史安装包和 Release 保留。
 
 真机调试需要将 Android `API_BASE_URL` 改成电脑局域网 IP，并使 `server/.env` 的 `HOST=0.0.0.0`，再重新启动服务与构建 App。
 

@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 public final class SessionStore {
     private static volatile String temporaryToken="";
+    private static volatile boolean temporaryAuthenticated;
     private final SharedPreferences preferences;
     public SessionStore(Context context){
         preferences=context.getSharedPreferences("huimeng_session",Context.MODE_PRIVATE);
@@ -16,17 +17,24 @@ public final class SessionStore {
     }
     public void save(String token,String role,String name,boolean canMerchant,String accountId,String username,boolean remember){
         temporaryToken=remember?"":token;
+        temporaryAuthenticated=true;
         preferences.edit().putBoolean("remember_choice_initialized",true).putBoolean("remember_login",remember)
+            .putBoolean("local_authenticated",remember)
             .putString("token",remember?token:"").putString("role",role).putString("name",name)
             .putBoolean("can_merchant",canMerchant).putString("account_id",accountId).putString("username",username).apply();
     }
     public String token(){return !temporaryToken.isEmpty()?temporaryToken:(remembered()?preferences.getString("token",""):"");}
     public boolean remembered(){return preferences.getBoolean("remember_login",false);}
+    public boolean authenticated(){return !token().isEmpty()||temporaryAuthenticated||(remembered()&&preferences.getBoolean("local_authenticated",false));}
     public boolean hasRememberedSession(){return remembered()&&!preferences.getString("token","").isEmpty();}
     public boolean hasLocalSpace(){return preferences.getBoolean("local_ready",false)&&!localSpaceId().isEmpty();}
     public String localSpaceId(){return preferences.getString("local_space","");}
     public void localSpace(String id){preferences.edit().putString("local_space",id).putBoolean("local_ready",true).apply();}
-    public void clearNetworkSession(){temporaryToken="";preferences.edit().remove("token").putBoolean("remember_login",false).putBoolean("can_merchant",false).apply();}
+    public void clearNetworkSession(){temporaryToken="";preferences.edit().remove("token").apply();}
+    public void invalidateNetworkCredentials(Context context){
+        String id=accountId();clearNetworkSession();
+        com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{try{new OfflineAccounts(context).forgetAccount(com.huimeng.bookshop.BuildConfig.API_BASE_URL,id);}catch(Exception ignored){}});
+    }
     public String role(){return preferences.getString("role","USER");}
     public String name(){return preferences.getString("name","绘梦用户");}
     public String accountId(){return preferences.getString("account_id","");}
@@ -38,5 +46,5 @@ public final class SessionStore {
     public boolean canMerchant(){return preferences.getBoolean("can_merchant",false);}
     public void updateAccess(org.json.JSONObject profile){org.json.JSONArray roles=profile.optJSONArray("roles");boolean merchant=false;if(roles!=null){for(int i=0;i<roles.length();i++)if("MERCHANT".equals(roles.optString(i)))merchant=true;preferences.edit().putBoolean("can_merchant",merchant).apply();}if(profile.has("activeRole"))setRole(profile.optString("activeRole","USER"));}
     public void setRole(String role){preferences.edit().putString("role",role).apply();}
-    public void clear(){temporaryToken="";preferences.edit().clear().putBoolean("remember_choice_initialized",true).apply();}
+    public void clear(){temporaryToken="";temporaryAuthenticated=false;preferences.edit().clear().putBoolean("remember_choice_initialized",true).apply();}
 }
