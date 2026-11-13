@@ -22,20 +22,27 @@ public class OrderDetailActivity extends AppCompatActivity{
     private int totalCents;
     private final Handler handler=new Handler(Looper.getMainLooper());private boolean loading;
     private String displayed="";
+    private JSONObject currentOrder;
+    private boolean progressExpanded;
     private final java.util.List<JSONObject> reviewItems=new java.util.ArrayList<>();
     private final Runnable refresh=new Runnable(){@Override public void run(){load(false);handler.postDelayed(this,5000);}};
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityOrderDetailBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
         orderId=getIntent().getStringExtra("order_id");binding.back.setOnClickListener(v->finish());binding.action.setOnClickListener(v->act());
+        progressExpanded=state!=null&&state.getBoolean("progress_expanded");
+        binding.progressToggle.setOnClickListener(v->{progressExpanded=!progressExpanded;renderProgress();});
+        binding.orderId.setOnLongClickListener(v->{if(currentOrder==null)return false;String platform=OrderPresentation.platformId(currentOrder),local=currentOrder.optString("id");
+            String copy=platform.isEmpty()?"本地编号："+local:"订单号："+platform+(local.equals(platform)?"":"\n本地编号："+local);
+            ((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(android.content.ClipData.newPlainText("订单编号",copy));Toast.makeText(this,"订单编号已复制",Toast.LENGTH_SHORT).show();return true;});
         serviceSale=ServiceEntries.orderActions(binding.timeline,"联系商家",()->com.huimeng.bookshop.core.ServiceClient.remoteOrder(this,orderId,remote->new com.huimeng.bookshop.core.ServiceClient(this).get("me/orders/"+remote,r->{JSONObject d=r.optJSONObject("data");if(d!=null)ServiceActivity.contact(this,d.optString("merchant_id"),remote,null);},this::error),this::error),"申请售后",()->ServiceActivity.sale(this,orderId))[1];}
     @Override protected void onResume(){super.onResume();handler.removeCallbacks(refresh);load(displayed.isEmpty());handler.postDelayed(refresh,5000);}
     @Override protected void onPause(){handler.removeCallbacks(refresh);super.onPause();}
     private void load(boolean showLoading){if(loading)return;loading=true;if(showLoading)binding.loading.setVisibility(View.VISIBLE);
         new ApiClient(this).get("me/orders/"+orderId,result->{loading=false;binding.loading.setVisibility(View.GONE);
-            JSONObject data=result.optJSONObject("data");if(data==null||isFinishing()||isDestroyed())return;String next=data.toString();if(next.equals(displayed))return;displayed=next;
+            JSONObject data=result.optJSONObject("data");if(data==null||isFinishing()||isDestroyed())return;renderReceipt(data);String next=data.toString();if(next.equals(displayed))return;displayed=next;
             status=data.optString("status");logistics=data.optString("logistics_status",status);
             groupId=data.optString("checkout_group_id");totalCents=data.optInt("total_cents");
-            binding.orderId.setText("订单号："+data.optString("id"));binding.shop.setText(data.optString("shop"));
-            binding.status.setText(zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":""));binding.total.setText(String.format(Locale.CHINA,"¥%.2f",totalCents/100.0));
+            currentOrder=data;binding.orderId.setText(OrderPresentation.number(data));binding.shop.setText(data.optString("shop"));
+            binding.status.setText(AfterSaleState.detailStatus(data,zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":"")));binding.total.setText(String.format(Locale.CHINA,"¥%.2f",totalCents/100.0));
             JSONObject address=data.optJSONObject("address_snapshot_json");if(address==null){try{address=new JSONObject(data.optString("address_snapshot_json"));}catch(Exception ignored){}}
             if(address!=null&&!address.optString("recipient").isEmpty()){binding.address.setText("收货信息  "+address.optString("recipient")+"  "+address.optString("phone")+"\n"+address.optString("region")+address.optString("detail"));binding.address.setVisibility(View.VISIBLE);}else binding.address.setVisibility(View.GONE);
             binding.itemList.removeAllViews();itemId="";returnProductId="";reviewItems.clear();
@@ -53,13 +60,13 @@ public class OrderDetailActivity extends AppCompatActivity{
                 binding.itemList.addView(line.getRoot());
             }
             if("PENDING_PAYMENT".equals(status))addCancelButton();
-            binding.timeline.setText(OrderProgress.format(data));
+            renderProgress();
             binding.action.setEnabled(true);
             if("PENDING_PAYMENT".equals(status)){binding.action.setText("去付款");binding.action.setVisibility(View.VISIBLE);}
             else if("OUT_FOR_DELIVERY".equals(logistics)){binding.action.setText("确认收货");binding.action.setVisibility(View.VISIBLE);}
             else if("COMPLETED".equals(logistics)){binding.action.setText(reviewItems.isEmpty()?"全部商品已评价":"评价商品");binding.action.setVisibility(View.VISIBLE);binding.action.setEnabled(!reviewItems.isEmpty());}
             else binding.action.setVisibility(View.GONE);
-            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(!afterSale.isEmpty()||java.util.Arrays.asList("PAID","SHIPPED","COMPLETED").contains(status)?View.VISIBLE:View.GONE);serviceSale.setText(afterSale.isEmpty()?"申请售后":"售后进度");if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.append("\n"+AfterSaleState.refundLabel(data)+" · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(AfterSaleState.blocked(data))binding.action.setVisibility(View.GONE);}
+            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(!afterSale.isEmpty()||java.util.Arrays.asList("PAID","SHIPPED","COMPLETED").contains(status)?View.VISIBLE:View.GONE);serviceSale.setText(afterSale.isEmpty()?"申请售后":"售后进度");if(!afterSale.isEmpty()){if(AfterSaleState.blocked(data))binding.action.setVisibility(View.GONE);}
         },this::error);
     }
     private void act(){if("PENDING_PAYMENT".equals(status))startActivity(new Intent(this,PaymentActivity.class)
@@ -75,4 +82,7 @@ public class OrderDetailActivity extends AppCompatActivity{
     }
     private String zh(String value){return switch(value){case "PENDING_PAYMENT","WAITING_PAYMENT"->"等待付款";case "PAID","PREPARING"->"商家准备出库";case "READY_TO_SHIP"->"等待商家发货";case "SHIPPED"->"商品已发货";case "IN_TRANSIT"->"运输途中";case "OUT_FOR_DELIVERY"->"正在派送";case "COMPLETED"->"订单已完成";case "CANCELLED"->"订单已取消";default->value;};}
     private void error(String value){loading=false;binding.loading.setVisibility(View.GONE);if(!displayed.isEmpty())return;Toast.makeText(this,value,Toast.LENGTH_SHORT).show();}
+    private void renderProgress(){if(currentOrder==null)return;binding.timeline.setText(OrderProgress.format(currentOrder,progressExpanded));binding.progressToggle.setVisibility(OrderProgress.hasHistory(currentOrder)?View.VISIBLE:View.GONE);binding.progressToggle.setText(progressExpanded?"收起订单进度":"展开全部进度");}
+    private void renderReceipt(JSONObject data){String receipt=OrderPresentation.receipt(data,java.time.Instant.now());if(!receipt.contentEquals(binding.autoReceipt.getText()))binding.autoReceipt.setText(receipt);binding.autoReceipt.setVisibility(receipt.isEmpty()?View.GONE:View.VISIBLE);}
+    @Override protected void onSaveInstanceState(Bundle state){state.putBoolean("progress_expanded",progressExpanded);super.onSaveInstanceState(state);}
 }

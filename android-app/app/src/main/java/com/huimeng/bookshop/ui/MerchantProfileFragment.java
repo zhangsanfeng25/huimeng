@@ -18,15 +18,15 @@ public class MerchantProfileFragment extends Fragment implements LocalDataRefres
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){
         binding=FragmentMerchantProfileBinding.inflate(inflater,container,false);
         binding.avatar.setOnClickListener(v->open(EditAccountActivity.class));
-        binding.publish.setOnClickListener(v->open(PublishPostActivity.class));
-        binding.notifications.setOnClickListener(v->open(NotificationsActivity.class));
+        binding.publish.setText("内容运营 · 社区与阅读笔记");
+        binding.publish.setOnClickListener(v->open(MerchantCommunityActivity.class));
+        binding.notifications.setVisibility(View.GONE);
         binding.settings.setOnClickListener(v->open(SettingsActivity.class));
         ServiceEntries.menuBefore(binding.settings,"售后管理",com.huimeng.bookshop.R.drawable.ic_orders,()->ServiceActivity.open(requireContext(),"after-sales"));
         ServiceEntries.menuBefore(binding.settings,"意见反馈",com.huimeng.bookshop.R.drawable.ic_review,()->ServiceActivity.open(requireContext(),"feedback"));
-        binding.switchRole.setOnClickListener(v->open(RoleSwitchActivity.class));
         binding.editAccount.setOnClickListener(v->open(EditAccountActivity.class));
         binding.logout.setOnClickListener(v->((MainActivity)requireActivity()).logout());
-        for(View entry:new View[]{binding.publish,binding.notifications,binding.settings,binding.switchRole,binding.editAccount})TapMotion.attach(entry);
+        for(View entry:new View[]{binding.publish,binding.notifications,binding.settings,binding.editAccount})TapMotion.attach(entry);
         binding.getRoot().setOnRefreshListener(this::refreshProfile);renderProfile();return binding.getRoot();
     }
     private void open(Class<?> target){startActivity(new Intent(requireContext(),target));}

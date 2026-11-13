@@ -1,0 +1,11 @@
+import type Database from 'better-sqlite3';
+export type Sqlite=Database.Database;
+export type SchemaPhase='legacy'|'expanded'|'normalized';
+export type OrderedRelation='product_revision_images'|'product_revision_contents'|'community_post_images'|'after_sale_images';
+export type AuditIssue={code:string;entity:string;count:number;blocking:boolean};
+export type PreflightReport={phase:SchemaPhase;integrityOk:boolean;foreignKeysOk:boolean;issues:AuditIssue[];canProceed:boolean};
+export type ResourceBaseline={count:number;rows:string[];digest:string};
+export type BusinessBaseline={modelVersion:2;resources:Record<string,ResourceBaseline>;amounts:Record<string,number>;counters:Record<string,number>};
+export type ComparisonReport={equal:boolean;differences:Array<{resource:string;kind:string;count:number}>};
+export type MediaEntry={path:string;size:number;sha256:string};
+export type MigrationManifest={format:'huimeng-normalization-v1';sourcePhase:SchemaPhase;targetPhase:SchemaPhase;sourceDigest:string;targetDigest:string;mediaDigest:string;sourceCode:string;buildCode:string|null;preflight:PreflightReport;comparison:ComparisonReport;restoreVerified:boolean};

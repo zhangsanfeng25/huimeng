@@ -13,13 +13,20 @@ import java.util.List;
 final class OrderProgress {
     private record Step(String title,String note,String time,int sequence){}
     static String format(JSONObject order){
+        return format(order,true);
+    }
+    static boolean hasHistory(JSONObject order){return !"LOCAL".equals(order.optString("confirmedState"))&&steps(order).size()>1;}
+    private static List<Step> steps(JSONObject order){
+        List<Step> steps=new ArrayList<>();append(steps,order.optJSONArray("events"),false);append(steps,order.optJSONArray("serviceEvents"),true);
+        steps.sort(Comparator.comparingLong((Step s)->epoch(s.time())).thenComparingInt(Step::sequence).reversed());return steps;
+    }
+    static String format(JSONObject order,boolean expanded){
         boolean local="LOCAL".equals(order.optString("confirmedState"));
         String current=local?"待联网确认":current(order);
         if(local)return "当前："+current+"\n\n订单意向已保存在本机，尚未提交至平台。";
-        List<Step> steps=new ArrayList<>();append(steps,order.optJSONArray("events"),false);append(steps,order.optJSONArray("serviceEvents"),true);
-        steps.sort(Comparator.comparingLong((Step s)->epoch(s.time())).thenComparingInt(Step::sequence).reversed());
+        List<Step> steps=steps(order);
         StringBuilder text=new StringBuilder("当前："+current);
-        for(Step step:steps){text.append("\n\n● ").append(step.title());if(!step.note().isEmpty())text.append("\n   ").append(step.note());if(!step.time().isEmpty())text.append("\n   ").append(date(step.time()));}
+        for(Step step:steps){text.append("\n\n● ").append(step.title());if(!step.note().isEmpty())text.append("\n   ").append(step.note());if(!step.time().isEmpty())text.append("\n   ").append(date(step.time()));if(!expanded)break;}
         if(steps.isEmpty())text.append("\n\n暂无已记录的操作。");return text.toString();
     }
     private static void append(List<Step> rows,JSONArray events,boolean service){
@@ -34,7 +41,7 @@ final class OrderProgress {
     private static String orderTitle(JSONObject e){return switch(e.optString("toStatus")){
         case "PENDING_PAYMENT","WAITING_PAYMENT"->"订单已提交，待付款";case "PAID","PREPARING"->"付款已完成，商家准备出库";
         case "READY_TO_SHIP"->"出库准备已完成，待发货";case "SHIPPED"->"商家已发货";case "IN_TRANSIT"->"订单正在运输";case "OUT_FOR_DELIVERY"->"订单正在派送";
-        case "COMPLETED"->"已确认收货，订单完成";case "CANCELLED"->"订单已取消";case "EXPIRED"->"订单超时未付款，已关闭";default->"";};}
+        case "COMPLETED"->"AUTO_CONFIRM".equals(e.optString("action"))?"系统已自动确认收货，订单完成":"已确认收货，订单完成";case "CANCELLED"->"订单已取消";case "EXPIRED"->"订单超时未付款，已关闭";default->"";};}
     private static String serviceTitle(JSONObject e){return switch(e.optString("action")){
         case "CREATE"->"售后申请已提交，待商家审核";case "merchant-review"->"商家已初审，待平台审核";
         case "approve"->"RETURN_REFUND".equals(e.optString("type"))?"平台审核已通过，待买家退货":"平台审核已通过，待退款";

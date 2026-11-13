@@ -1,3 +1,4 @@
+import {productStock} from '../services/product-stock.js';
 import {businessRoute} from '../services/context.js';
 import {productSave} from '../services/products.js';
 import express, { Router } from 'express';
@@ -28,3 +29,5 @@ merchantProductsRouter.get('/merchant/products/:productId',requireAuth('MERCHANT
 });
 merchantProductsRouter.post('/merchant/products',requireAuth('MERCHANT'),businessRoute(productSave));
 merchantProductsRouter.put('/merchant/products/:productId',requireAuth('MERCHANT'),businessRoute(productSave));
+
+merchantProductsRouter.post('/merchant/products/:productId/stock',requireAuth('MERCHANT'),businessRoute(productStock));

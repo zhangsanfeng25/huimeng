@@ -17,7 +17,13 @@ public class LoginActivity extends AppCompatActivity {
     private float touchStartX;
     private float touchStartY;
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityLoginBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
-        new SessionStore(this);
+        SessionStore session=new SessionStore(this);
+        boolean paymentLogin=getIntent().getBooleanExtra("return_to_payment",false);
+        if(session.authenticated()&&(!paymentLogin||!"USER".equals(session.role()))){
+            android.widget.Toast.makeText(this,"请先退出当前账号，再选择登录身份",android.widget.Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         // Android 8.0 has no light-navigation-bar theme attribute: keep white icons readable.
         if(android.os.Build.VERSION.SDK_INT<27)getWindow().setNavigationBarColor(getColor(R.color.auth_green));
         float density=getResources().getDisplayMetrics().density;

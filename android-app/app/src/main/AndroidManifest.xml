@@ -30,7 +30,6 @@
         <activity android:name=".ui.MerchantOrderDetailActivity" android:exported="false" />
         <activity android:name=".ui.SettingsActivity" android:exported="false" />
         <activity android:name=".ui.SyncStatusActivity" android:exported="false" />
-        <activity android:name=".ui.RoleSwitchActivity" android:exported="false" />
         <activity android:name=".ui.ManageProductActivity" android:exported="false" />
         <activity android:name=".ui.EditAccountActivity" android:exported="false" />
         <activity android:name=".ui.AddressesActivity" android:exported="false" />
@@ -49,6 +48,7 @@
         <activity android:name=".ui.CartActivity" android:exported="false" />
         <activity android:name=".ui.ProductDetailActivity" android:exported="false" />
         <activity android:name=".ui.MainActivity" android:exported="false" />
+        <activity android:name=".ui.MerchantCommunityActivity" android:exported="false" />
         <activity android:name=".ui.LoginActivity" android:exported="false" android:theme="@style/Theme.HuiMeng.ForestLogin" android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".ui.WelcomeActivity"

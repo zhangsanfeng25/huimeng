@@ -248,7 +248,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         for(int tab=1;tab<=5;tab++){final int position=tab;runTestOnUiThread(()->merchant.selectTab(position));getInstrumentation().waitForIdleSync();screenshot("merchant-tab-"+tab);}
         preferences.edit().putString("role","USER").commit();runTestOnUiThread(merchant::finish);getInstrumentation().waitForIdleSync();
         populatedCart=true;
-        Class<?>[] pages={CartActivity.class,OrdersActivity.class,AddressesActivity.class,AddAddressActivity.class,EditAccountActivity.class,SettingsActivity.class,PublishPostActivity.class,RatingActivity.class,DataListActivity.class,AddProductActivity.class,RoleSwitchActivity.class,ProductDetailActivity.class};
+        Class<?>[] pages={CartActivity.class,OrdersActivity.class,AddressesActivity.class,AddAddressActivity.class,EditAccountActivity.class,SettingsActivity.class,PublishPostActivity.class,RatingActivity.class,DataListActivity.class,AddProductActivity.class,MerchantApplicationActivity.class,ProductDetailActivity.class};
         for(Class<?> page:pages){Activity screen=getInstrumentation().startActivitySync(new Intent(activity,page).putExtra("product_id","book-0").putExtra("title","我的收藏").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));getInstrumentation().waitForIdleSync();screenshot(page.getSimpleName());runTestOnUiThread(screen::finish);getInstrumentation().waitForIdleSync();}
     }
     public void testReturningFromPublisherAndProductEditorRefreshesLists() throws Throwable {

@@ -1,3 +1,4 @@
+import {readTables} from '../core/db.js';
 import {visibleNotices} from '../services/notice-data.js';
 import {businessRoute} from '../services/context.js';
 import {likeEnable,likeDisable,postCreate,commentCreate,ratingCreate} from '../services/community.js';
@@ -24,14 +25,14 @@ communityRouter.get('/community/posts',requireAuth(),(req,res)=>{
     (SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.status='PUBLIC') commentCount,
     (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount,
     EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) liked
-    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.status='PUBLIC' ORDER BY p.created_at DESC`)).all(req.actor!.id);
+    FROM ${readTables.community_posts} p JOIN users u ON u.id=p.author_user_id WHERE p.status='PUBLIC' ORDER BY p.created_at DESC`)).all(req.actor!.id);
   res.json({data});
 });
 communityRouter.get('/community/posts/:id',requireAuth(),(req,res)=>{
   const post=(publicPost??=db.prepare(`SELECT p.*,p.author_user_id authorId,u.nickname authorName,u.avatar_url avatarUrl,
     (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount,
     EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) liked
-    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.id=? AND p.status='PUBLIC'`)).get(req.actor!.id,String(req.params.id));
+    FROM ${readTables.community_posts} p JOIN users u ON u.id=p.author_user_id WHERE p.id=? AND p.status='PUBLIC'`)).get(req.actor!.id,String(req.params.id));
   if(!post)return res.status(404).json({message:'帖子不存在'});
   const comments=(publicComments??=db.prepare(`SELECT c.id,c.content,c.created_at createdAt,u.nickname authorName,u.avatar_url avatarUrl FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? AND c.status='PUBLIC' ORDER BY c.created_at`)).all(String(req.params.id));
   res.json({data:{...(post as any),comments}});
@@ -43,7 +44,7 @@ communityRouter.get('/community/users/:id',requireAuth(),(req,res)=>{
     (SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.status='PUBLIC') commentCount,
     (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likeCount,
     EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) liked
-    FROM community_posts p JOIN users u ON u.id=p.author_user_id WHERE p.author_user_id=? AND p.status='PUBLIC' ORDER BY p.created_at DESC,p.id DESC`)).all(req.actor!.id,String(req.params.id)) as Array<{likeCount:number}>;
+    FROM ${readTables.community_posts} p JOIN users u ON u.id=p.author_user_id WHERE p.author_user_id=? AND p.status='PUBLIC' ORDER BY p.created_at DESC,p.id DESC`)).all(req.actor!.id,String(req.params.id)) as Array<{likeCount:number}>;
   res.json({data:{user,posts,postCount:posts.length,likeCount:posts.reduce((total,post)=>total+post.likeCount,0)}});
 });
 communityRouter.post('/community/uploads',requireAuth('USER','MERCHANT'),express.raw({type:'image/jpeg',limit:'3mb'}),(req,res)=>{

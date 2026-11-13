@@ -1,3 +1,4 @@
+import {readTables} from '../core/db.js';
 import {db} from '../core/db.js';
 import {SyncError} from '../sync/types.js';
 type Row=Record<string,any>;
@@ -5,9 +6,9 @@ export type SaleItem={orderItemId:string;quantity:number;amountCents:number};
 const reject=(message:string):never=>{throw new SyncError(409,'SERVICE_RULE',message);};
 export function refundableItems(orderId:string):Row[]{
  return db.prepare(`SELECT i.*,
-  MAX(0,i.subtotal_cents-COALESCE((SELECT SUM(x.amount_cents) FROM after_sale_items x JOIN after_sales a ON a.id=x.after_sale_id WHERE x.order_item_id=i.id AND a.status NOT IN ('REJECTED','CANCELLED')),0)) refundable_cents,
-  MAX(0,i.quantity-COALESCE((SELECT SUM(x.restock_quantity) FROM after_sale_items x JOIN after_sales a ON a.id=x.after_sale_id WHERE x.order_item_id=i.id AND a.status NOT IN ('REJECTED','CANCELLED')),0)) returnable_quantity
-  FROM order_items i WHERE i.order_id=? ORDER BY i.id`).all(orderId) as Row[];
+  MAX(0,i.subtotal_cents-COALESCE((SELECT SUM(x.amount_cents) FROM after_sale_items x JOIN ${readTables.after_sales} a ON a.id=x.after_sale_id WHERE x.order_item_id=i.id AND a.status NOT IN ('REJECTED','CANCELLED')),0)) refundable_cents,
+  MAX(0,i.quantity-COALESCE((SELECT SUM(x.restock_quantity) FROM after_sale_items x JOIN ${readTables.after_sales} a ON a.id=x.after_sale_id WHERE x.order_item_id=i.id AND a.status NOT IN ('REJECTED','CANCELLED')),0)) returnable_quantity
+  FROM ${readTables.order_items} i WHERE i.order_id=? ORDER BY i.id`).all(orderId) as Row[];
 }
 export function selectSaleItems(order:Row,type:string,input?:SaleItem[]):Array<SaleItem&{restockQuantity:number}>{
  const available=refundableItems(order.id);
@@ -29,12 +30,12 @@ export function selectSaleItems(order:Row,type:string,input?:SaleItem[]):Array<S
 }
 export function saleItems(id:string):Row[]{
  return db.prepare(`SELECT i.id,i.product_id,i.product_name,i.cover_url,i.unit_price_cents,x.quantity,x.amount_cents,x.restock_quantity
- FROM after_sale_items x JOIN order_items i ON i.id=x.order_item_id WHERE x.after_sale_id=? ORDER BY i.id`).all(id) as Row[];
+ FROM after_sale_items x JOIN ${readTables.order_items} i ON i.id=x.order_item_id WHERE x.after_sale_id=? ORDER BY i.id`).all(id) as Row[];
 }
-export function refundedAmount(orderId:string):number{return (db.prepare('SELECT COALESCE(SUM(amount_cents),0) n FROM refunds WHERE order_id=?').get(orderId) as {n:number}).n;}
+export function refundedAmount(orderId:string):number{return (db.prepare(`SELECT COALESCE(SUM(amount_cents),0) n FROM ${readTables.refunds} WHERE order_id=?`).get(orderId) as {n:number}).n;}
 export function withFulfillment(items:unknown[]):Row[]{
  return (items as Row[]).map(item=>{
-  const cancelled=(db.prepare("SELECT COALESCE(SUM(x.restock_quantity),0) n FROM after_sale_items x JOIN after_sales a ON a.id=x.after_sale_id WHERE x.order_item_id=? AND a.type='REFUND_ONLY' AND a.status='COMPLETED'").get(item.id) as {n:number}).n;
+  const cancelled=(db.prepare(`SELECT COALESCE(SUM(x.restock_quantity),0) n FROM after_sale_items x JOIN ${readTables.after_sales} a ON a.id=x.after_sale_id WHERE x.order_item_id=? AND a.type='REFUND_ONLY' AND a.status='COMPLETED'`).get(item.id) as {n:number}).n;
   return {...item,cancelledQuantity:cancelled,fulfillableQuantity:Math.max(0,item.quantity-cancelled)};
  });
 }

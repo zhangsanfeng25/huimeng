@@ -13,7 +13,7 @@ import java.util.UUID;
 public final class LocalDatabase extends SQLiteOpenHelper {
     private static LocalDatabase instance;
     public static synchronized LocalDatabase get(Context context){if(instance==null)instance=new LocalDatabase(context.getApplicationContext(),"huimeng-local.db");return instance;}
-    public LocalDatabase(Context context,String name){super(context,name,null,1);setWriteAheadLoggingEnabled(true);}
+    public LocalDatabase(Context context,String name){super(context,name,null,2);setWriteAheadLoggingEnabled(true);}
     @Override public void onConfigure(SQLiteDatabase db){db.setForeignKeyConstraintsEnabled(true);}
     @Override public void onCreate(SQLiteDatabase db){
         db.execSQL("CREATE TABLE local_spaces(id TEXT PRIMARY KEY,origin TEXT NOT NULL DEFAULT '',user_id TEXT NOT NULL DEFAULT '',role TEXT NOT NULL DEFAULT 'USER',active INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL)");
@@ -21,14 +21,44 @@ public final class LocalDatabase extends SQLiteOpenHelper {
         db.execSQL("CREATE UNIQUE INDEX bound_space ON local_spaces(origin,user_id) WHERE user_id<>''");
         db.execSQL("CREATE TABLE local_entities(space_id TEXT NOT NULL REFERENCES local_spaces(id),resource TEXT NOT NULL,id TEXT NOT NULL,remote_id TEXT,data TEXT NOT NULL,confirmed TEXT,version INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0,sample INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(space_id,resource,id))");
         db.execSQL("CREATE INDEX entity_remote ON local_entities(space_id,resource,remote_id)");
-        db.execSQL("CREATE TABLE sync_operations(operation_id TEXT PRIMARY KEY,space_id TEXT NOT NULL REFERENCES local_spaces(id),resource TEXT NOT NULL,entity_id TEXT NOT NULL,action TEXT NOT NULL,payload TEXT NOT NULL,payload_hash TEXT NOT NULL DEFAULT '',base_version INTEGER NOT NULL DEFAULT 0,dependencies TEXT NOT NULL DEFAULT '[]',state TEXT NOT NULL DEFAULT 'PENDING' CHECK(state IN ('PENDING','IN_FLIGHT','WAITING_AUTH','BLOCKED','CONFLICT','ACKED')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE sync_operations(operation_id TEXT PRIMARY KEY,space_id TEXT NOT NULL REFERENCES local_spaces(id),resource TEXT NOT NULL,entity_id TEXT NOT NULL,action TEXT NOT NULL,payload TEXT NOT NULL,payload_hash TEXT NOT NULL DEFAULT '',base_version INTEGER NOT NULL DEFAULT 0,dependencies TEXT NOT NULL DEFAULT '[]',submission_role TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'PENDING' CHECK(state IN ('PENDING','IN_FLIGHT','WAITING_AUTH','BLOCKED','CONFLICT','ACKED')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL)");
         db.execSQL("CREATE INDEX outbox_ready ON sync_operations(space_id,state,next_attempt_at,created_at)");
-        db.execSQL("CREATE TABLE local_media(space_id TEXT NOT NULL REFERENCES local_spaces(id),id TEXT NOT NULL,path TEXT NOT NULL,sha256 TEXT NOT NULL,url TEXT NOT NULL DEFAULT '',purpose TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'PENDING',PRIMARY KEY(space_id,id))");
+        db.execSQL("CREATE TABLE local_media(space_id TEXT NOT NULL REFERENCES local_spaces(id),id TEXT NOT NULL,path TEXT NOT NULL,sha256 TEXT NOT NULL,url TEXT NOT NULL DEFAULT '',purpose TEXT NOT NULL,submission_role TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'PENDING',PRIMARY KEY(space_id,id))");
         db.execSQL("CREATE TABLE sync_results(operation_id TEXT PRIMARY KEY REFERENCES sync_operations(operation_id),result TEXT NOT NULL,confirmed_at INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE local_metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)");
         db.execSQL("CREATE TABLE snapshot_pages(space_id TEXT NOT NULL,resource TEXT NOT NULL,snapshot_id TEXT NOT NULL,offset INTEGER NOT NULL,data TEXT NOT NULL,PRIMARY KEY(space_id,resource,snapshot_id,offset))");
     }
-    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){throw new IllegalStateException("本地数据版本暂不支持，原数据已保留");}
+    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){
+        if(oldVersion!=1||newVersion!=2)throw new IllegalStateException("本地数据版本暂不支持，原数据已保留");
+        db.execSQL("ALTER TABLE sync_operations ADD COLUMN submission_role TEXT NOT NULL DEFAULT ''");
+        db.execSQL("ALTER TABLE local_media ADD COLUMN submission_role TEXT NOT NULL DEFAULT ''");
+        db.execSQL("UPDATE sync_operations SET submission_role=CASE "
+            +"WHEN action LIKE 'product.%' OR action IN ('merchant.profile','order.ship','order.advance') THEN 'MERCHANT' "
+            +"WHEN action LIKE 'address.%' OR action LIKE 'cart.%' OR action LIKE 'favorite.%' OR action LIKE 'checkout.%' OR action LIKE 'rating.%' OR action IN ('merchant.apply','order.cancel','order.confirm') THEN 'USER' "
+            +"ELSE '' END");
+        try(Cursor posts=db.rawQuery("SELECT o.operation_id,e.data FROM sync_operations o JOIN local_entities e ON e.space_id=o.space_id AND e.resource='posts' AND e.id=o.entity_id WHERE o.action='post.create' AND o.state<>'ACKED'",null)){
+            while(posts.moveToNext()){
+                String role;
+                try{role=new JSONObject(posts.getString(1)).optString("authorRole");}
+                catch(org.json.JSONException malformed){continue;}
+                if("USER".equals(role)||"MERCHANT".equals(role)){
+                    db.execSQL("UPDATE sync_operations SET submission_role=? WHERE operation_id=?",new Object[]{role,posts.getString(0)});
+                }
+            }
+        }
+        db.execSQL("UPDATE local_media SET submission_role='MERCHANT' WHERE purpose='PRODUCT'");
+        db.execSQL("UPDATE local_media SET submission_role=COALESCE((SELECT o.submission_role FROM sync_operations o WHERE o.space_id=local_media.space_id AND o.action='post.create' AND instr(replace(o.payload,char(92)||'/','/'),local_media.path)>0 ORDER BY o.created_at LIMIT 1),'') WHERE purpose='COMMUNITY'");
+    }
+    public void assignPendingRole(String space,String operationId,String role){
+        if(!"USER".equals(role)&&!"MERCHANT".equals(role))throw new IllegalArgumentException("请先登录对应身份");
+        SQLiteDatabase db=getWritableDatabase();
+        db.beginTransaction();
+        try{
+            db.execSQL("UPDATE local_media SET submission_role=? WHERE space_id=? AND submission_role='' AND purpose='COMMUNITY' AND EXISTS (SELECT 1 FROM sync_operations o WHERE o.operation_id=? AND o.space_id=local_media.space_id AND o.submission_role='' AND o.state<>'ACKED' AND instr(replace(o.payload,char(92)||'/','/'),local_media.path)>0)",new Object[]{role,space,operationId});
+            db.execSQL("UPDATE sync_operations SET submission_role=?,state=CASE WHEN state IN ('IN_FLIGHT','WAITING_AUTH') THEN 'PENDING' ELSE state END WHERE space_id=? AND operation_id=? AND submission_role='' AND state<>'ACKED'",new Object[]{role,space,operationId});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+    }
     public static JSONObject object(String value){try{return new JSONObject(value);}catch(Exception error){throw new IllegalStateException("本地数据损坏，已保留原数据",error);}}
     public JSONObject entity(String space,String resource,String id){try(Cursor c=getReadableDatabase().rawQuery("SELECT data,version,remote_id,deleted,sample FROM local_entities WHERE space_id=? AND resource=? AND (id=? OR remote_id=?)",new String[]{space,resource,id,id})){if(!c.moveToFirst()||c.getInt(3)==1)return null;JSONObject value=object(c.getString(0));try{value.put("version",c.getLong(1));value.put("sample",c.getInt(4)==1);if(!c.isNull(2))value.put("remoteId",c.getString(2));}catch(Exception e){throw new IllegalStateException(e);}return value;}}
     public JSONArray list(String space,String resource){JSONArray result=new JSONArray();try(Cursor c=getReadableDatabase().rawQuery("SELECT data FROM local_entities WHERE space_id=? AND resource=? AND deleted=0 ORDER BY rowid DESC",new String[]{space,resource})){while(c.moveToNext())result.put(object(c.getString(0)));}return result;}
@@ -46,11 +76,12 @@ public final class LocalDatabase extends SQLiteOpenHelper {
             int changed=db.update("local_entities",row,"space_id=? AND resource=? AND id=?",new String[]{space,resource,id});if(changed==0)db.insertOrThrow("local_entities",null,row);
             db.execSQL("UPDATE local_entities SET revision=revision+1 WHERE space_id=? AND resource=? AND id=?",new Object[]{space,resource,id});
             String operationId=UUID.randomUUID().toString();
-            if(!sample){ContentValues operation=new ContentValues();operation.put("operation_id",operationId);operation.put("space_id",space);operation.put("resource",resource);operation.put("entity_id",id);operation.put("action",action);operation.put("payload",payload.toString());operation.put("base_version",version);operation.put("created_at",System.currentTimeMillis());db.insertOrThrow("sync_operations",null,operation);}
+            if(!sample){ContentValues operation=new ContentValues();operation.put("operation_id",operationId);operation.put("space_id",space);operation.put("resource",resource);operation.put("submission_role",new LocalSpaceStore(this).info(space).optString("role","USER"));operation.put("entity_id",id);operation.put("action",action);operation.put("payload",payload.toString());operation.put("base_version",version);operation.put("created_at",System.currentTimeMillis());db.insertOrThrow("sync_operations",null,operation);}
             db.setTransactionSuccessful();return operationId;
         }finally{db.endTransaction();}
     }
-    public JSONArray pending(String space){JSONArray rows=new JSONArray();try(Cursor c=getReadableDatabase().rawQuery("SELECT operation_id,resource,entity_id,action,payload,base_version,state,attempts,next_attempt_at,error FROM sync_operations WHERE space_id=? AND state<>'ACKED' ORDER BY created_at,rowid",new String[]{space})){while(c.moveToNext())try{rows.put(new JSONObject().put("operationId",c.getString(0)).put("spaceId",space).put("resource",c.getString(1)).put("entityId",c.getString(2)).put("action",c.getString(3)).put("payload",object(c.getString(4))).put("baseVersion",c.getLong(5)).put("state",c.getString(6)).put("attempts",c.getInt(7)).put("nextAttemptAt",c.getLong(8)).put("error",c.getString(9)));}catch(Exception e){throw new IllegalStateException(e);}}return rows;}
+    public JSONArray pending(String space){return pending(space,null);}
+    public JSONArray pending(String space,String role){JSONArray rows=new JSONArray();try(Cursor c=getReadableDatabase().rawQuery("SELECT operation_id,resource,entity_id,action,payload,base_version,state,attempts,next_attempt_at,error,submission_role FROM sync_operations WHERE space_id=? AND state<>'ACKED'"+(role==null?"":" AND submission_role=?")+" ORDER BY created_at,rowid",role==null?new String[]{space}:new String[]{space,role})){while(c.moveToNext())try{rows.put(new JSONObject().put("operationId",c.getString(0)).put("spaceId",space).put("resource",c.getString(1)).put("entityId",c.getString(2)).put("action",c.getString(3)).put("payload",object(c.getString(4))).put("baseVersion",c.getLong(5)).put("state",c.getString(6)).put("attempts",c.getInt(7)).put("nextAttemptAt",c.getLong(8)).put("error",c.getString(9)).put("submissionRole",c.getString(10)));}catch(Exception e){throw new IllegalStateException(e);}}return rows;}
     public void acknowledge(JSONObject op,JSONObject result)throws org.json.JSONException{
         String operation=op.getString("operationId"),space=op.getString("spaceId"),resource=op.getString("resource"),id=op.getString("entityId");
         if(!operation.equals(result.optString("operationId")))throw new IllegalArgumentException("服务器回执不匹配");

@@ -2,9 +2,9 @@
 
 本工程按《绘梦儿童绘本商城完整实施说明》组织，包含管理员网页端、Node.js API、SQLite 数据库和 Android 原生 Java/XML 用户与商家端。
 
-## 当前版本 1.1.6（2026-10-24）
+## 当前版本 1.2.0（2026-11-13）
 
-新增买家与店铺聊天、部分/全额演示售后、留言反馈及管理端审核回复。当前 Android 版本为 1.1.6，包含账号/消息/付款修复、部分售后和本地演示找回密码，作为后续局部界面优化前的备份基线。数据库查看、聊天导出及只读查询见 [数据库说明](docs/customer-services-database.md)，安装包与验收范围见 [版本说明](docs/releases/android-1.1.6.md)。
+新增买家、商家和管理员 AI 助手，按登录身份隔离会话与同步队列，更新商家工作台、商品维护和订单状态展示，并纳入 SQLite 规范化维护工具。此版本作为三端界面改版前的基线。安装与验收范围见 [版本说明](docs/releases/android-1.2.0.md)。
 
 ## 1.1.3 图书资料与背景更新（本地版）
 
@@ -22,16 +22,19 @@
 
 ## 目录
 
-- `html/`：已完成的 React + TypeScript + Vite 管理网页，保留原页面与 `/api/v1` 接口约定。
-- `server/`：Express + TypeScript + SQLite 模块化服务，负责认证、权限、商品、购物车、订单、社区、通知和后台接口。
+- `html/`：管理网页，`html/launcher/` 存放 Windows 控制中心及其服务脚本。
+- `server/`：三端共用的 Express API、SQLite 迁移、演示素材和服务端测试。
 - `android-app/`：Android Java/XML 工程，用户与商家共用一个 APK，通过角色进入独立导航。
-- `docs/`：环境、需求、接口、第三方许可和测试记录。
-- `scripts/`：Windows 本地启动脚本。
+- `docs/`：需求、接口、环境与数据维护说明。历史发行说明和验收记录分别放在 `docs/releases/` 和 `docs/verification/`。
+- `scripts/`：跨端联调、控制中心回归、性能测量和离线内容导出。
+- `shared/assets/`：共用的原始品牌素材。
+- `output/`：本地 APK、论文材料、测试截图等交付和验证产物。测试需要临时数据库时也放在这里，并使用单独的目录。
 
+活动数据库位于 `server/data/huimeng.db`，用户图片位于 `server/uploads/`，备份默认位于 `server/data/backups/`。`html/server/data/` 存放控制中心状态、日志及历史数据库。Android 使用自己的私有 SQLite 数据库，通过操作队列与服务器同步。
 
-项目目录保持原有布局：网页及控制中心放在 html，Android 软件工程放在 android-app，共用 API 放在 server。活动数据库为 server/data/huimeng.db，用户图片为 server/uploads；html/server/data 仅保留控制中心日志和历史数据库，不作为第二套运行服务。网络端共用一套业务数据。Android 另有私有 SQLite 本地数据库，通过操作队列与服务器回执同步，不复制服务器数据库文件。
+数据库结构与维护说明见 [完整数据字典](docs/database-dictionary.md)，覆盖当前服务端 40 张表和 Android 7 张本地技术表；[3NF 调整设计](docs/superpowers/specs/2026-10-24-database-normalization-design.md)说明后续拟调整范围、交易快照保留和兼容要求，当前尚未执行结构迁移。聊天、部分售后及反馈的查询方式见 [专项数据库说明](docs/customer-services-database.md)。
 
-.npm-cache 是原有 npm 下载缓存（目录创建于 2026-09-27），android-app/.gradle 是 Gradle 构建缓存，android-app/.idea 是 Android Studio 工程配置（均创建于 2026-09-28）；它们不是新增网站目录。node_modules 为构建和运行依赖。无需把这些目录当作网页或软件源码打开。
+`node_modules/` 是构建和运行依赖。`.npm-cache/`、`.gradle-user-home/` 和 `android-app/.gradle/` 是本地缓存。`html/dist/`、`server/dist/` 和 Android 各级 `build/` 由构建生成。`android-app/.idea/` 保存本地 Android Studio 工程设置。
 
 生成新的离线内容时，先备份业务库，再用 `node scripts/export-android-offline.mjs --database <备份数据库绝对路径> --user <原账号ID> --output output/<迁移目录>` 导出；随后构建 Android。`assets/bootstrap` 为忽略提交的本地公开内容；账号迁移文件和备份仅保存在 output，不进入源码或 APK。
 
@@ -58,9 +61,11 @@
 
 检查命令：在项目根目录运行 `npm run build`、`npm run lint`、`npm test`。同步回归测试使用临时数据库，不会向业务数据库添加测试用户和商品。依赖统一由根目录 `package-lock.json` 管理。
 
+本机业务库已于 2026-10-24 完成规范化迁移，当前 47 表；[数据字典](docs/database-dictionary.md)逐表记录用途、字段、候选键及函数依赖，[验收记录](docs/verification/2026-10-24-database-normalization.md)记录三端检查、旧 APK 兼容、备份恢复与覆盖限制。保留旧库和完整备份；日常启动不会自动执行规范化切换。
+
 源码上传范围、日常提交与发布标签规则见 [源码上传与版本管理](docs/version-management.md)。业务数据库、备份及用户上传图片只保留在本机或独立备份中，不通过 Git 同步。
 
-正式发行版 APK 和对应简短改动说明见 [Android 1.1.6 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.1.6)，最新正式版入口为 [releases/latest](https://github.com/zhangsanfeng25/huimeng/releases/latest)。下载附件 `huimeng-1.1.6.apk`；当前 APK 为 Debug 模拟器演示包，使用方式与验证限制见该版本说明。仓库为私有，下载需登录有访问权限的 GitHub 账号。各版本独立发布，历史安装包和 Release 保留。
+正式发行版见 [Android 1.2.0 Release](https://github.com/zhangsanfeng25/huimeng/releases/tag/android-v1.2.0)。下载附件 `huimeng-1.2.0.apk`，使用方式与验证范围见版本说明。当前 APK 为 Debug 模拟器演示包，私有仓库需登录有访问权限的 GitHub 账号。
 
 真机调试需要将 Android `API_BASE_URL` 改成电脑局域网 IP，并使 `server/.env` 的 `HOST=0.0.0.0`，再重新启动服务与构建 App。
 

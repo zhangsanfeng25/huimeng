@@ -16,7 +16,7 @@ public final class LocalMediaStore {
         File folder=new File(context.getFilesDir(),"offline-media/"+space);if(!folder.isDirectory()&&!folder.mkdirs())throw new java.io.IOException("无法创建本地图片目录");
         File temp=File.createTempFile("image-",".tmp",folder),target=new File(folder,id+".jpg");
         try{try(FileOutputStream stream=new FileOutputStream(temp)){stream.write(bytes);stream.getFD().sync();}if(!temp.renameTo(target))throw new java.io.IOException("本地图片保存失败");
-            ContentValues row=new ContentValues();row.put("space_id",space);row.put("id",id);row.put("path",target.getAbsolutePath());row.put("sha256",hex.toString());row.put("purpose",purpose);db.getWritableDatabase().insertOrThrow("local_media",null,row);return id;
+            ContentValues row=new ContentValues();row.put("space_id",space);row.put("id",id);row.put("path",target.getAbsolutePath());row.put("sha256",hex.toString());row.put("purpose",purpose);row.put("submission_role",new LocalSpaceStore(db).info(space).optString("role","USER"));db.getWritableDatabase().insertOrThrow("local_media",null,row);return id;
         }catch(Exception e){if(target.exists())target.delete();throw e;}finally{if(temp.exists())temp.delete();}
     }
     public Uri resolveUri(String space,String id){try(Cursor c=db.getReadableDatabase().rawQuery("SELECT path FROM local_media WHERE space_id=? AND id=?",new String[]{space,id})){if(!c.moveToFirst())throw new IllegalArgumentException("本地图片不存在");return Uri.fromFile(new File(c.getString(0)));}}

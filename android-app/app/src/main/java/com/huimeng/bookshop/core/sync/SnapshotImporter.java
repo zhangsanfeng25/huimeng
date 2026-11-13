@@ -3,6 +3,8 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import com.huimeng.bookshop.core.local.LocalDatabase;
+import com.huimeng.bookshop.core.local.BuyerRepository;
+import com.huimeng.bookshop.core.local.LocalSpaceStore;
 import org.json.*;
 import java.util.HashSet;
 import java.util.Set;
@@ -28,7 +30,14 @@ public final class SnapshotImporter {
       }
      }
     }
-    try(Cursor existing=db.rawQuery("SELECT id FROM local_entities e WHERE space_id=? AND resource=? AND sample=0 AND NOT EXISTS(SELECT 1 FROM sync_operations o WHERE o.space_id=e.space_id AND o.resource=e.resource AND o.entity_id=e.id AND o.state<>'ACKED')",new String[]{space,resource})){while(existing.moveToNext()){String id=existing.getString(0);if(!present.contains(id))db.execSQL("UPDATE local_entities SET deleted=1 WHERE space_id=? AND resource=? AND id=?",new Object[]{space,resource,id});}}
+    String noticeRole=resource.equals("notifications")?new LocalSpaceStore(store).info(space).optString("role","USER"):null;
+    try(Cursor existing=db.rawQuery("SELECT id,data FROM local_entities e WHERE space_id=? AND resource=? AND sample=0 AND NOT EXISTS(SELECT 1 FROM sync_operations o WHERE o.space_id=e.space_id AND o.resource=e.resource AND o.entity_id=e.id AND o.state<>'ACKED')",new String[]{space,resource})){
+     while(existing.moveToNext()){
+      String id=existing.getString(0);
+      if(noticeRole!=null&&!BuyerRepository.visibleNotice(LocalDatabase.object(existing.getString(1)),noticeRole))continue;
+      if(!present.contains(id))db.execSQL("UPDATE local_entities SET deleted=1 WHERE space_id=? AND resource=? AND id=?",new Object[]{space,resource,id});
+     }
+    }
     db.delete("snapshot_pages","space_id=? AND resource=?",new String[]{space,resource});
    }
    db.setTransactionSuccessful();

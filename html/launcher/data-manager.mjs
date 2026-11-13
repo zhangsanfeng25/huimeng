@@ -125,7 +125,7 @@ async function restore(source) {
   rmSync(oldDatabase, { force: true }); removeTree(oldUploads, dirname(uploadsPath));
   return { restored: true, safetyBackup: safety.path, message: '恢复成功，请重新打开服务，网页和手机需重新登录。' };
 }
-const exportTables = ['users','merchants','categories','products','product_revisions','orders','order_items','ratings','community_posts','comments','notifications','audit_logs','after_sales','after_sale_events','refunds','conversations','chat_messages','conversation_reads','feedbacks','feedback_replies'];
+const exportTables = ['users','merchants','categories','products','product_revisions','orders','order_items','ratings','community_posts','comments','notifications','audit_logs','after_sales','after_sale_events','after_sale_items','refunds','conversations','chat_messages','conversation_reads','feedbacks','feedback_replies','checkout_groups','payments','order_address_snapshots','after_sale_requests','product_revision_images','product_revision_contents','community_post_images','after_sale_images','notification_read_receipts'];
 function csv(value) {
   let text = value == null ? '' : String(value);
   if (/^[\s]*[=+@-]/.test(text)) text = "'" + text;
@@ -136,13 +136,21 @@ async function exportData(output) {
   const path = join(resolve(output), 'huimeng-export-' + stamp()); mkdirSync(path, { recursive: true });
   const db = new Database(databasePath, { readonly: true, fileMustExist: true });
   try {
-    const data = db.transaction(() => Object.fromEntries(exportTables.map(table => {
-      const columns = db.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name).filter(name => !/password|token|secret/i.test(name));
-      return [table, { columns, rows: db.prepare(`SELECT ${columns.map(name => '"' + name + '"').join(',')} FROM "${table}"`).all() }];
+    const data = db.transaction(() => Object.fromEntries(exportTables.filter(table=>db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)).map(table => {
+      const view='compat_'+table;
+      const source=db.prepare("SELECT 1 FROM sqlite_master WHERE type='view' AND name=?").get(view)?view:table;
+      const columns = db.prepare(`PRAGMA table_info(${source})`).all().map(row => row.name).filter(name => !/password|token|secret/i.test(name));
+      const rows=db.prepare(`SELECT ${columns.map(name => '"' + name + '"').join(',')} FROM "${source}"`).all();
+      if(table==='notifications'&&!columns.includes('is_read')){
+        columns.push('is_read','read_at');
+        const receipt=db.prepare('SELECT read_at FROM notification_read_receipts WHERE notification_id=? AND user_id=?');
+        for(const row of rows){const read=row.user_id?receipt.get(row.id,row.user_id):undefined;row.is_read=read?1:0;row.read_at=read?.read_at??null;}
+      }
+      return [table, { columns, rows }];
     })))();
     for (const [table, { columns, rows }] of Object.entries(data)) writeFileSync(join(path, table + '.csv'), '\uFEFF' + [columns.map(csv).join(','), ...rows.map(row => columns.map(name => csv(row[name])).join(','))].join('\r\n'), 'utf8');
     writeFileSync(join(path, 'data.json'), JSON.stringify(Object.fromEntries(Object.entries(data).map(([table,value]) => [table,value.rows])), null, 2));
-    history('导出', '成功', path); return { path, tables: exportTables.length };
+    history('导出', '成功', path); return { path, tables: Object.keys(data).length };
   } finally { db.close(); }
 }
 function records() {

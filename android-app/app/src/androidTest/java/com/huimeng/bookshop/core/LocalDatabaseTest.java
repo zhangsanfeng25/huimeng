@@ -18,6 +18,16 @@ public class LocalDatabaseTest extends AndroidTestCase {
         String space=space();String op=store.mutate(space,"addresses","a1","address.save",new JSONObject().put("recipient","小明"),false);
         store.close();store=new LocalDatabase(getContext(),file);assertEquals(op,store.pending(space).getJSONObject(0).getString("operationId"));assertEquals("小明",store.entity(space,"addresses","a1").getString("recipient"));
     }
+    public void testPendingOperationsStayWithTheRoleThatCreatedThem() throws Exception {
+        String space=space();
+        LocalSpaceStore spaces=new LocalSpaceStore(store);
+        String buyer=store.mutate(space,"posts","buyer-post","post.create",new JSONObject().put("title","买家帖子"),false);
+        spaces.role(space,"MERCHANT");
+        String merchant=store.mutate(space,"posts","merchant-post","post.create",new JSONObject().put("title","商家帖子"),false);
+        assertEquals(2,store.pending(space).length());
+        assertEquals(buyer,store.pending(space,"USER").getJSONObject(0).getString("operationId"));
+        assertEquals(merchant,store.pending(space,"MERCHANT").getJSONObject(0).getString("operationId"));
+    }
     public void testSpaceAndOriginIsolation() throws Exception {
         LocalSpaceStore spaces=new LocalSpaceStore(store);String a=spaces.ensureActiveSpace();spaces.bind(a,"http://a/api/v1/","u1");store.mutate(a,"addresses","a1","address.save",new JSONObject().put("recipient","private"),false);
         String b=spaces.forAccount("http://a/api/v1/","u2");assertFalse(a.equals(b));assertNull(store.entity(b,"addresses","a1"));assertFalse(a.equals(spaces.forAccount("http://b/api/v1/","u1")));

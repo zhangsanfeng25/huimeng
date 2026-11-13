@@ -1,4 +1,4 @@
-import {db,now} from '../core/db.js';
+import {db,now,readTables} from '../core/db.js';
 import {z} from 'zod';
 import {addressCreate,addressUpdate,addressDelete,favoriteEnable,favoriteDisable,cartSet,cartRemove} from '../services/buyer.js';
 import {checkoutCreate,checkoutPay,orderCancel,orderConfirm,orderShip,orderAdvance} from '../services/orders.js';
@@ -22,15 +22,19 @@ function version(actor:Actor,op:SyncEnvelope,id:string){
  const scope=op.action.split('.')[0];const lookup:Record<string,{table:string;key:string;owner:string}>={address:{table:'addresses',key:id,owner:'user_id'},profile:{table:'users',key:actor.id,owner:'id'},product:{table:'products',key:id,owner:'merchant_id'},merchant:{table:'merchants',key:actor.merchantId||'',owner:'owner_user_id'},checkout:{table:'checkout_groups',key:id,owner:'user_id'},order:{table:'orders',key:id,owner:op.action==='order.ship'||op.action==='order.advance'?'merchant_id':'user_id'}};
  const item=lookup[scope];if(!item||op.baseVersion===undefined)return;
  const owner=item.owner==='merchant_id'?actor.merchantId||'':actor.id;
- const row=db.prepare(`SELECT version FROM ${item.table} WHERE id=? AND ${item.owner}=?`).get(item.key,owner) as {version:number}|undefined;
+ const row=db.prepare(`SELECT version FROM ${readTables[item.table]||item.table} WHERE id=? AND ${item.owner}=?`).get(item.key,owner) as {version:number}|undefined;
  if(row&&row.version!==op.baseVersion)throw new SyncError(409,'VERSION_CONFLICT','内容已在另一端修改，请处理冲突',{version:row.version});
  if(!row&&op.baseVersion>0)throw new SyncError(409,'ENTITY_DELETED','内容不存在或已删除，请处理冲突');
 }
-export function applyOperation(actor:Actor,op:SyncEnvelope):{result:SyncResult;events:Array<{resource:string;action:string}>}{
+export function authorizeOperation(actor:Actor,op:SyncEnvelope){
  const resource=resourceForAction(op.action);if(!resource)throw new SyncError(400,'UNKNOWN_ACTION','不支持的同步操作');
  const merchant=op.action.startsWith('product.')||op.action==='merchant.profile'||op.action==='order.ship'||op.action==='order.advance';
  if(merchant&&(!actor.roles.includes('MERCHANT')||!actor.merchantId))throw new SyncError(403,'ROLE_REQUIRED','当前账号没有有效商家权限');
  if(!merchant&&!op.action.startsWith('post.')&&!op.action.startsWith('comment.')&&!op.action.startsWith('profile.')&&!op.action.startsWith('notice.')&&!actor.roles.includes('USER'))throw new SyncError(403,'ROLE_REQUIRED','当前账号没有买家权限');
+ return resource;
+}
+export function applyOperation(actor:Actor,op:SyncEnvelope):{result:SyncResult;events:Array<{resource:string;action:string}>}{
+ const resource=authorizeOperation(actor,op);
  const p={...op.payload};const id=remoteId(actor,resource,op.entityId||p.id||'');
  for(const [key,type] of [['productId','merchantProducts'],['postId','posts'],['addressId','addresses'],['groupId','checkouts'],['orderId','buyerOrders']] as const)if(p[key])p[key]=remoteId(actor,type,p[key]);
  if(Array.isArray(p.items))p.items=p.items.map((item:any)=>({...item,productId:remoteId(actor,'merchantProducts',item.productId)}));

@@ -1,4 +1,4 @@
-import { db, now } from './db.js';
+import { db, now, readTables, normalizedSchema } from './db.js';
 import type { Statement } from 'better-sqlite3';
 
 let closeGroup:Statement,pendingOrders:Statement,orderItems:Statement,reservationTotal:Statement,
@@ -10,7 +10,7 @@ export function closePendingCheckout(groupId: string, actorId: string | null, no
     const stamp = now();
     const changed = (closeGroup??=db.prepare("UPDATE checkout_groups SET status='CLOSED',version=version+1 WHERE id=? AND status='PENDING'")).run(groupId);
     if (!changed.changes) return false;
-    const orders = (pendingOrders??=db.prepare("SELECT id FROM orders WHERE checkout_group_id=? AND status='PENDING_PAYMENT'")).all(groupId) as Array<{id:string}>;
+    const orders = (pendingOrders??=db.prepare(`SELECT id FROM ${readTables.orders} WHERE checkout_group_id=? AND status='PENDING_PAYMENT'`)).all(groupId) as Array<{id:string}>;
     for (const order of orders) {
       const items = (orderItems??=db.prepare('SELECT product_id,quantity FROM order_items WHERE order_id=?')).all(order.id) as Array<{product_id:string;quantity:number}>;
       for (const item of items) {
@@ -23,7 +23,7 @@ export function closePendingCheckout(groupId: string, actorId: string | null, no
           (releaseMovement??=db.prepare("INSERT INTO stock_movements(product_id,order_id,type,available_delta,reserved_delta,created_at) VALUES(?,?,'RELEASE',?,?,?)")).run(item.product_id,order.id,quantity,-quantity,stamp);
         }
       }
-      (cancelOrder??=db.prepare("UPDATE orders SET status='CANCELLED',logistics_status='CANCELLED',cancelled_at=?,updated_at=?,version=version+1 WHERE id=?")).run(stamp,stamp,order.id);
+      (cancelOrder??=db.prepare(`UPDATE orders SET ${normalizedSchema?'':"status='CANCELLED',"}logistics_status='CANCELLED',cancelled_at=?,updated_at=?,version=version+1 WHERE id=?`)).run(stamp,stamp,order.id);
       (cancelEvent??=db.prepare("INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'CANCEL','PENDING_PAYMENT','CANCELLED',?,?)")).run(order.id,actorId||'SYSTEM',note,stamp);
     }
     return true;

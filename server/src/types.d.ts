@@ -1,7 +1,7 @@
 declare global {
   namespace Express {
     interface Request {
-      actor?: { id: string; name: string; roles: string[]; merchantId?: string; activeRole?: string };
+      actor?: { id: string; name: string; roles: string[]; accountRoles?: string[]; merchantId?: string; activeRole?: string };
     }
   }
 }

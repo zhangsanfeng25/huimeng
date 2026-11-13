@@ -9,10 +9,7 @@ export const customerServicesRouter=Router();
 customerServicesRouter.use('/service',requireAuth());
 customerServicesRouter.use('/service',(req,res,next)=>{
  const requested=req.header('X-Service-Role');
- if(requested&&['USER','MERCHANT'].includes(requested)){
-  if(!req.actor!.roles.includes(requested))return res.status(403).json({message:'当前账号没有此身份'});
-  req.actor!.activeRole=requested;
- }
+ if(requested&&requested!==req.actor!.activeRole)return res.status(403).json({message:'请使用当前登录身份访问'});
  next();
 });
 customerServicesRouter.get('/service/events',(req,res)=>{res.set({'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.flushHeaders();res.write('event: ready\ndata: {}\n\n');subscribe(res,req.actor!.id);});

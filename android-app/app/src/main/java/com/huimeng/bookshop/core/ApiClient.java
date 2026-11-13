@@ -20,6 +20,13 @@ public final class ApiClient {
     private final SessionStore session;
     public ApiClient(Context context){this.context=context.getApplicationContext();this.session=new SessionStore(context);}
     public void get(String path,Consumer<JSONObject> success,Consumer<String> failure){request(Request.Method.GET,path,null,success,failure);}
+    public void getOnline(String path,Consumer<JSONObject> success,Consumer<String> failure){
+        requestOnline(Request.Method.GET,path,null,new HashMap<>(),success,failure);
+    }
+    public void chat(JSONObject body,Consumer<JSONObject> success,Consumer<String> failure){
+        if(session.token().isEmpty()){failure.accept("AI 助手需联网登录后使用");return;}
+        requestOnline(Request.Method.POST,"ai/chat",body,new HashMap<>(),success,failure);
+    }
     public void post(String path,JSONObject body,Consumer<JSONObject> success,Consumer<String> failure){request(Request.Method.POST,path,body,success,failure);}
     public void post(String path,JSONObject body,Map<String,String> extraHeaders,Consumer<JSONObject> success,Consumer<String> failure){request(Request.Method.POST,path,body,extraHeaders,success,failure);}
     public void put(String path,JSONObject body,Consumer<JSONObject> success,Consumer<String> failure){request(Request.Method.PUT,path,body,success,failure);}
@@ -59,15 +66,19 @@ public final class ApiClient {
         request(method,path,body,new HashMap<>(),success,failure);
     }
     private void request(int method,String path,JSONObject body,Map<String,String> extraHeaders,Consumer<JSONObject> success,Consumer<String> failure){
-        if(session.hasLocalSpace()&&(!path.startsWith("auth/")||path.equals("auth/me")||path.equals("auth/me/avatar")||path.equals("auth/switch-role")||path.equals("auth/default-avatars"))){
+        if(session.hasLocalSpace()&&(!path.startsWith("auth/")||path.equals("auth/me")||path.equals("auth/me/avatar")||path.equals("auth/default-avatars"))){
             if(!(path.equals("auth/me")&&body!=null&&(body.has("newPassword")||body.has("currentPassword")))){
                 com.huimeng.bookshop.core.local.LocalRepository.request(context,method,path,body,success,failure);return;
             }
         }
+        requestOnline(method,path,body,extraHeaders,success,failure);
+    }
+    private void requestOnline(int method,String path,JSONObject body,Map<String,String> extraHeaders,
+                               Consumer<JSONObject> success,Consumer<String> failure){
         String token=session.token();
         JsonObjectRequest request=new JsonObjectRequest(method, BuildConfig.API_BASE_URL+path,body,success::accept,error->{
             if(unauthorized(path,error.networkResponse==null?0:error.networkResponse.statusCode,token))return;
-            String message="无法连接服务器，请启动控制服务后重试";
+            String message=path.equals("ai/chat")?"AI 助手需要连接服务，请检查网络后重试":"无法连接服务器，请启动控制服务后重试";
             if(error.networkResponse!=null&&error.networkResponse.data!=null){try{message=new JSONObject(new String(error.networkResponse.data)).optString("message",message);}catch(Exception ignored){}}
             failure.accept(message);
         }){
@@ -75,6 +86,7 @@ public final class ApiClient {
         };
         request.setTag(context.getClass().getSimpleName());
         request.setShouldCache(false);
+        if(path.equals("ai/chat"))request.setRetryPolicy(new com.android.volley.DefaultRetryPolicy(13000,0,1f));
         ((HuiMengApp)context).requests().add(request);
     }
     private boolean unauthorized(String path,int status,String requestToken){

@@ -1,0 +1,33 @@
+.admin-ai { position: fixed; top: var(--ai-ball-top); width: 52px; z-index: 40; }
+.admin-ai-right { right: 12px; }
+.admin-ai-left { left: 12px; }
+.admin-ai .admin-ai-trigger { width: 52px; height: 52px; padding: 0; border-radius: 50%; display: grid; place-items: center; touch-action: none; user-select: none; cursor: grab; }
+.admin-ai.is-dragging .admin-ai-trigger { cursor: grabbing; }
+.admin-ai.is-dragging .admin-ai-dialog { visibility: hidden; }
+.admin-ai-dialog { position: absolute; width: min(420px,calc(100vw - 24px)); padding: 16px; display: flex; flex-direction: column; overflow: auto; box-shadow: 0 16px 48px #281e5433; }
+.admin-ai-right .admin-ai-dialog { right: 0; }
+.admin-ai-left .admin-ai-dialog { left: 0; }
+.admin-ai-above .admin-ai-dialog { bottom: 64px; max-height: max(110px,calc(var(--ai-ball-top) - 24px)); }
+.admin-ai-below .admin-ai-dialog { top: 64px; max-height: max(110px,calc(100dvh - var(--ai-ball-top) - 76px)); }
+.admin-ai-header { margin-bottom: 12px; gap: 10px; }
+.admin-ai-header h2 { margin: 0; font-size: 16px; }
+.admin-ai-header p { margin: 2px 0 0; color: var(--muted); }
+.admin-ai .ai-conversation { flex: 1 1 230px; align-content: start; min-height: min(95px,25dvh); max-height: 310px; }
+.admin-ai .ai-compose input { margin-top: 0; min-width: 0; }
+.admin-ai .ai-compose button { white-space: nowrap; }
+.ai-waiting { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); }
+.admin-ai button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.ai-conversation { display: grid; gap: 10px; min-height: 135px; max-height: 360px; overflow: auto; margin: 14px 0; padding: 12px; border-radius: 12px; background: var(--surface-2); }
+.ai-message { width: fit-content; max-width: 88%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow-wrap: anywhere; }
+.ai-message p { margin: 0; white-space: pre-wrap; }
+.ai-message small { color: var(--muted); }
+.ai-message.user { justify-self: end; background: color-mix(in srgb,var(--surface) 88%,var(--primary)); }
+.ai-product { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ai-product img { object-fit: cover; border-radius: 5px; }
+.ai-product p { color: var(--muted); }
+.ai-compose.form-grid { grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+.ai-spin { animation: ai-spin .85s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-spin { animation: none; }
+}

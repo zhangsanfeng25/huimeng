@@ -1,5 +1,7 @@
+import {readTables} from '../core/db.js';
 import {z} from 'zod';
-import {db,now} from '../core/db.js';
+import {db,now,normalizedSchema} from '../core/db.js';
+import {replaceOrderedValues} from '../normalization/relations.js';
 import {audit} from '../core/http.js';
 import {id} from './shop-data.js';
 import type {BusinessContext} from './context.js';
@@ -9,10 +11,10 @@ import {broadcastPrivate} from '../core/events.js';
 import {refundableItems,selectSaleItems,saleItems,refundedAmount} from './after-sale-items.js';
 
 type Row=Record<string,any>;
-export const afterSaleColumns=`COALESCE((SELECT status FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_state,COALESCE((SELECT id FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_id,COALESCE((SELECT SUM(amount_cents) FROM refunds WHERE order_id=o.id),0) refunded_cents`;
+export const afterSaleColumns=`COALESCE((SELECT status FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_state,COALESCE((SELECT id FROM after_sales WHERE order_id=o.id ORDER BY created_at DESC,rowid DESC LIMIT 1),'') after_sale_id,COALESCE((SELECT SUM(amount_cents) FROM ${readTables.refunds} WHERE order_id=o.id),0) refunded_cents`;
 /** Recorded actions only. Order ownership must be checked by the caller before exposing them. */
 export function orderServiceEvents(orderId:string){
- return db.prepare('SELECT e.id,e.action,e.note,e.created_at createdAt,a.type FROM after_sale_events e JOIN after_sales a ON a.id=e.after_sale_id WHERE a.order_id=? ORDER BY e.created_at,e.id').all(orderId);
+ return db.prepare(`SELECT e.id,e.action,e.note,e.created_at createdAt,a.type FROM after_sale_events e JOIN ${readTables.after_sales} a ON a.id=e.after_sale_id WHERE a.order_id=? ORDER BY e.created_at,e.id`).all(orderId);
 }
 const text=z.string().trim().min(1).max(2000);
 const client=z.string().trim().min(1).max(100);
@@ -22,27 +24,28 @@ const staff=(a:Actor)=>a.roles.some(r=>['ADMIN','OPERATOR','SUPPORT'].includes(r
 const writer=(a:Actor)=>a.roles.some(r=>['ADMIN','OPERATOR'].includes(r));
 function merchant(a:Actor){return a.activeRole==='MERCHANT'&&!!a.merchantId;}
 function role(a:Actor){return merchant(a)?'MERCHANT':'USER';}
-function get(table:string,key:string){const row=db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(key) as Row|undefined;if(!row)fail('记录不存在',404);return row;}
+function get(table:string,key:string){const row=db.prepare(`SELECT * FROM ${readTables[table]||table} WHERE id=?`).get(key) as Row|undefined;if(!row)fail('记录不存在',404);return row;}
 function canSee(a:Actor,kind:string,row:Row,admin=false){
  if(admin){if(!staff(a))fail('无权查看管理数据',403);return;}
  const allowed=kind==='feedback'?row.user_id===a.id:merchant(a)?row.merchant_id===a.merchantId:row.buyer_id===a.id;
  if(!allowed)fail('无权访问此记录',403);
 }
-function notify(userId:string,title:string,content:string){db.prepare("INSERT INTO notifications(id,user_id,audience,title,content,status,created_at) VALUES(?,?,'指定账号',?,?,'SENT',?)").run(id('N'),userId,title,content,now());}
+function notify(userId:string,title:string,content:string,audience='指定账号'){db.prepare("INSERT INTO notifications(id,user_id,audience,title,content,status,created_at) VALUES(?,?,?,?,?,'SENT',?)").run(id('N'),userId,audience,title,content,now());}
 function owner(merchantId:string){return (db.prepare('SELECT owner_user_id id FROM merchants WHERE id=?').get(merchantId) as Row).id as string;}
 function saleEvent(a:Actor,sale:Row,action:string,note=''){
  db.prepare('INSERT INTO after_sale_events(after_sale_id,actor_id,action,note,created_at) VALUES(?,?,?,?,?)').run(sale.id,a.id,action,note,now());
- notify(sale.buyer_id,'售后进度更新',`售后单 ${sale.id}：${note||action}`);notify(owner(sale.merchant_id),'售后进度更新',`售后单 ${sale.id}：${note||action}`);
+ notify(sale.buyer_id,'售后进度更新',`售后单 ${sale.id}：${note||action}`,'用户售后消息');
+ notify(owner(sale.merchant_id),'售后进度更新',`售后单 ${sale.id}：${note||action}`,'商家售后消息');
 }
-export function hasBlockingAfterSale(orderId:string){return !!db.prepare("SELECT 1 FROM after_sales WHERE order_id=? AND status NOT IN ('REJECTED','CANCELLED','COMPLETED')").get(orderId)||!!db.prepare('SELECT 1 FROM orders WHERE id=? AND total_cents>0 AND total_cents<=(SELECT COALESCE(SUM(amount_cents),0) FROM refunds WHERE order_id=?)').get(orderId,orderId);}
+export function hasBlockingAfterSale(orderId:string){return !!db.prepare(`SELECT 1 FROM ${readTables.after_sales} WHERE order_id=? AND status NOT IN ('REJECTED','CANCELLED','COMPLETED')`).get(orderId)||!!db.prepare(`SELECT 1 FROM ${readTables.orders} WHERE id=? AND total_cents>0 AND total_cents<=(SELECT COALESCE(SUM(amount_cents),0) FROM ${readTables.refunds} WHERE order_id=?)`).get(orderId,orderId);}
 export function orderAfterSale(a:Actor,orderId:string){
  const order=get('orders',orderId);canSee(a,'after-sales',{buyer_id:order.user_id,merchant_id:order.merchant_id});
- return {order:{id:order.id,status:order.status,total_cents:order.total_cents,refunded_cents:refundedAmount(orderId),merchant_id:order.merchant_id},items:refundableItems(orderId),sale:db.prepare('SELECT * FROM after_sales WHERE order_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(orderId)||null};
+ return {order:{id:order.id,status:order.status,total_cents:order.total_cents,refunded_cents:refundedAmount(orderId),merchant_id:order.merchant_id},items:refundableItems(orderId),sale:db.prepare(`SELECT * FROM ${readTables.after_sales} WHERE order_id=? ORDER BY created_at DESC,(SELECT source.rowid FROM after_sales source WHERE source.id=${readTables.after_sales}.id) DESC LIMIT 1`).get(orderId)||null};
 }
 
 export function serviceList(a:Actor,kind:string,admin=false):Row[]{
  if(admin&&!staff(a))fail('无权查看管理数据',403);
- if(kind==='after-sales')return db.prepare(`SELECT s.*,m.shop_name shop,u.nickname buyer FROM after_sales s JOIN merchants m ON m.id=s.merchant_id JOIN users u ON u.id=s.buyer_id ${admin?'':merchant(a)?'WHERE s.merchant_id=?':'WHERE s.buyer_id=?'} ORDER BY s.updated_at DESC LIMIT 200`).all(...(admin?[]:[merchant(a)?a.merchantId:a.id])) as Row[];
+ if(kind==='after-sales')return db.prepare(`SELECT s.*,m.shop_name shop,u.nickname buyer FROM ${readTables.after_sales} s JOIN merchants m ON m.id=s.merchant_id JOIN users u ON u.id=s.buyer_id ${admin?'':merchant(a)?'WHERE s.merchant_id=?':'WHERE s.buyer_id=?'} ORDER BY s.updated_at DESC LIMIT 200`).all(...(admin?[]:[merchant(a)?a.merchantId:a.id])) as Row[];
  if(kind==='feedback')return db.prepare(`SELECT f.*,u.nickname submitter FROM feedbacks f JOIN users u ON u.id=f.user_id ${admin?'':'WHERE f.user_id=?'} ORDER BY f.updated_at DESC LIMIT 200`).all(...(admin?[]:[a.id])) as Row[];
  if(kind==='conversations'){
   if(admin)fail('管理员不通过普通会话接口读取私人聊天',403);
@@ -59,11 +62,11 @@ export function serviceDetail(a:Actor,kind:string,key:string,admin=false,before=
  if(kind==='after-sales'){
   const order=get('orders',row.order_id);
   const canApplyAgain=['REJECTED','CANCELLED','COMPLETED'].includes(row.status)&&['PAID','SHIPPED','COMPLETED'].includes(order.status)&&!hasBlockingAfterSale(order.id)&&refundableItems(order.id).some(item=>item.refundable_cents>0&&item.returnable_quantity>0);
-  return {...row,can_apply_again:canApplyAgain,images:JSON.parse(row.images_json),events:db.prepare('SELECT e.*,u.nickname actor FROM after_sale_events e JOIN users u ON u.id=e.actor_id WHERE after_sale_id=? ORDER BY e.id').all(key),items:saleItems(key),refund:db.prepare('SELECT * FROM refunds WHERE after_sale_id=?').get(key)||null};
+  return {...row,can_apply_again:canApplyAgain,images:JSON.parse(row.images_json),events:db.prepare('SELECT e.*,u.nickname actor FROM after_sale_events e JOIN users u ON u.id=e.actor_id WHERE after_sale_id=? ORDER BY e.id').all(key),items:saleItems(key),refund:db.prepare(`SELECT * FROM ${readTables.refunds} WHERE after_sale_id=?`).get(key)||null};
  }
  if(kind==='feedback')return {...row,replies:db.prepare('SELECT r.*,u.nickname sender FROM feedback_replies r JOIN users u ON u.id=r.sender_id WHERE feedback_id=? ORDER BY r.id').all(key)};
  if(admin)fail('无权通过管理接口读取私人聊天',403);
- const messages=db.prepare(`SELECT x.*,u.nickname sender,p.name product_name,oi.product_name order_product FROM chat_messages x JOIN users u ON u.id=x.sender_id LEFT JOIN product_revisions p ON p.id=(SELECT published_revision_id FROM products WHERE id=x.product_id) LEFT JOIN order_items oi ON oi.id=(SELECT id FROM order_items WHERE order_id=x.order_id LIMIT 1) WHERE x.conversation_id=? AND (?=0 OR x.id<?) ORDER BY x.id DESC LIMIT 50`).all(key,before,before) as Row[];
+ const messages=db.prepare(`SELECT x.*,u.nickname sender,p.name product_name,oi.product_name order_product FROM chat_messages x JOIN users u ON u.id=x.sender_id LEFT JOIN ${readTables.product_revisions} p ON p.id=(SELECT published_revision_id FROM products WHERE id=x.product_id) LEFT JOIN ${readTables.order_items} oi ON oi.id=(SELECT id FROM ${readTables.order_items} WHERE order_id=x.order_id LIMIT 1) WHERE x.conversation_id=? AND (?=0 OR x.id<?) ORDER BY x.id DESC LIMIT 50`).all(key,before,before) as Row[];
  return {...row,shop:(db.prepare('SELECT shop_name name FROM merchants WHERE id=?').get(row.merchant_id) as Row).name,buyer:(db.prepare('SELECT nickname name FROM users WHERE id=?').get(row.buyer_id) as Row).name,messages:messages.reverse(),hasMore:messages.length===50,readerRole:role(a),peerRead:(db.prepare('SELECT last_message_id n FROM conversation_reads WHERE conversation_id=? AND reader_role<>?').get(key,role(a)) as Row)?.n||0};
 }
 
@@ -72,7 +75,7 @@ function saleAction(ctx:BusinessContext):Row{
  if(action==='create'){
   if(merchant(a)||!a.roles.includes('USER'))fail('请以买家身份申请售后',403);
   const v=input(z.object({orderId:client,type:z.enum(['REFUND_ONLY','RETURN_REFUND']),reason:z.string().trim().min(1).max(200),description:z.string().trim().max(2000).default(''),images:z.array(z.string()).max(3).default([]),clientId:client,items:z.array(z.object({orderItemId:client,quantity:z.number().int().positive(),amountCents:z.number().int().positive()})).min(1).max(100).optional()}),b);
-  const previous=db.prepare('SELECT * FROM after_sales WHERE buyer_id=? AND client_id=?').get(a.id,v.clientId) as Row|undefined;
+  const previous=db.prepare(`SELECT * FROM ${readTables.after_sales} WHERE buyer_id=? AND client_id=?`).get(a.id,v.clientId) as Row|undefined;
   if(previous){const oldItems=saleItems(previous.id);const changed=v.items&&(v.items.length!==oldItems.length||v.items.some(i=>!oldItems.some(o=>o.id===i.orderItemId&&o.quantity===i.quantity&&o.amount_cents===i.amountCents)));if(previous.order_id!==v.orderId||previous.type!==v.type||previous.reason!==v.reason||previous.description!==v.description||previous.images_json!==JSON.stringify(v.images)||changed)fail('同一请求标识不能用于不同申请');return {data:previous,reused:true};}
   const order=get('orders',v.orderId);if(order.user_id!==a.id)fail('无权为此订单申请售后',403);
   if(!['PAID','SHIPPED','COMPLETED'].includes(order.status))fail('仅已付款订单可申请售后');
@@ -80,7 +83,12 @@ function saleAction(ctx:BusinessContext):Row{
   if(v.type==='RETURN_REFUND'&&order.status==='PAID')fail('未发货订单请选择仅退款');
   const items=selectSaleItems(order,v.type,v.items),amount=items.reduce((sum,i)=>sum+i.amountCents,0);
   if(v.images.some(url=>!db.prepare('SELECT 1 FROM community_uploads WHERE path=? AND user_id=?').get(url,a.id)))fail('凭证必须使用本人上传的图片',400);
-  const stamp=now(),sid=id('AS');db.prepare("INSERT INTO after_sales(id,order_id,buyer_id,merchant_id,type,amount_cents,reason,description,images_json,status,client_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'MERCHANT_REVIEW',?,?,?)").run(sid,order.id,a.id,order.merchant_id,v.type,amount,v.reason,v.description,JSON.stringify(v.images),v.clientId,stamp,stamp);
+  const stamp=now(),sid=id('AS');
+  if(normalizedSchema){
+   db.prepare("INSERT INTO after_sales(id,order_id,type,amount_cents,reason,description,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'MERCHANT_REVIEW',?,?)").run(sid,order.id,v.type,amount,v.reason,v.description,stamp,stamp);
+   db.prepare('INSERT INTO after_sale_requests(buyer_id,client_id,after_sale_id) VALUES(?,?,?)').run(a.id,v.clientId,sid);
+   replaceOrderedValues(db,'after_sale_images',sid,v.images);
+  }else db.prepare("INSERT INTO after_sales(id,order_id,buyer_id,merchant_id,type,amount_cents,reason,description,images_json,status,client_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'MERCHANT_REVIEW',?,?,?)").run(sid,order.id,a.id,order.merchant_id,v.type,amount,v.reason,v.description,JSON.stringify(v.images),v.clientId,stamp,stamp);
   const insert=db.prepare('INSERT INTO after_sale_items(after_sale_id,order_item_id,quantity,amount_cents,restock_quantity) VALUES(?,?,?,?,?)');
   for(const item of items)insert.run(sid,item.orderItemId,item.quantity,item.amountCents,item.restockQuantity);
   const row=get('after_sales',sid);saleEvent(a,row,'CREATE','买家提交售后');return {data:row};
@@ -111,7 +119,7 @@ function saleAction(ctx:BusinessContext):Row{
   if(!isAdmin)fail('无权退款',403);if(row.status!=='REFUND_PENDING')fail('状态不允许退款');
   const order=get('orders',row.order_id);const payment=db.prepare('SELECT method FROM payments WHERE checkout_group_id=?').get(order.checkout_group_id) as Row|undefined;
   if(payment&&!String(payment.method).startsWith('DEMO'))fail('真实支付不能使用演示退款');
-  db.prepare("INSERT INTO refunds(id,after_sale_id,order_id,amount_cents,method,status,created_at) VALUES(?,?,?,?,'DEMO','COMPLETED',?)").run(id('RF'),key,row.order_id,row.amount_cents,now());
+  db.prepare(`INSERT INTO refunds(id,after_sale_id,${normalizedSchema?'':'order_id,'}amount_cents,method,status,created_at) VALUES(?,?,${normalizedSchema?'':'?,'}?,'DEMO','COMPLETED',?)`).run(id('RF'),key,...(normalizedSchema?[]:[row.order_id]),row.amount_cents,now());
   for(const item of saleItems(key)){
    if(!item.restock_quantity)continue;
    db.prepare('UPDATE products SET stock_available=stock_available+?,updated_at=? WHERE id=?').run(item.restock_quantity,now(),item.product_id);
@@ -137,14 +145,14 @@ function chatAction(ctx:BusinessContext):Row{
  }
  const row=get('conversations',params.id);canSee(a,'conversations',row);
  if(b.action==='read'){
-  const max=(db.prepare('SELECT COALESCE(MAX(id),0) n FROM chat_messages WHERE conversation_id=?').get(row.id) as Row).n;
-  const last=Number.isSafeInteger(b.lastMessageId)?Math.min(max,Math.max(0,b.lastMessageId)):max;
+  const limit=Number.isSafeInteger(b.lastMessageId)?Math.max(0,b.lastMessageId):Number.MAX_SAFE_INTEGER;
+  const last=(db.prepare('SELECT COALESCE(MAX(id),0) n FROM chat_messages WHERE conversation_id=? AND id<=?').get(row.id,limit) as Row).n;
   db.prepare('INSERT INTO conversation_reads(conversation_id,reader_role,last_message_id) VALUES(?,?,?) ON CONFLICT(conversation_id,reader_role) DO UPDATE SET last_message_id=MAX(last_message_id,excluded.last_message_id)').run(row.id,role(a),last);return {ok:true};
  }
  if(b.action!=='send')fail('未知聊天操作',400);
  const v=input(z.object({content:text,clientId:client,productId:z.string().optional(),orderId:z.string().optional()}),b);
  if(v.productId&&!db.prepare('SELECT 1 FROM products WHERE id=? AND merchant_id=? AND published_revision_id IS NOT NULL').get(v.productId,row.merchant_id))fail('商品不属于此店铺',400);
- if(v.orderId&&!db.prepare('SELECT 1 FROM orders WHERE id=? AND user_id=? AND merchant_id=?').get(v.orderId,row.buyer_id,row.merchant_id))fail('订单不属于此会话',403);
+ if(v.orderId&&!db.prepare(`SELECT 1 FROM ${readTables.orders} WHERE id=? AND user_id=? AND merchant_id=?`).get(v.orderId,row.buyer_id,row.merchant_id))fail('订单不属于此会话',403);
  const old=db.prepare('SELECT * FROM chat_messages WHERE sender_id=? AND sender_role=? AND client_id=?').get(a.id,role(a),v.clientId) as Row|undefined;
  if(old){if(old.conversation_id!==row.id||old.content!==v.content||(old.product_id||'')!==(v.productId||'')||(old.order_id||'')!==(v.orderId||''))fail('同一消息标识不能用于不同内容');return {ok:true,reused:true};}
  db.prepare('INSERT INTO chat_messages(conversation_id,sender_id,sender_role,content,product_id,order_id,client_id,created_at) VALUES(?,?,?,?,?,?,?,?)').run(row.id,a.id,role(a),v.content,v.productId||null,v.orderId||null,v.clientId,now());

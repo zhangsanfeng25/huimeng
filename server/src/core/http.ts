@@ -28,8 +28,11 @@ export function requireAuth(...roles: string[]) {
     const roleRows=(roleQuery??=db.prepare('SELECT role FROM user_roles WHERE user_id=?')).all(session.user_id) as Array<{role:string}>;
     const merchant=(merchantQuery??=db.prepare('SELECT id,approval_status,business_status FROM merchants WHERE owner_user_id=?')).get(session.user_id) as {id:string;approval_status:string;business_status:string}|undefined;
     const actorRoles=roleRows.map(row=>row.role).filter(role=>role!=='MERCHANT'||(merchant?.approval_status==='APPROVED'&&merchant.business_status==='OPEN'));
-    if(roles.length && !roles.some(role=>actorRoles.includes(role))) return res.status(403).json({message:'当前角色无权执行此操作'});
-    req.actor={id:session.user_id,name:session.nickname,roles:actorRoles,merchantId:actorRoles.includes('MERCHANT')?merchant?.id:undefined,activeRole:actorRoles.includes(session.active_role)?session.active_role:(actorRoles.includes('USER')?'USER':actorRoles[0])};
+    const activeRole: string=session.active_role;
+    if(!actorRoles.includes(activeRole))return res.status(401).json({message:'登录身份已失效，请重新登录'});
+    if(roles.length && !roles.includes(activeRole)) return res.status(403).json({message:'当前角色无权执行此操作'});
+    req.actor={id:session.user_id,name:session.nickname,roles:[activeRole],accountRoles:actorRoles,
+      merchantId:activeRole==='MERCHANT'?merchant?.id:undefined,activeRole};
     next();
   };
 }

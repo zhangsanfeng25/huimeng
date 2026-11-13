@@ -29,7 +29,7 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
         new ApiClient(this).get("merchant/orders/"+orderId,result->{loading=false;binding.loading.setVisibility(View.GONE);
             JSONObject data=result.optJSONObject("data");if(data==null||isFinishing()||isDestroyed())return;String next=data.toString();if(next.equals(displayed))return;displayed=next;
             logistics=data.optString("logistics_status",data.optString("status"));
-            binding.status.setText(zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":""));binding.orderId.setText("订单号："+data.optString("id"));
+            binding.status.setText(AfterSaleState.detailStatus(data,zh(logistics)+(data.has("pendingAction")?" · 本地操作待联网确认":"")));binding.orderId.setText("订单号："+data.optString("id"));
             binding.shop.setText("买家："+data.optString("buyer"));
             binding.total.setText(String.format(Locale.CHINA,"¥%.2f",data.optInt("total_cents")/100.0));
             JSONObject address=data.optJSONObject("address_snapshot_json");if(address==null){try{address=new JSONObject(data.optString("address_snapshot_json"));}catch(Exception ignored){}}
@@ -46,7 +46,7 @@ public class MerchantOrderDetailActivity extends AppCompatActivity {
             binding.timeline.setText(OrderProgress.format(data));
             String action=action(logistics);binding.action.setVisibility(action.isEmpty()?View.GONE:View.VISIBLE);
             binding.action.setText(action);
-            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(afterSale.isEmpty()?View.GONE:View.VISIBLE);if(!afterSale.isEmpty()){if("COMPLETED".equals(afterSale))binding.status.append("\n"+AfterSaleState.refundLabel(data)+" · 售后完成");else if(!java.util.Arrays.asList("REJECTED","CANCELLED").contains(afterSale))binding.status.setText("售后处理中\n"+ServiceActivity.label(afterSale));else binding.status.append("\n售后："+ServiceActivity.label(afterSale));if(AfterSaleState.blocked(data))binding.action.setVisibility(View.GONE);}
+            String afterSale=data.isNull("after_sale_state")?"":data.optString("after_sale_state");serviceSale.setVisibility(afterSale.isEmpty()?View.GONE:View.VISIBLE);if(!afterSale.isEmpty()){if(AfterSaleState.blocked(data))binding.action.setVisibility(View.GONE);}
         },this::error);
     }
     private void advance(){new ApiClient(this).post("merchant/orders/"+orderId+"/advance",new JSONObject(),result->{

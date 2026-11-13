@@ -16,6 +16,7 @@ public final class SessionStore {
         }
     }
     public void save(String token,String role,String name,boolean canMerchant,String accountId,String username,boolean remember){
+        if(!authenticated()||!accountId.equals(accountId())||!role.equals(role()))AiConversation.clear();
         temporaryToken=remember?"":token;
         temporaryAuthenticated=true;
         preferences.edit().putBoolean("remember_choice_initialized",true).putBoolean("remember_login",remember)
@@ -44,7 +45,5 @@ public final class SessionStore {
     public void setAccountId(String id){preferences.edit().putString("account_id",id).apply();}
     public void updateProfile(String username,String name){preferences.edit().putString("username",username).putString("name",name).apply();}
     public boolean canMerchant(){return preferences.getBoolean("can_merchant",false);}
-    public void updateAccess(org.json.JSONObject profile){org.json.JSONArray roles=profile.optJSONArray("roles");boolean merchant=false;if(roles!=null){for(int i=0;i<roles.length();i++)if("MERCHANT".equals(roles.optString(i)))merchant=true;preferences.edit().putBoolean("can_merchant",merchant).apply();}if(profile.has("activeRole"))setRole(profile.optString("activeRole","USER"));}
-    public void setRole(String role){preferences.edit().putString("role",role).apply();}
-    public void clear(){temporaryToken="";temporaryAuthenticated=false;preferences.edit().clear().putBoolean("remember_choice_initialized",true).apply();}
+    public void clear(){AiConversation.clear();temporaryToken="";temporaryAuthenticated=false;preferences.edit().clear().putBoolean("remember_choice_initialized",true).apply();}
 }

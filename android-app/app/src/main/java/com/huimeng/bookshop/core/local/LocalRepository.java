@@ -18,12 +18,12 @@ public final class LocalRepository {
     public static void request(Context context,int method,String path,JSONObject body,Consumer<JSONObject> ok,Consumer<String> fail){
         SessionStore session=new SessionStore(context);String space=session.localSpaceId();IO.execute(()->{try{
             JSONObject result=new LocalApi(LocalDatabase.get(context),space).handle(method,path,body);
-            MAIN.post(()->{if(!space.equals(session.localSpaceId()))return;JSONObject user=result.optJSONObject("user");if(user!=null&&session.authenticated()){session.updateProfile(user.optString("username",session.username()),user.optString("name",session.name()));session.setAvatarUrl(user.optString("avatarUrl",session.avatarUrl()));}if(path.equals("auth/switch-role"))session.setRole(result.optString("activeRole","USER"));ok.accept(result);if(method!=0)com.huimeng.bookshop.core.sync.SyncCoordinator.get(context).requestSync();});
+            MAIN.post(()->{if(!space.equals(session.localSpaceId()))return;JSONObject user=result.optJSONObject("user");if(user!=null&&session.authenticated()){session.updateProfile(user.optString("username",session.username()),user.optString("name",session.name()));session.setAvatarUrl(user.optString("avatarUrl",session.avatarUrl()));}ok.accept(result);if(method!=0)com.huimeng.bookshop.core.sync.SyncCoordinator.get(context).requestSync();});
         }catch(Exception e){MAIN.post(()->{if(space.equals(session.localSpaceId()))fail.accept("本地操作未完成："+e.getMessage());});}});
     }
     public static void prepare(Context context,Runnable ready,Consumer<String> fail){IO.execute(()->{try{
         LocalDatabase db=LocalDatabase.get(context);LocalSpaceStore spaces=new LocalSpaceStore(db);SessionStore session=new SessionStore(context);
-        String space=session.authenticated()?spaces.forAccount(BuildConfig.API_BASE_URL,session.accountId()):spaces.guestSpace();spaces.select(space);
+        String space=session.authenticated()?spaces.forAccount(BuildConfig.API_BASE_URL,session.accountId()):spaces.guestSpace();spaces.select(space);spaces.role(space,session.role());
         LocalBootstrap.prepare(context,db,space);
         if(db.entity(space,"profile","self")==null)db.saveConfirmed(space,"profile","self",new JSONObject().put("id",session.accountId().isEmpty()?space:session.accountId()).put("username",session.username().isEmpty()?"local_reader":session.username()).put("name",session.name()).put("avatarUrl",session.avatarUrl()).put("roles",new JSONArray().put("USER")).put("activeRole",spaces.info(space).optString("role","USER")),0);
         String legacy=context.getSharedPreferences("huimeng_cart",0).getString("cart_"+session.accountId(),"[]");

@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {db,now} from '../core/db.js';
 import {broadcast} from '../core/events.js';
-import {applyOperation} from './operations.js';
+import {applyOperation,authorizeOperation} from './operations.js';
 import {SyncError,type Actor,type SyncEnvelope,type SyncResult} from './types.js';
 export function canonical(value:unknown):string{
  if(value===null||typeof value==='boolean'||typeof value==='string')return JSON.stringify(value);
@@ -14,9 +14,11 @@ export function canonicalHash(value:unknown){return createHash('sha256').update(
 export function executeOnce(actor:Actor,op:SyncEnvelope):SyncResult{
  const user=db.prepare("SELECT 1 FROM users WHERE id=? AND status='ACTIVE'").get(actor.id);if(!user)throw new SyncError(401,'AUTH_REQUIRED','请重新验证网络账号');
  const shop=db.prepare("SELECT id FROM merchants WHERE owner_user_id=? AND approval_status='APPROVED' AND business_status='OPEN'").get(actor.id) as {id:string}|undefined;
- const roles=(db.prepare('SELECT role FROM user_roles WHERE user_id=?').all(actor.id) as Array<{role:string}>).map(row=>row.role).filter(role=>role!=='MERCHANT'||!!shop);
- actor={...actor,roles,merchantId:shop?.id};
- if((op.action.startsWith('product.')||op.action==='merchant.profile'||op.action==='order.ship'||op.action==='order.advance')&&(!roles.includes('MERCHANT')||!shop))throw new SyncError(403,'ROLE_REQUIRED','商家权限已变化，请重新核对');
+ const allowed=(db.prepare('SELECT role FROM user_roles WHERE user_id=?').all(actor.id) as Array<{role:string}>).map(row=>row.role);
+ const roles=(actor.activeRole?[actor.activeRole]:actor.roles).filter(role=>allowed.includes(role)&&(role!=='MERCHANT'||!!shop));
+ if(!roles.length)throw new SyncError(403,'ROLE_REQUIRED','当前身份权限已变化，请重新登录');
+ actor={...actor,roles,merchantId:roles.includes('MERCHANT')?shop?.id:undefined};
+ authorizeOperation(actor,op);
  if(op.payloadHash!==canonicalHash(op.payload))throw new SyncError(400,'HASH_MISMATCH','同步载荷校验失败');
  const hash=canonicalHash({action:op.action,entityId:op.entityId||null,baseVersion:op.baseVersion??null,payload:op.payload});
  const output=db.transaction(()=>{

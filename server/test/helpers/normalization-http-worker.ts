@@ -1,0 +1,11 @@
+import express from 'express';
+const {db}=await import('../../src/core/db.js');
+const {authRouter}=await import('../../src/modules/auth.js');
+const {adminRouter}=await import('../../src/modules/admin.js');
+const {shopRouter}=await import('../../src/modules/shop.js');
+const {communityRouter}=await import('../../src/modules/community.js');
+const {customerServicesRouter}=await import('../../src/modules/customer-services.js');
+const app=express();app.use(express.json());app.use('/auth',authRouter);app.use(shopRouter);app.use(communityRouter);app.use(customerServicesRouter);app.use(adminRouter);
+app.use((error:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(400).json({message:error.message}));
+const server=app.listen(0,'127.0.0.1',()=>{const address=server.address();if(address&&typeof address!=='string')process.send?.({port:address.port});});
+process.on('message',message=>{if(message==='close')server.close(()=>{db.close();process.exit(0);});});

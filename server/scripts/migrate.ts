@@ -1,6 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { db, now } from '../src/core/db.js';
+import {assertSupportedSchema} from '../src/normalization/schema-guard.js';
+
+assertSupportedSchema(db,{allowLegacyUpgrade:true});
 
 db.exec('CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
 const directory = join(process.cwd(), 'migrations');

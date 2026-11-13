@@ -66,16 +66,12 @@ authRouter.post('/forgot-password',loginLimit,(_req,res)=>{
 
 authRouter.get('/me',requireAuth(),(req,res)=>{
   const profile=db.prepare('SELECT username,nickname,avatar_url,version FROM users WHERE id=?').get(req.actor!.id) as {username:string,nickname:string,avatar_url:string|null,version:number};
-  res.json({user:{...req.actor,username:profile.username,name:profile.nickname,avatarUrl:profile.avatar_url||'',version:profile.version}});
+  const {accountRoles,...actor}=req.actor!;
+  res.json({user:{...actor,roles:accountRoles,username:profile.username,name:profile.nickname,avatarUrl:profile.avatar_url||'',version:profile.version}});
 });
 
-authRouter.post('/switch-role',requireAuth(),(req,res)=>{
-  const parsed=z.object({role:z.enum(['USER','MERCHANT'])}).safeParse(req.body);
-  if(!parsed.success)return res.status(400).json({message:'请选择买家或商家身份'});
-  if(!req.actor!.roles.includes(parsed.data.role))return res.status(403).json({message:'商家申请尚未通过或店铺已停用，请查看申请状态'});
-  const token=req.headers.authorization?.replace(/^Bearer\s+/i,'')||'';
-  db.prepare('UPDATE sessions SET active_role=? WHERE token_hash=?').run(parsed.data.role,hashToken(token));
-  res.json({activeRole:parsed.data.role,roles:req.actor!.roles});
+authRouter.post('/switch-role',requireAuth(),(_req,res)=>{
+  res.status(403).json({message:'请退出登录，再选择要使用的身份'});
 });
 authRouter.get('/default-avatars',requireAuth(),(_req,res)=>res.json({data:defaultAvatars}));
 authRouter.put('/me/avatar',requireAuth(),businessRoute(profileAvatar));

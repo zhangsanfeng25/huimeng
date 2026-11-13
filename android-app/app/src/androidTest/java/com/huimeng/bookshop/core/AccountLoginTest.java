@@ -43,4 +43,18 @@ public class AccountLoginTest extends AndroidTestCase {
         try{accounts.login(origin,"qa-email@example.invalid","old-password","USER");fail("Old alias must not retain the old password");}catch(IllegalArgumentException expected){}
         accounts.forgetAccount(origin,"qa-user");assertNull(accounts.login(origin,"qa-reader","new-password","USER"));assertNull(accounts.login(origin,"qa-email@example.invalid","new-password","USER"));
     }
+    public void testEachVerifiedRoleRemainsAvailableOfflineUntilRevoked()throws Exception{
+        OfflineAccounts accounts=new OfflineAccounts(getContext());
+        String origin="https://qa.invalid/api/v1/";
+        for(String role:new String[]{"MERCHANT","USER"}){
+            JSONObject verified=user().put("roles",new JSONArray().put("USER").put("MERCHANT")).put("activeRole",role);
+            accounts.save(origin,"qa-reader","fixture-password",new JSONObject()
+                .put("token",role+"-token").put("expiresAt","2999-01-01T00:00:00Z").put("user",verified));
+        }
+        assertEquals("MERCHANT-token",accounts.login(origin,"qa-reader","fixture-password","MERCHANT").getString("token"));
+        assertEquals("USER-token",accounts.login(origin,"qa-reader","fixture-password","USER").getString("token"));
+        accounts.save(origin,"qa-reader","fixture-password",new JSONObject().put("token","buyer-only").put("user",user()));
+        try{accounts.login(origin,"qa-reader","fixture-password","MERCHANT");fail("Revoked role must not stay available offline");}
+        catch(IllegalArgumentException expected){}
+    }
 }

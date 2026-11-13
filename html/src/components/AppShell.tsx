@@ -1,9 +1,10 @@
 import { SyncStatus } from './SyncStatus';
-import { ReactNode, useEffect, useState } from 'react';
+import { lazy, ReactNode, Suspense, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FolderTree, Gauge, LogOut, Menu, MessageSquare, PackageCheck, Settings, ShieldCheck, ShoppingBag, Star, Store, Users } from 'lucide-react';
+import { Bell, BookOpen, Bot, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FolderTree, Gauge, LogOut, Menu, MessageSquare, PackageCheck, Settings, ShieldCheck, ShoppingBag, Star, Store, Users } from 'lucide-react';
 import { api, realtime, session } from '../api';
 import { applyAppearance, readAppearance } from '../theme';
+const AdminAiAssistant = lazy(() => import('./AdminAiAssistant').then(module => ({default:module.AdminAiAssistant})));
 
 const navGroups = [
   { label: '', items: [{ to: '/', label: '工作台', icon: Gauge }] },
@@ -11,12 +12,13 @@ const navGroups = [
   { label: '商品管理', items: [{ to: '/categories', label: '商品分类', icon: FolderTree }, { to: '/reviews', label: '商品审核', icon: PackageCheck }, { to: '/products', label: '商品列表', icon: BookOpen }] },
   { label: '交易管理', items: [{ to: '/orders', label: '订单管理', icon: ShoppingBag }, { to: '/after-sales', label: '售后管理', icon: PackageCheck }, { to: '/ratings', label: '评价管理', icon: Star }] },
   { label: '内容管理', items: [{ to: '/community', label: '社区内容', icon: MessageSquare }, { to: '/feedback', label: '留言反馈', icon: MessageSquare }, { to: '/notices', label: '通知中心', icon: Bell }] },
-  { label: '系统管理', items: [{ to: '/logs', label: '操作日志', icon: ClipboardList }, { to: '/settings', label: '系统设置', icon: Settings }] },
+  { label: '系统管理', items: [{ to: '/logs', label: '操作日志', icon: ClipboardList }, { to: '/settings', label: '系统设置', icon: Settings }, { to: '/ai', label: 'AI 管理', icon: Bot }] },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => window.innerWidth <= 1100);
   const [adminName,setAdminName]=useState('管理员');
+  const [isAdmin,setIsAdmin]=useState(false);
   const location = useLocation();
   const [expandedGroups,setExpandedGroups]=useState<Record<string,boolean>>(()=>{
     let saved:Record<string,boolean>={};
@@ -32,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const current = location.pathname === '/account' ? '账户安全' : navGroups.flatMap(group => group.items).find(item => item.to === location.pathname)?.label ?? '经营工作台';
   useEffect(() => { applyAppearance(readAppearance()); }, []);
-  useEffect(()=>{api<{user:{name:string}}>('/auth/me').then(result=>setAdminName(result.user.name)).catch(()=>{})},[]);
+  useEffect(()=>{api<{user:{name:string;activeRole:string}}>('/auth/me').then(result=>{setAdminName(result.user.name);setIsAdmin(result.user.activeRole==='ADMIN');}).catch(()=>{})},[]);
 
   useEffect(()=>realtime(()=>{}),[]);
   const logout = async () => {
@@ -54,7 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               else setExpandedGroups(value=>({...value,[group.label]:!value[group.label]}));
             }}><GroupIcon size={18} aria-hidden="true"/><span>{group.label}</span><ChevronDown size={16} className={expanded?'is-open':''} aria-hidden="true"/></button>:null}
             <div id={`nav-group-${index}`} className={group.label?'sidebar-submenu':''} hidden={!expanded}>
-              {group.items.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} aria-label={label} title={label} onClick={()=>{if(window.innerWidth<=1100)setCollapsed(true);}}><Icon size={18} /><span>{label}</span></NavLink>)}
+              {group.items.filter(item=>item.to!=='/ai'||isAdmin).map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} aria-label={label} title={label} onClick={()=>{if(window.innerWidth<=1100)setCollapsed(true);}}><Icon size={18} /><span>{label}</span></NavLink>)}
             </div>
           </div>;
         })}
@@ -68,6 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="top-actions"><SyncStatus/><button className="notification" aria-label="通知中心" onClick={() => navigate('/notices')}><Bell size={20} /></button><button className="admin admin-button" onClick={() => navigate('/account')}><span><ShieldCheck size={18} /></span><strong>{adminName}</strong></button><button className="logout" onClick={logout}><LogOut size={18} />退出登录</button></div>
     </header>
     <main>{children}</main>
+    {isAdmin&&<Suspense fallback={null}><AdminAiAssistant/></Suspense>}
     <button className="collapse-fab" onClick={() => setCollapsed(value => !value)} aria-label="切换侧栏"><ChevronLeft size={17} /></button>
   </div>;
 }

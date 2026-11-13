@@ -1,0 +1,21 @@
+.ai-management .settings-section { min-width: 0; }
+.ai-management .ai-config-status { margin-inline-start: auto; flex: none; }
+.ai-config-status .status { white-space: nowrap; padding: 5px 10px; font-size: 12px; }
+.ai-config-status .status i { flex: none; }
+.ai-config .ai-actions { margin-top: 12px; }
+.ai-switch { position: relative; display: flex; width: fit-content; align-items: center; gap: 9px; min-height: 40px; margin-top: 12px; cursor: pointer; font-size: 13px; }
+.ai-switch input { position: absolute; opacity: 0; inset: 0; width: 100%; margin: 0; cursor: inherit; }
+.ai-switch-track { display: flex; flex: none; align-items: center; width: 36px; height: 21px; padding: 3px; border-radius: 12px; background: #7b7789; transition: background-color 150ms ease; }
+.ai-switch-track::before { content: ""; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: transform 150ms ease; }
+.ai-switch input:checked + .ai-switch-track { background: var(--primary); }
+.ai-switch input:checked + .ai-switch-track::before { transform: translateX(15px); }
+.ai-switch input:focus-visible + .ai-switch-track { outline: 2px solid var(--primary); outline-offset: 3px; }
+.ai-switch input:disabled ~ span { opacity: .65; }
+.ai-feedback { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.ai-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-spin { animation: ai-spin .85s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-spin { animation: none; }
+  .ai-switch-track, .ai-switch-track::before { transition: none; }
+}

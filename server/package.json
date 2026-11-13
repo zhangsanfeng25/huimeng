@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx --watch src/main.ts",
-    "build": "tsc -p tsconfig.json && tsc --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --strict --skipLibCheck --outDir dist --rootDir . scripts/migrate.ts scripts/seed.ts",
+    "build": "tsc -p tsconfig.json && tsc --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --strict --skipLibCheck --outDir dist --rootDir . scripts/migrate.ts scripts/seed.ts scripts/normalize.ts && node scripts/copy-normalization-assets.mjs",
     "start": "node dist/main.js",
     "db:migrate": "node --import tsx scripts/migrate.ts",
     "db:seed": "node --import tsx scripts/seed.ts",
+    "db:normalize": "node --import tsx scripts/normalize.ts",
     "test": "node --import tsx --test test/**/*.test.ts",
     "test:smoke": "node scripts/smoke.mjs",
     "test:realtime": "npm run build && node scripts/test-realtime.mjs",

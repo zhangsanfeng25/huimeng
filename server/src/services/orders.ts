@@ -1,13 +1,15 @@
+import {readTables} from '../core/db.js';
 // Shared synchronous business rules used by HTTP routes and atomic offline sync.
 import {createHash} from 'node:crypto';
 import {z} from 'zod';
-import {db,now} from '../core/db.js';
+import {db,now,normalizedSchema} from '../core/db.js';
 import {id,productSelect} from './shop-data.js';
 import {config} from '../config.js';
 import {closePendingCheckout} from '../core/order-lifecycle.js';
 import {createOrderNotifications} from '../core/order-notifications.js';
 import {audit} from '../core/http.js';
 import {hasBlockingAfterSale} from './customer-services.js';
+import {addressFields} from '../normalization/projections.js';
 import type {Statement} from 'better-sqlite3';
 import type {BusinessContext,BusinessResult} from './context.js';
 export function checkoutCreate(ctx:BusinessContext):BusinessResult {
@@ -50,9 +52,14 @@ export function checkoutCreate(ctx:BusinessContext):BusinessResult {
         for (const [merchantId, items] of byMerchant) {
             const orderId = id('HM'), total = items.reduce((n, x) => n + x.subtotal, 0);
             orderIds.push(orderId);
-            (orderInsert ??= db.prepare(`INSERT INTO orders(id,checkout_group_id,user_id,merchant_id,address_snapshot_json,total_cents,status,version,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,'PENDING_PAYMENT',1,?,?,?)`)).run(orderId, groupId, ctx.actor.id, merchantId, JSON.stringify(address), total, expiresAt, stamp, stamp);
+            if(normalizedSchema){
+                (orderInsert ??= db.prepare(`INSERT INTO orders(id,checkout_group_id,merchant_id,total_cents,version,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`)).run(orderId,groupId,merchantId,total,stamp,stamp);
+                let mask=0;
+                const values=addressFields.map(([key],index)=>{if(Object.hasOwn(address,key)){mask|=2**index;return address[key];}return null;});
+                db.prepare(`INSERT INTO order_address_snapshots(order_id,field_mask,${addressFields.map(([,field])=>field).join(',')}) VALUES(?,?,${values.map(()=>'?').join(',')})`).run(orderId,mask,...values);
+            }else (orderInsert ??= db.prepare(`INSERT INTO orders(id,checkout_group_id,user_id,merchant_id,address_snapshot_json,total_cents,status,version,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,'PENDING_PAYMENT',1,?,?,?)`)).run(orderId, groupId, ctx.actor.id, merchantId, JSON.stringify(address), total, expiresAt, stamp, stamp);
             for (const item of items) {
-                (itemInsert ??= db.prepare(`INSERT INTO order_items(id,order_id,product_id,product_name,cover_url,unit_price_cents,quantity,subtotal_cents) VALUES(?,?,?,?,?,?,?,?)`)).run(id('OI'), orderId, item.productId, item.name, item.coverUrl, item.priceCents, item.quantity, item.subtotal);
+                (itemInsert ??= db.prepare(`INSERT INTO order_items(id,order_id,product_id,product_name,cover_url,unit_price_cents,quantity${normalizedSchema?'':',subtotal_cents'}) VALUES(?,?,?,?,?,?,?${normalizedSchema?'':',?'})`)).run(id('OI'), orderId, item.productId, item.name, item.coverUrl, item.priceCents, item.quantity, ...(normalizedSchema?[]:[item.subtotal]));
                 (reserveMovement ??= db.prepare(`INSERT INTO stock_movements(product_id,order_id,type,available_delta,reserved_delta,created_at) VALUES(?,?,'RESERVE',?,?,?)`)).run(item.productId, orderId, -item.quantity, item.quantity, stamp);
             }
             (createEvent ??= db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?,'CREATE',NULL,'PENDING_PAYMENT',?)`)).run(orderId, ctx.actor.id, stamp);
@@ -85,17 +92,17 @@ export function checkoutPay(ctx:BusinessContext):BusinessResult {
         const paymentId = id('PAY');
         db.prepare(`INSERT INTO payments(id,checkout_group_id,amount_cents,method,idempotency_key,paid_at) VALUES(?,?,?,?,?,?)`).run(paymentId, groupId, group.total_cents, method, key, stamp);
         db.prepare(`UPDATE checkout_groups SET status='PAID',version=version+1 WHERE id=?`).run(groupId);
-        db.prepare(`UPDATE orders SET status='PAID',logistics_status='PREPARING',paid_at=?,updated_at=?,version=version+1 WHERE checkout_group_id=? AND status='PENDING_PAYMENT'`).run(stamp, stamp, groupId);
-        for (const order of db.prepare(`SELECT id FROM orders WHERE checkout_group_id=?`).all(groupId) as any[]) {
+        db.prepare(`UPDATE orders SET ${normalizedSchema?'':"status='PAID',"}logistics_status='PREPARING',paid_at=?,updated_at=?,version=version+1 WHERE checkout_group_id=? AND ${normalizedSchema?"logistics_status='WAITING_PAYMENT'":"status='PENDING_PAYMENT'"}`).run(stamp, stamp, groupId);
+        for (const order of db.prepare(`SELECT id FROM ${readTables.orders} WHERE checkout_group_id=?`).all(groupId) as any[]) {
             (payEvent ??= db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?,'PAY','WAITING_PAYMENT','PREPARING',?)`)).run(order.id, ctx.actor.id, stamp);
             createOrderNotifications(order.id, 'PAID', stamp);
         }
-        for (const item of db.prepare(`SELECT oi.product_id,oi.quantity FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.checkout_group_id=?`).all(groupId) as any[]) {
+        for (const item of db.prepare(`SELECT oi.product_id,oi.quantity FROM ${readTables.order_items} oi JOIN ${readTables.orders} o ON o.id=oi.order_id WHERE o.checkout_group_id=?`).all(groupId) as any[]) {
             (deductReservedStock ??= db.prepare(`UPDATE products SET stock_reserved=stock_reserved-? WHERE id=? AND stock_reserved>=?`)).run(item.quantity, item.product_id, item.quantity);
             (payMovement ??= db.prepare(`INSERT INTO stock_movements(product_id,type,available_delta,reserved_delta,created_at) VALUES(?,'PAY',0,?,?)`)).run(item.product_id, -item.quantity, stamp);
         }
         db.prepare(`DELETE FROM cart_items WHERE user_id=? AND product_id IN
-      (SELECT oi.product_id FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.checkout_group_id=?)`).run(ctx.actor.id, groupId);
+      (SELECT oi.product_id FROM ${readTables.order_items} oi JOIN ${readTables.orders} o ON o.id=oi.order_id WHERE o.checkout_group_id=?)`).run(ctx.actor.id, groupId);
         return { paymentId, paidAt: stamp };
     })();
     ctx.emit('orders', 'pay');
@@ -108,7 +115,9 @@ export function orderConfirm(ctx:BusinessContext):BusinessResult {
     const stamp = now(), orderId = String(ctx.params.orderId);
     if(hasBlockingAfterSale(orderId))return ctx.reply(409,{message:'订单存在售后或已退款，请先处理售后'});
     const completed = db.transaction(() => {
-        const changed = db.prepare(`UPDATE orders SET status='COMPLETED',logistics_status='COMPLETED',completed_at=?,updated_at=?,version=version+1 WHERE id=? AND user_id=? AND status='SHIPPED' AND logistics_status='OUT_FOR_DELIVERY'`).run(stamp, stamp, orderId, ctx.actor.id);
+        const changed = db.prepare(normalizedSchema
+            ? `UPDATE orders SET logistics_status='COMPLETED',completed_at=?,updated_at=?,version=version+1 WHERE id=? AND checkout_group_id IN (SELECT id FROM checkout_groups WHERE user_id=?) AND logistics_status='OUT_FOR_DELIVERY'`
+            : `UPDATE orders SET status='COMPLETED',logistics_status='COMPLETED',completed_at=?,updated_at=?,version=version+1 WHERE id=? AND user_id=? AND status='SHIPPED' AND logistics_status='OUT_FOR_DELIVERY'`).run(stamp, stamp, orderId, ctx.actor.id);
         if (changed.changes !== 1)
             return false;
         db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,created_at) VALUES(?,?, 'CONFIRM','OUT_FOR_DELIVERY','COMPLETED',?)`).run(orderId, ctx.actor.id, stamp);
@@ -123,7 +132,7 @@ export function orderConfirm(ctx:BusinessContext):BusinessResult {
 }
 
 export function orderCancel(ctx:BusinessContext):BusinessResult {
-    const order = db.prepare('SELECT checkout_group_id groupId,status FROM orders WHERE id=? AND user_id=?').get(String(ctx.params.orderId), ctx.actor.id) as {
+    const order = db.prepare(`SELECT checkout_group_id groupId,status FROM ${readTables.orders} WHERE id=? AND user_id=?`).get(String(ctx.params.orderId), ctx.actor.id) as {
         groupId: string;
         status: string;
     } | undefined;
@@ -144,7 +153,7 @@ export function orderShip(ctx:BusinessContext):BusinessResult {
     const stamp = now(), orderId = String(ctx.params.orderId), trackingNo = `DEMO${Date.now()}`;
     if(hasBlockingAfterSale(orderId))return ctx.reply(409,{message:'订单存在售后或已退款，不能发货'});
     const shipped = db.transaction(() => {
-        const changed = db.prepare(`UPDATE orders SET status='SHIPPED',logistics_status='SHIPPED',shipped_at=?,updated_at=?,version=version+1 WHERE id=? AND merchant_id=? AND status='PAID'`).run(stamp, stamp, orderId, ctx.actor.merchantId);
+        const changed = db.prepare(`UPDATE orders SET ${normalizedSchema?'':"status='SHIPPED',"}logistics_status='SHIPPED',shipped_at=?,updated_at=?,version=version+1 WHERE id=? AND merchant_id=? AND ${normalizedSchema?"logistics_status IN ('PREPARING','READY_TO_SHIP')":"status='PAID'"}`).run(stamp, stamp, orderId, ctx.actor.merchantId);
         if (changed.changes !== 1)
             return false;
         db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'SHIP','READY_TO_SHIP','SHIPPED',?,?)`).run(orderId, ctx.actor.id, trackingNo, stamp);
@@ -160,7 +169,7 @@ export function orderShip(ctx:BusinessContext):BusinessResult {
 }
 
 export function orderAdvance(ctx:BusinessContext):BusinessResult {
-    const orderId = String(ctx.params.orderId), stamp = now(), order = db.prepare(`SELECT status,logistics_status logisticsStatus FROM orders WHERE id=? AND merchant_id=?`).get(orderId, ctx.actor.merchantId) as any;
+    const orderId = String(ctx.params.orderId), stamp = now(), order = db.prepare(`SELECT status,logistics_status logisticsStatus FROM ${readTables.orders} WHERE id=? AND merchant_id=?`).get(orderId, ctx.actor.merchantId) as any;
     if(hasBlockingAfterSale(orderId))return ctx.reply(409,{message:'订单存在售后或已退款，不能推进物流'});
     if (!order)
         return ctx.reply(404, { message: '订单不存在' });
@@ -168,7 +177,7 @@ export function orderAdvance(ctx:BusinessContext):BusinessResult {
     if (!to)
         return ctx.reply(409, { message: '当前物流状态无需继续更新' });
     const status = to === 'SHIPPED' ? 'SHIPPED' : order.status, tracking = to === 'SHIPPED' ? `DEMO${Date.now()}` : null;
-    db.transaction(() => { db.prepare(`UPDATE orders SET status=?,logistics_status=?,shipped_at=CASE WHEN ?='SHIPPED' THEN ? ELSE shipped_at END,updated_at=?,version=version+1 WHERE id=?`).run(status, to, to, stamp, stamp, orderId); db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'ADVANCE',?,?,?,?)`).run(orderId, ctx.actor.id, order.logisticsStatus, to, tracking, stamp); if (to === 'SHIPPED')
+    db.transaction(() => { db.prepare(`UPDATE orders SET ${normalizedSchema?'':'status=?,'}logistics_status=?,shipped_at=CASE WHEN ?='SHIPPED' THEN ? ELSE shipped_at END,updated_at=?,version=version+1 WHERE id=?`).run(...(normalizedSchema?[]:[status]), to, to, stamp, stamp, orderId); db.prepare(`INSERT INTO order_events(order_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,'ADVANCE',?,?,?,?)`).run(orderId, ctx.actor.id, order.logisticsStatus, to, tracking, stamp); if (to === 'SHIPPED')
         createOrderNotifications(orderId, 'SHIPPED', stamp); })();
     ctx.emit('orders', 'advance');
     if (to === 'SHIPPED')

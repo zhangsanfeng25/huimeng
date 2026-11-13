@@ -25,13 +25,16 @@ public class ProductDetailActivity extends AppCompatActivity{
     private ActivityProductDetailBinding binding;private String productId;private BookDetailsView bookDetails;
     private boolean favorite,busy,adding;private String serviceMerchant="";
     private final List<String> images=new ArrayList<>();private int imageIndex;private String bookName="绘本";private Product product;
+    private boolean merchantPreview;
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityProductDetailBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());
         bookDetails=new BookDetailsView(this,binding,state);productId=getIntent().getStringExtra("product_id");
+        merchantPreview="MERCHANT".equals(new com.huimeng.bookshop.core.SessionStore(this).role());
         binding.addCart.setEnabled(false);binding.buyNow.setEnabled(false);binding.favorite.setEnabled(false);
+        if(merchantPreview){binding.addCart.setVisibility(View.GONE);binding.buyNow.setVisibility(View.GONE);binding.favorite.setVisibility(View.GONE);}
         binding.back.setOnClickListener(v->finish());binding.favorite.setOnClickListener(v->toggleFavorite());
         binding.addCart.setOnClickListener(v->addCart(null));
         binding.buyNow.setOnClickListener(v->buyNow());
-        ServiceEntries.compactBefore(binding.galleryHint,"联系商家",()->{if(!serviceMerchant.isEmpty())ServiceActivity.contact(this,serviceMerchant,null,productId);});
+        if(!merchantPreview)ServiceEntries.compactBefore(binding.galleryHint,"联系商家",()->{if(!serviceMerchant.isEmpty())ServiceActivity.contact(this,serviceMerchant,null,productId);});
         GestureDetector gestures=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
             @Override public boolean onDown(MotionEvent event){return true;}
             @Override public boolean onSingleTapUp(MotionEvent event){zoomImage();return true;}
@@ -42,8 +45,18 @@ public class ProductDetailActivity extends AppCompatActivity{
         TapMotion.attach(binding.buyNow);
         renderFavorite();load();
     }
-    @Override protected void onResume(){super.onResume();loadFavorite();}
-    private void load(){new ApiClient(this).get("catalog/products/"+productId,result->{JSONObject data=result.optJSONObject("data");if(data==null)return;
+    @Override protected void onResume(){super.onResume();if(!merchantPreview)loadFavorite();}
+    private void load(){
+        ApiClient api=new ApiClient(this);
+        String path="catalog/products/"+productId;
+        api.get(path,this::renderProduct,error->{
+            if(getIntent().getBooleanExtra("from_ai",false))api.getOnline(path,this::renderProduct,this::showLoadError);
+            else showLoadError(error);
+        });
+    }
+    private void showLoadError(String error){binding.loading.setVisibility(View.GONE);binding.error.setText(error);binding.error.setVisibility(View.VISIBLE);}
+    private void renderProduct(JSONObject result){JSONObject data=result.optJSONObject("data");
+        if(data==null){showLoadError("商品暂时不可用");return;}
         Product item=Product.from(data);product=item;serviceMerchant=data.optString("merchantId");bookName=item.name();binding.favorite.setEnabled(true);binding.loading.setVisibility(View.GONE);binding.content.setVisibility(View.VISIBLE);
         binding.name.setText(item.name());binding.summary.setText(item.summary());binding.price.setText(item.price());binding.shop.setText(item.shop());
         StringBuilder tags=new StringBuilder();if(!item.ageRange().isEmpty())tags.append("适读 ").append(item.ageRange());if(!item.category().isEmpty()){if(tags.length()>0)tags.append("  ·  ");tags.append(item.category());}if(tags.length()>0)tags.append("  ·  ");tags.append("库存 ").append(item.stock());binding.tags.setText(tags);
@@ -53,7 +66,7 @@ public class ProductDetailActivity extends AppCompatActivity{
         if(detail!=null)for(int i=0;i<detail.length();i++){String url=detail.optString(i);if(!url.isEmpty()&&!images.contains(url))images.add(url);}
         imageIndex=0;showImage();binding.galleryHint.setVisibility(images.size()>1?View.VISIBLE:View.GONE);
         bookDetails.bind(data);
-    },error->{binding.loading.setVisibility(View.GONE);binding.error.setText(error);binding.error.setVisibility(View.VISIBLE);});}
+    }
     private void loadFavorite(){new ApiClient(this).get("me/favorites",result->{JSONArray rows=result.optJSONArray("data");
         boolean found=false;if(rows!=null)for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&productId.equals(row.optString("id"))){found=true;break;}}
         favorite=found;renderFavorite();},error->{});}

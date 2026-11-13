@@ -1,6 +1,8 @@
+import {readTables} from '../core/db.js';
 import {existsSync,readFileSync} from 'node:fs';
 import {z} from 'zod';
-import {db,now} from '../core/db.js';
+import {db,now,normalizedSchema} from '../core/db.js';
+import {replaceOrderedValues} from '../normalization/relations.js';
 
 const date=z.string().refine(value=>value===''||(/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value),'请填写有效的年月日');
 export const bookInput=z.object({
@@ -20,10 +22,13 @@ export function readBookDetails(value:any):Record<string,any>{
  return result;
 }
 export function saveBookDetails(revisionId:string,value:Record<string,unknown>){
- const keys=Object.keys(bookFields).filter(key=>value[key]!==undefined) as Array<keyof typeof bookFields>;
+ const keys=Object.keys(bookFields).filter(key=>value[key]!==undefined&&(!normalizedSchema||key!=='tableOfContents')) as Array<keyof typeof bookFields>;
+ db.transaction(()=>{
+ if(normalizedSchema&&value.tableOfContents!==undefined)replaceOrderedValues(db,'product_revision_contents',revisionId,value.tableOfContents as string[]);
  if(!keys.length)return;
  db.prepare(`UPDATE product_revisions SET ${keys.map(key=>`${bookFields[key]}=?`).join(',')} WHERE id=?`)
   .run(...keys.map(key=>key==='tableOfContents'?JSON.stringify(value[key]):value[key]),revisionId);
+ })();
 }
 export function fictionalBooks():any[]{
  // The app build emits dist/services; seed's rootDir build emits dist/src/services.
@@ -37,7 +42,7 @@ export function fillFictionalBookDetails(bumpVersion=true):Array<{id:string;revi
  return db.transaction(()=>{
   const changed:Array<{id:string;revisionId:string;name:string}>=[];const stamp=now();
   for(const book of fictionalBooks()){
-   const row=db.prepare('SELECT r.*,p.published_revision_id FROM products p JOIN product_revisions r ON r.id=p.published_revision_id WHERE p.id=?').get(book.id) as any;
+   const row=db.prepare(`SELECT r.*,p.published_revision_id FROM products p JOIN ${readTables.product_revisions} r ON r.id=p.published_revision_id WHERE p.id=?`).get(book.id) as any;
    if(!row||row.name!==book.name||row.metadata_source||Object.entries(bookFields).some(([key,column])=>key!=='tableOfContents'&&row[column])||row.contents_json!=='[]')continue;
    const parsed=bookInput.parse(book);saveBookDetails(row.id,parsed);
    if(row.summary===`${book.name}，适合亲子共读的温暖绘本。`)db.prepare('UPDATE product_revisions SET summary=? WHERE id=?').run(book.summary,row.id);

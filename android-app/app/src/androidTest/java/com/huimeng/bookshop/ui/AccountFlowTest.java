@@ -34,6 +34,7 @@ public class AccountFlowTest extends RefreshNavigationTest {
     private void await(Condition condition,long timeout){long end=SystemClock.uptimeMillis()+timeout;while(SystemClock.uptimeMillis()<end){boolean[] ready={false};getInstrumentation().runOnMainSync(()->ready[0]=condition.ready());if(ready[0])return;SystemClock.sleep(80);}fail("目标界面未在限定时间内完成");}
     private Activity next(Instrumentation.ActivityMonitor monitor)throws Exception{Activity next=getInstrumentation().waitForMonitorWithTimeout(monitor,15000);getInstrumentation().removeMonitor(monitor);assertNotNull("应打开预期界面",next);getInstrumentation().waitForIdleSync();return next;}
     public void testLoginEntersAccountWithoutAssociationDialog()throws Exception{
+        getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());
         opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
         Instrumentation.ActivityMonitor main=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);
         getInstrumentation().runOnMainSync(()->{((EditText)opened.findViewById(R.id.accountInput)).setText("fixture");((EditText)opened.findViewById(R.id.passwordInput)).setText("fixture-password");opened.findViewById(R.id.loginButton).performClick();});
@@ -84,10 +85,12 @@ public class AccountFlowTest extends RefreshNavigationTest {
     }
     private void enterCachedLogin(){getInstrumentation().runOnMainSync(()->{((EditText)opened.findViewById(R.id.accountInput)).setText("offline-qa");((EditText)opened.findViewById(R.id.passwordInput)).setText("fixture-password");opened.findViewById(R.id.loginButton).performClick();});}
     public void testDisconnectedLoginUsesVerifiedAccount()throws Exception{
+        getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());
         cacheAccount();authFailure(0);opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
         Instrumentation.ActivityMonitor main=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);enterCachedLogin();opened=next(main);assertEquals("offline-qa-user",new SessionStore(opened).accountId());assertTrue(new SessionStore(opened).authenticated());
     }
     public void testServerRejectionNeverFallsBackToCachedPassword()throws Exception{
+        getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());
         cacheAccount();authFailure(401);opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));enterCachedLogin();
         await(()->"账号或密码错误".contentEquals(((TextView)opened.findViewById(R.id.message)).getText()),6000);assertFalse(opened.isFinishing());assertFalse("offline-qa-user".equals(new SessionStore(opened).accountId()));
         assertNull(new com.huimeng.bookshop.core.OfflineAccounts(activity).login(com.huimeng.bookshop.BuildConfig.API_BASE_URL,"offline-qa","fixture-password","USER"));

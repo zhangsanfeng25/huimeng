@@ -32,11 +32,11 @@ public class ProfileFragment extends Fragment implements LocalDataRefresh {
         binding.settings.setOnClickListener(v->open(SettingsActivity.class));
         ServiceEntries.menuBefore(binding.settings,"退款 / 售后",com.huimeng.bookshop.R.drawable.ic_orders,()->account(()->ServiceActivity.open(requireContext(),"after-sales")));
         ServiceEntries.menuBefore(binding.settings,"意见反馈",com.huimeng.bookshop.R.drawable.ic_review,()->account(()->ServiceActivity.open(requireContext(),"feedback")));
-        binding.switchRole.setOnClickListener(v->open(RoleSwitchActivity.class));
+        binding.merchantApplication.setOnClickListener(v->open(MerchantApplicationActivity.class));
         binding.editAccount.setOnClickListener(v->open(EditAccountActivity.class));
         binding.logout.setOnClickListener(v->((MainActivity)requireActivity()).logout());
         for(View entry:new View[]{binding.pendingPayment,binding.pendingShipment,binding.pendingReceipt,binding.pendingReview,
-                binding.cart,binding.favorites,binding.addresses,binding.settings,binding.switchRole,binding.editAccount})TapMotion.attach(entry);
+                binding.cart,binding.favorites,binding.addresses,binding.settings,binding.merchantApplication,binding.editAccount})TapMotion.attach(entry);
         binding.getRoot().setOnRefreshListener(this::refreshProfile);renderProfile();return binding.getRoot();
     }
     private void account(Runnable action){if(new SessionStore(requireContext()).authenticated())action.run();else startActivity(new Intent(requireContext(),LoginActivity.class));}

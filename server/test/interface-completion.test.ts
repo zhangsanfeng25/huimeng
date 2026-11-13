@@ -17,6 +17,7 @@ const user=await login('xingxing'),other=await login('xiaoxiong'),merchant=await
 async function call(path:string,method='GET',body?:unknown,token=user){return fetch(base+path,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});}
 const application={shopName:'共读小屋',contactName:'陈老师',contactPhone:'13800002001',businessAddress:'辽宁省大连市阅读街20号',description:'提供儿童绘本与亲子共读服务。',acceptedTerms:true};
 let applicationId='';
+let approvedMerchant='';
 test('申请表校验后入库、待审核无商家权限、重复提交不创建第二个店铺',async()=>{
   assert.equal((await call('/me/merchant-application','POST',{...application,contactPhone:'abc'})).status,400);
   assert.equal((await call('/me/merchant-application','POST',{...application,acceptedTerms:false})).status,400);
@@ -28,23 +29,27 @@ test('申请表校验后入库、待审核无商家权限、重复提交不创�
   const details=await (await call('/merchants/'+applicationId+'/details','GET',undefined,admin)).json();assert.equal(details.data.application.contactPhone,'13800002001');
   assert.equal((await call('/me/merchant-application','GET',undefined,other)).status,200);assert.equal((await (await call('/me/merchant-application','GET',undefined,other)).json()).data,null);
 });
-test('审核拒绝非法状态及无理由驳回，通过后原用户会话即时获得权限并切换身份',async()=>{
+test('审核拒绝非法状态及无理由驳回，通过后需要以商家身份重新登录',async()=>{
   assert.equal((await call('/merchants/'+applicationId,'PUT',{approval:'伪造',status:'营业中'},admin)).status,400);
   assert.equal((await call('/merchants/'+applicationId,'PUT',{approval:'已驳回',status:'待审核'},admin)).status,400);
   assert.equal((await call('/merchants/'+applicationId,'PUT',{approval:'已通过',status:'营业中'},other)).status,403);
   assert.equal((await call('/merchants/'+applicationId,'PUT',{shop:application.shopName,approval:'已通过',status:'营业中'},admin)).status,200);
   assert.ok((await (await call('/auth/me')).json()).user.roles.includes('MERCHANT'));
-  assert.equal((await call('/auth/switch-role','POST',{role:'MERCHANT'})).status,200);
-  assert.equal((await call('/merchant/products')).status,200);
+  assert.equal((await call('/auth/switch-role','POST',{role:'MERCHANT'})).status,403);
+  assert.equal((await call('/merchant/products')).status,403);
   assert.equal((await call('/me/merchant-application','POST',application)).status,409);
-  assert.equal((await call('/auth/switch-role','POST',{role:'ADMIN'})).status,400);
+  assert.equal((await call('/auth/switch-role','POST',{role:'ADMIN'})).status,403);
   assert.equal((await call('/auth/switch-role','POST',{role:'MERCHANT'},other)).status,403);
+  approvedMerchant=await login('xingxing','demo12345','MERCHANT');
+  assert.equal((await call('/merchant/products','GET',undefined,approvedMerchant)).status,200);
 });
 test('商家停用后旧会话不能继续管理，恢复营业重新获得权限',async()=>{
   assert.equal((await call('/merchants/'+applicationId,'PUT',{approval:'已通过',status:'已停用'},admin)).status,200);
-  assert.equal((await call('/merchant/products')).status,403);assert.equal((await call('/auth/switch-role','POST',{role:'MERCHANT'})).status,403);
+  assert.equal((await call('/merchant/products','GET',undefined,approvedMerchant)).status,401);
   assert.ok(!(await (await call('/auth/me')).json()).user.roles.includes('MERCHANT'));
   assert.equal((await call('/merchants/'+applicationId,'PUT',{approval:'已通过',status:'营业中'},admin)).status,200);
+  assert.equal((await call('/merchant/products','GET',undefined,approvedMerchant)).status,401);
+  approvedMerchant=await login('xingxing','demo12345','MERCHANT');
 });
 test('商家管理列表携带版本，旧编辑表单不能覆盖新审核结果',async()=>{
   const list=await (await call('/merchants','GET',undefined,admin)).json();const row=list.data.find((r:any)=>r.id===applicationId);assert.ok(row.updatedAt);
@@ -69,13 +74,13 @@ test('商家图片只接受自己的上传，编辑文字保留封面、详情�
   const uploaded=await fetch(base+'/community/uploads',{method:'POST',headers:{Authorization:`Bearer ${merchant}`,'Content-Type':'image/jpeg'},body:jpeg});assert.equal(uploaded.status,201);const url=(await uploaded.json()).url;
   const body={name:'图文测试绘本',summary:'保留图文的绘本',ageRange:'3–6岁',priceCents:2900,stock:10,categoryId:(db.prepare('SELECT id FROM categories LIMIT 1').get() as any).id,coverUrl:url,detailImages:[url],audioUrl:'/public/sample.mp3'};
   const created=await call('/merchant/products','POST',body,merchant);assert.equal(created.status,201);const {productId}=await created.json();
-  assert.equal((await call('/merchant/products','POST',body,user)).status,400);
+  assert.equal((await call('/merchant/products','POST',body,approvedMerchant)).status,400);
   const {coverUrl:omitCover,detailImages:omitImages,audioUrl:omitAudio,...textOnly}=body;void omitCover;void omitImages;void omitAudio;
   assert.equal((await call('/merchant/products/'+productId,'PUT',{...textOnly,summary:'仅修改文字'},merchant)).status,200);
   const {data}=await (await call('/merchant/products/'+productId,'GET',undefined,merchant)).json();assert.equal(data.coverUrl,url);assert.deepEqual(data.detailImages,[url]);assert.equal(data.audioUrl,'/public/sample.mp3');
   assert.equal((await call('/merchant/products/'+productId+'/submit','POST',{},merchant)).status,200);
   assert.equal((await call('/merchant/products/'+productId,'PUT',body,merchant)).status,409);
-  assert.equal((await call('/merchant/products/'+productId,'GET',undefined,user)).status,404);
+  assert.equal((await call('/merchant/products/'+productId,'GET',undefined,approvedMerchant)).status,404);
 });
 test('评价页仅分页展示公开且未删除的评价，未上架商品不能查询评价',async()=>{
   const row=db.prepare('SELECT product_id id FROM ratings LIMIT 1').get() as any;assert.ok(row);

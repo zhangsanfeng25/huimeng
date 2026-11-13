@@ -1,3 +1,4 @@
+import {readTables} from '../core/db.js';
 import {withFulfillment} from '../services/after-sale-items.js';
 import {afterSaleColumns,orderServiceEvents} from '../services/customer-services.js';
 import {businessRoute} from '../services/context.js';
@@ -13,6 +14,7 @@ import {requireAuth} from '../core/http.js';
 
 import { matchesAge, themeTerms } from '../core/catalog-filters.js';
 import {expirePendingCheckouts} from '../core/order-lifecycle.js';
+import {confirmOverdueOrders} from '../core/auto-receipt.js';
 
 
 
@@ -22,7 +24,7 @@ export const shopRouter=Router();
 shopRouter.use(merchantApplicationRouter);
 shopRouter.use(merchantProductsRouter);
 db.function('matches_age', { deterministic: true }, matchesAge);
-shopRouter.use((req,_res,next)=>{if(/^\/(me\/orders|merchant\/orders|checkout)/.test(req.path))expirePendingCheckouts();next();});
+shopRouter.use((req,_res,next)=>{if(/^\/(me\/orders|merchant\/orders|checkout)/.test(req.path)){expirePendingCheckouts();confirmOverdueOrders();}next();});
 import {productSelect} from '../services/shop-data.js';
 import {readBookDetails} from '../services/book-details.js';
 shopRouter.get('/catalog/categories',(_req,res)=>res.json({data:db.prepare(`SELECT id,name,parent_name parent,sort_order sort FROM categories WHERE status='ENABLED' ORDER BY sort_order`).all()}));
@@ -42,15 +44,15 @@ shopRouter.get('/catalog/products/:id/ratings',(req,res)=>{
   const parsed=z.object({page:z.coerce.number().int().min(1).max(100000).default(1),pageSize:z.coerce.number().int().min(1).max(50).default(20)}).safeParse(req.query);
   if(!parsed.success)return res.status(400).json({message:'评价分页参数不正确'});
   const id=String(req.params.id);if(!db.prepare("SELECT 1 FROM products WHERE id=? AND status='ONLINE'").get(id))return res.status(404).json({message:'商品不存在或已下架'});
-  const total=(db.prepare("SELECT COUNT(*) count FROM ratings WHERE product_id=? AND status='PUBLIC' AND deleted_at IS NULL").get(id) as {count:number}).count;
+  const total=(db.prepare(`SELECT COUNT(*) count FROM ${readTables.ratings} WHERE product_id=? AND status='PUBLIC' AND deleted_at IS NULL`).get(id) as {count:number}).count;
   const {page,pageSize}=parsed.data;
-  const data=db.prepare(`SELECT r.id,r.stars,r.content,r.created_at createdAt,u.nickname user,u.avatar_url avatarUrl FROM ratings r JOIN users u ON u.id=r.user_id WHERE r.product_id=? AND r.status='PUBLIC' AND r.deleted_at IS NULL ORDER BY r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`).all(id,pageSize,(page-1)*pageSize);
+  const data=db.prepare(`SELECT r.id,r.stars,r.content,r.created_at createdAt,u.nickname user,u.avatar_url avatarUrl FROM ${readTables.ratings} r JOIN users u ON u.id=r.user_id WHERE r.product_id=? AND r.status='PUBLIC' AND r.deleted_at IS NULL ORDER BY r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`).all(id,pageSize,(page-1)*pageSize);
   res.json({data,total,page,hasMore:page*pageSize<total});
 });
 shopRouter.get('/catalog/products/:id',(req,res)=>{
   const data=db.prepare(`${productSelect} WHERE p.id=? AND p.status='ONLINE'`).get(String(req.params.id));
   if(!data)return res.status(404).json({message:'商品不存在或已下架'});
-  const ratings=db.prepare(`SELECT r.id,r.stars,r.content,r.created_at createdAt,u.nickname user FROM ratings r JOIN users u ON u.id=r.user_id WHERE r.product_id=? AND r.status='PUBLIC' AND r.deleted_at IS NULL ORDER BY r.created_at DESC`).all(String(req.params.id));
+  const ratings=db.prepare(`SELECT r.id,r.stars,r.content,r.created_at createdAt,u.nickname user FROM ${readTables.ratings} r JOIN users u ON u.id=r.user_id WHERE r.product_id=? AND r.status='PUBLIC' AND r.deleted_at IS NULL ORDER BY r.created_at DESC`).all(String(req.params.id));
   const item=data as any;
   const recommendations=db.prepare(`${productSelect} WHERE p.status='ONLINE' AND p.stock_available>0 AND p.id<>? ORDER BY (p.category_id=?) DESC,(r.age_range=?) DESC,p.id ASC LIMIT 4`).all(item.id,item.categoryId,item.ageRange);
   res.json({data:{...item,...readBookDetails(item),ratings,recommendations}});
@@ -81,14 +83,14 @@ shopRouter.get('/checkout/:groupId',requireAuth('USER'),(req,res)=>{
 shopRouter.post('/checkout/:groupId/pay',requireAuth('USER'),businessRoute(checkoutPay));
 
 shopRouter.get('/me/orders',requireAuth('USER'),(req,res)=>res.json({data:db.prepare(`SELECT o.*,${afterSaleColumns},m.shop_name shop,
- (SELECT oi.product_name FROM order_items oi WHERE oi.order_id=o.id LIMIT 1) productName,
- (SELECT oi.cover_url FROM order_items oi WHERE oi.order_id=o.id LIMIT 1) coverUrl,
- (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id=o.id) itemCount
- FROM orders o JOIN merchants m ON m.id=o.merchant_id WHERE o.user_id=? ORDER BY o.created_at DESC`).all(req.actor!.id)}));
+ (SELECT oi.product_name FROM ${readTables.order_items} oi WHERE oi.order_id=o.id LIMIT 1) productName,
+ (SELECT oi.cover_url FROM ${readTables.order_items} oi WHERE oi.order_id=o.id LIMIT 1) coverUrl,
+ (SELECT COUNT(*) FROM ${readTables.order_items} oi WHERE oi.order_id=o.id) itemCount
+ FROM ${readTables.orders} o JOIN merchants m ON m.id=o.merchant_id WHERE o.user_id=? ORDER BY o.created_at DESC`).all(req.actor!.id)}));
 shopRouter.get('/me/orders/:orderId',requireAuth('USER'),(req,res)=>{
-  const order=db.prepare(`SELECT o.*,${afterSaleColumns},m.shop_name shop FROM orders o JOIN merchants m ON m.id=o.merchant_id WHERE o.id=? AND o.user_id=?`).get(String(req.params.orderId),req.actor!.id) as any;
+  const order=db.prepare(`SELECT o.*,${afterSaleColumns},m.shop_name shop FROM ${readTables.orders} o JOIN merchants m ON m.id=o.merchant_id WHERE o.id=? AND o.user_id=?`).get(String(req.params.orderId),req.actor!.id) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
-  const items=withFulfillment(db.prepare(`SELECT oi.id,oi.product_id productId,oi.product_name productName,oi.cover_url coverUrl,oi.unit_price_cents unitPriceCents,oi.quantity,oi.subtotal_cents subtotalCents,EXISTS(SELECT 1 FROM ratings r WHERE r.order_item_id=oi.id AND r.user_id=?) rated FROM order_items oi WHERE oi.order_id=?`).all(req.actor!.id,order.id));
+  const items=withFulfillment(db.prepare(`SELECT oi.id,oi.product_id productId,oi.product_name productName,oi.cover_url coverUrl,oi.unit_price_cents unitPriceCents,oi.quantity,oi.subtotal_cents subtotalCents,EXISTS(SELECT 1 FROM ${readTables.ratings} r WHERE r.order_item_id=oi.id AND r.user_id=?) rated FROM ${readTables.order_items} oi WHERE oi.order_id=?`).all(req.actor!.id,order.id));
   const events=db.prepare(`SELECT action,from_status fromStatus,to_status toStatus,note,created_at createdAt FROM order_events WHERE order_id=? ORDER BY created_at`).all(order.id);
   res.json({data:{...order,items,events,serviceEvents:orderServiceEvents(order.id)}});
 });
@@ -96,14 +98,14 @@ shopRouter.post('/me/orders/:orderId/confirm',requireAuth('USER'),businessRoute(
 shopRouter.post('/me/orders/:orderId/cancel',requireAuth('USER'),businessRoute(orderCancel));
 
 shopRouter.get('/merchant/orders',requireAuth('MERCHANT'),(req,res)=>res.json({data:db.prepare(`SELECT o.*,${afterSaleColumns},u.nickname buyer,
- (SELECT oi.product_name FROM order_items oi WHERE oi.order_id=o.id LIMIT 1) productName,
- (SELECT oi.cover_url FROM order_items oi WHERE oi.order_id=o.id LIMIT 1) coverUrl,
- (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id=o.id) itemCount
- FROM orders o JOIN users u ON u.id=o.user_id WHERE o.merchant_id=? ORDER BY o.created_at DESC`).all(req.actor!.merchantId)}));
+ (SELECT oi.product_name FROM ${readTables.order_items} oi WHERE oi.order_id=o.id LIMIT 1) productName,
+ (SELECT oi.cover_url FROM ${readTables.order_items} oi WHERE oi.order_id=o.id LIMIT 1) coverUrl,
+ (SELECT COUNT(*) FROM ${readTables.order_items} oi WHERE oi.order_id=o.id) itemCount
+ FROM ${readTables.orders} o JOIN users u ON u.id=o.user_id WHERE o.merchant_id=? ORDER BY o.created_at DESC`).all(req.actor!.merchantId)}));
 shopRouter.get('/merchant/orders/:orderId',requireAuth('MERCHANT'),(req,res)=>{
-  const order=db.prepare(`SELECT o.*,${afterSaleColumns},u.nickname buyer FROM orders o JOIN users u ON u.id=o.user_id WHERE o.id=? AND o.merchant_id=?`).get(String(req.params.orderId),req.actor!.merchantId) as any;
+  const order=db.prepare(`SELECT o.*,${afterSaleColumns},u.nickname buyer FROM ${readTables.orders} o JOIN users u ON u.id=o.user_id WHERE o.id=? AND o.merchant_id=?`).get(String(req.params.orderId),req.actor!.merchantId) as any;
   if(!order)return res.status(404).json({message:'订单不存在'});
-  const items=withFulfillment(db.prepare('SELECT id,product_id productId,product_name productName,cover_url coverUrl,unit_price_cents unitPriceCents,quantity,subtotal_cents subtotalCents FROM order_items WHERE order_id=?').all(order.id));
+  const items=withFulfillment(db.prepare(`SELECT id,product_id productId,product_name productName,cover_url coverUrl,unit_price_cents unitPriceCents,quantity,subtotal_cents subtotalCents FROM ${readTables.order_items} WHERE order_id=?`).all(order.id));
   const events=db.prepare('SELECT action,from_status fromStatus,to_status toStatus,note,created_at createdAt FROM order_events WHERE order_id=? ORDER BY created_at').all(order.id);
   res.json({data:{...order,items,events,serviceEvents:orderServiceEvents(order.id)}});
 });
@@ -113,7 +115,7 @@ shopRouter.post('/merchant/orders/:orderId/advance',requireAuth('MERCHANT'),busi
 shopRouter.get('/merchant/products',requireAuth('MERCHANT'),(req,res)=>res.json({data:db.prepare(`SELECT p.id,p.merchant_id merchantId,m.shop_name shop,p.category_id categoryId,c.name category,
  r.name,r.summary,r.age_range ageRange,r.price_cents priceCents,r.cover_url coverUrl,r.detail_images_json detailImages,
  r.audio_url audioUrl,r.ar_enabled arEnabled,r.ar_resource_url arResourceUrl,p.stock_available stock,p.status,r.review_status reviewStatus
- FROM products p JOIN product_revisions r ON r.id=(SELECT id FROM product_revisions latest WHERE latest.product_id=p.id ORDER BY latest.version DESC LIMIT 1)
+ FROM products p JOIN ${readTables.product_revisions} r ON r.id=(SELECT id FROM ${readTables.product_revisions} latest WHERE latest.product_id=p.id ORDER BY latest.version DESC LIMIT 1)
  JOIN merchants m ON m.id=p.merchant_id JOIN categories c ON c.id=p.category_id WHERE p.merchant_id=? ORDER BY p.updated_at DESC`).all(req.actor!.merchantId)}));
 shopRouter.post('/merchant/products/:productId/offline',requireAuth('MERCHANT'),businessRoute(productOffline));
 shopRouter.post('/merchant/products/:productId/submit',requireAuth('MERCHANT'),businessRoute(productSubmit));

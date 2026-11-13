@@ -33,3 +33,22 @@ th,thead .sticky-col{background:var(--surface-2);color:var(--muted)}td,.data-pan
 :root:not([data-wallpaper="none"]) .sidebar .brand{background:color-mix(in srgb,var(--surface) 68%,transparent)}
 .sidebar-art{align-items:center;gap:10px;justify-content:flex-start}
 .sidebar-art img{width:48px;height:48px;object-fit:contain;border-radius:12px;flex:none;box-shadow:0 5px 14px rgba(39,31,87,.15)}
+
+/* Shared content and controls follow the active theme, including detail dialogs. */
+:root{--text-muted:var(--muted)}
+:root[data-theme="dark"]{color-scheme:dark;--action-text:#b7afff;--danger-text:#ff9ca8}
+:root[data-theme="light"],:root[data-theme="soft"]{color-scheme:light;--action-text:var(--primary-dark);--danger-text:#b83f50}
+.app .detail-list dd,.app .modal h2,.app .modal h3,.app .action-form label,.app .form-grid label,.app .media-tile{color:var(--text)}
+.app .search-field input{background:transparent;color:var(--text)}
+.app input::placeholder,.app textarea::placeholder{color:var(--muted);opacity:1}
+.app .action-form textarea,.app .review-actions textarea,.app .review-actions select,.app .book-information-fields input,.app .book-information-fields textarea{background:var(--surface);color:var(--text);border-color:var(--border)}
+.app select option{background:var(--surface);color:var(--text)}
+.app .link,.app .empty button,.app .page-error button{color:var(--action-text,var(--primary-dark))}
+.app .danger-link{color:var(--danger-text,#b83f50)}
+.app .tasks nav button,.app .action-form p,.app .demo-strip{color:var(--muted)}
+.app .tasks nav button.active{color:var(--action-text,var(--primary-dark))}
+.app .tasks nav b,.app .profile-card em{background:var(--surface-2);color:var(--text)}
+.app .toast{background:var(--surface);color:var(--text);border-color:var(--border)}
+:root[data-theme="dark"] .page-error,:root[data-theme="dark"] .form-error{background:#43262d;color:#ffb4bd;border-color:#80505c}
+:root[data-theme="dark"] .crud-form input:disabled{background:var(--surface-2);color:var(--muted)}
+.app input:focus-visible,.app select:focus-visible,.app textarea:focus-visible,.app button:focus-visible{outline:2px solid var(--action-text,var(--primary));outline-offset:3px}
