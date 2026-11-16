@@ -11,25 +11,14 @@
                 android:background="@drawable/bg_forest_tabs" android:contentDescription="返回登录页"
                 android:padding="13dp" android:src="@drawable/ic_back" app:tint="@color/auth_ink" />
             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                android:layout_marginStart="14dp" android:text="绘梦书城" android:textColor="@color/auth_ink"
+                android:layout_marginStart="14dp" android:text="注册账号" android:textColor="@color/auth_ink"
                 android:textSize="20sp" android:textStyle="bold" />
         </LinearLayout>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="24dp" android:text="开启绘本旅程" android:textColor="@color/auth_ink"
-            android:textSize="29sp" android:textStyle="bold" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:text="创建账号，收藏属于你们的好故事"
-            android:textColor="@color/auth_muted" android:textSize="14sp" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="24dp" android:background="@drawable/bg_auth_registration"
             android:elevation="5dp" android:orientation="vertical" android:padding="20dp">
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="注册绘梦账号" android:textColor="@color/auth_ink" android:textSize="19sp" android:textStyle="bold" />
-            <TextView android:id="@+id/roleNote" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="7dp" android:text="注册后即可使用读者端功能"
-                android:textColor="@color/auth_muted" android:textSize="13sp" />
             <com.google.android.material.textfield.TextInputLayout style="@style/Widget.HuiMeng.AuthField" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="16dp" android:hint="登录账号">
+                android:layout_height="wrap_content" android:hint="登录账号">
                 <com.google.android.material.textfield.TextInputEditText android:id="@+id/username"
                     android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text"
                     android:singleLine="true" />

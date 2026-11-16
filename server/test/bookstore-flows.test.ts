@@ -31,6 +31,20 @@ test('演示找回拒绝仅凭用户名修改密码',async()=>{
 });
 async function call(path: string, method='GET', body?: unknown, actor=token, key?: string) { return fetch(base+path,{method,headers:{Authorization:`Bearer ${actor}`,'Content-Type':'application/json',...(key?{'Idempotency-Key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)}); }
 
+test('device registration retries keep the same account and never claim an existing alias', async () => {
+  const localId='L3e34ef62-09d5-4480-90ac-a1fe951fa348';
+  const form={localId,username:'device-reader',nickname:'本机读者',password:'demo12345'};
+  const created=await call('/auth/register-local','POST',form);
+  assert.equal(created.status,201);
+  assert.equal((await created.json()).id,localId);
+  const replay=await call('/auth/register-local','POST',form);
+  assert.equal(replay.status,200);
+  assert.equal((await replay.json()).id,localId);
+  const collision=await call('/auth/register-local','POST',{...form,localId:'L3e34ef62-09d5-4480-90ac-a1fe951fa349',username:'xingxing'});
+  assert.equal(collision.status,409);
+  assert.ok(await login(form.username));
+});
+
 test('搜索关键词和价格排序同时生效，价格升降序可切换', async () => {
   for (const sort of ['price_asc','price_desc']) {
     const response = await call(`/catalog/products?q=${encodeURIComponent('晚安')}&sort=${sort}`);

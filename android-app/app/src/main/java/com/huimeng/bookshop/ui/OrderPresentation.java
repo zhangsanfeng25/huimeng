@@ -11,7 +11,14 @@ final class OrderPresentation {
     }
     static String number(JSONObject order){
         String id=platformId(order);
-        return id.isEmpty()?"订单号：本地待同步（长按复制本地编号）":"订单号："+id;
+        return "订单号："+displayNumber(id.isEmpty()?order.optString("id"):id,"DD");
+    }
+    static String displayNumber(String id,String prefix){
+        if(id.matches("[A-Za-z]{1,4}-?[0-9]{5,18}"))return id;
+        String hex=id.replaceFirst("^local-","").replace("-","");
+        if(hex.matches("[a-fA-F0-9]{12,}"))
+            return String.format(java.util.Locale.ROOT,"%s-%015d",prefix,Long.parseLong(hex.substring(0,12),16));
+        return String.format(java.util.Locale.ROOT,"%s-%010d",prefix,Integer.toUnsignedLong(id.hashCode()));
     }
     static String receipt(JSONObject order,Instant now){
         String logistics=order.optString("logistics_status",order.optString("status"));
@@ -20,7 +27,7 @@ final class OrderPresentation {
         try{
             Instant deadline=Instant.parse(order.getString("shipped_at")).plusSeconds(30L*86400);
             long seconds=deadline.getEpochSecond()-now.getEpochSecond();
-            if(seconds<=0)return "已到自动确认收货时间，联网后以平台状态为准";
+            if(seconds<=0)return "等待自动确认收货";
             return "商品将在"+Math.max(1,(seconds+86399)/86400)+"天后自动确认收货（自发货起30天）";
         }catch(Exception ignored){return "商品将在发货满30天后自动确认收货";}
     }

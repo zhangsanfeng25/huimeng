@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import com.huimeng.bookshop.BuildConfig;
 import com.huimeng.bookshop.core.SessionStore;
+import com.huimeng.bookshop.core.OfflineAccounts;
 import com.huimeng.bookshop.core.local.*;
 import org.json.*;
 import java.io.File;
@@ -39,13 +40,42 @@ public final class SyncCoordinator {
      if(user.isEmpty()){finish(g,"服务器已连接，登录后同步个人数据",15000);return;}
      SessionStore session=new SessionStore(context);
      if(!BuildConfig.API_BASE_URL.equals(binding.optString("origin"))){finish(g,"服务地址与本地账号绑定不一致",15000);return;}
-     if(session.token().isEmpty()){finish(g,"服务已连接 · 登录原账号后同步个人数据",15000);return;}
+     if(session.token().isEmpty()){registerPendingAccount(g,user);return;}
      transport.json(0,"auth/me",null,result->{if(!valid(g))return;JSONObject profile=result.optJSONObject("user");if(profile==null||!user.equals(profile.optString("id"))||!role.equals(profile.optString("activeRole"))){finish(g,"网络账号与本地空间不匹配，已暂停上传",15000);return;}
       LocalRepository.IO.execute(()->{if(!valid(g))return;db.getWritableDatabase().execSQL("UPDATE sync_operations SET state='PENDING' WHERE space_id=? AND state='WAITING_AUTH'",new Object[]{captured});uploadMedia(g);});
      },error->networkFailure(g,error));
     });});
    },error->{LocalRepository.IO.execute(()->{if(valid(g))db.metadata("service-connected:"+captured,"0");});networkFailure(g,error);});});
   }catch(Exception e){finish(g,"同步准备失败："+e.getMessage(),15000);}});
+ }
+ private void registerPendingAccount(int g,String user){
+  LocalRepository.IO.execute(()->{
+   if(!valid(g))return;
+   OfflineAccounts accounts=new OfflineAccounts(context);
+   try{
+    JSONObject pending=accounts.pendingRegistration(BuildConfig.API_BASE_URL,user);
+    if(pending==null){finish(g,"",15000);return;}
+    JSONObject login=new JSONObject().put("username",pending.getString("username")).put("password",pending.getString("password")).put("role","USER");
+    main.post(()->{if(!valid(g))return;
+     transport.json(1,"auth/register-local",pending,registered->{
+      if(!valid(g))return;
+      if(!user.equals(registered.optString("id"))){finish(g,"",300000);return;}
+      transport.json(1,"auth/login",login,result->{
+       if(!valid(g))return;
+       JSONObject verified=result.optJSONObject("user");String token=result.optString("token");
+       if(verified==null||!user.equals(verified.optString("id"))||token.isEmpty()){finish(g,"",300000);return;}
+       LocalRepository.IO.execute(()->{if(!valid(g))return;
+        try{
+         accounts.save(BuildConfig.API_BASE_URL,login.getString("username"),login.getString("password"),result);
+         accounts.finishRegistration(user);
+         main.post(()->{if(!valid(g))return;new SessionStore(context).attachNetworkSession(token);finish(g,"",0);});
+        }catch(Exception error){finish(g,"",15000);}
+       });
+      },error->finish(g,"",retryDelay(++failures,error.retryAfterMs)));
+     },error->finish(g,"",error.status==409?300000:retryDelay(++failures,error.retryAfterMs)));
+    });
+   }catch(Exception error){finish(g,"",15000);}
+  });
  }
  private boolean valid(int g){return running&&generation==g&&space.equals(new SessionStore(context).localSpaceId());}
  public static long retryDelay(int attempts,long retryAfter){if(retryAfter>0)return retryAfter;long[] steps={2000,5000,15000,30000,60000,120000,240000,300000};return steps[Math.max(0,Math.min(steps.length-1,attempts-1))];}
@@ -56,7 +86,7 @@ public final class SyncCoordinator {
   }catch(Exception e){finish(g,"本地图片无法读取，内容已保留："+e.getMessage(),15000);}
  }
  private void uploadOperations(int g){if(!valid(g))return;LocalDatabase db=LocalDatabase.get(context);JSONArray rows=db.pending(space,role);java.util.Set<String> blocked=new java.util.HashSet<>();JSONObject selected=null;
-  for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);String key=row.optString("resource")+":"+row.optString("entityId");if(!row.optString("state").equals("PENDING")){blocked.add(key);continue;}if(blocked.contains(key))continue;if(row.optLong("nextAttemptAt")>System.currentTimeMillis()){blocked.add(key);continue;}selected=row;break;}
+  for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);String key=row.optString("resource")+":"+row.optString("entityId");if(!row.optString("state").equals("PENDING")){blocked.add(key);continue;}if(blocked.contains(key))continue;if(waitingForOrder(row,rows,db)){blocked.add(key);continue;}if(row.optLong("nextAttemptAt")>System.currentTimeMillis()){blocked.add(key);continue;}selected=row;break;}
   if(selected==null){pull(g,0,0,null);return;}JSONObject op=selected;
   try{
    String key="frozen:"+op.getString("operationId");String frozen=db.metadata(key);
@@ -68,6 +98,19 @@ public final class SyncCoordinator {
    op.put("frozenEnvelope",new JSONObject(frozen));ContentValues update=new ContentValues();update.put("state","IN_FLIGHT");update.put("payload_hash",new JSONObject(frozen).getString("payloadHash"));update.put("attempts",op.optInt("attempts")+1);db.getWritableDatabase().update("sync_operations",update,"operation_id=?",new String[]{op.getString("operationId")});
    main.post(()->{if(!valid(g))return;transport.send(new LocalOperation(op),result->LocalRepository.IO.execute(()->{if(!valid(g))return;try{db.acknowledge(op,result);uploadOperations(g);}catch(Exception e){db.getWritableDatabase().execSQL("UPDATE sync_operations SET state='PENDING' WHERE operation_id=? AND state='IN_FLIGHT'",new Object[]{op.optString("operationId")});finish(g,"回执保存失败，重试将核对原操作："+e.getMessage(),5000);}}),error->LocalRepository.IO.execute(()->{if(!valid(g))return;ContentValues failure=new ContentValues();failure.put("state",error.status==401?"WAITING_AUTH":error.status==409?"CONFLICT":error.status==0||error.status>=500||error.status==429?"PENDING":"BLOCKED");failure.put("error",error.code+" · "+error.message);failure.put("next_attempt_at",System.currentTimeMillis()+retryDelay(op.optInt("attempts")+1,error.retryAfterMs));db.getWritableDatabase().update("sync_operations",failure,"operation_id=?",new String[]{op.optString("operationId")});if(error.status==0||error.status>=500||error.status==401||error.status==429)networkFailure(g,error);else uploadOperations(g);}));});
   }catch(Exception e){ContentValues failure=new ContentValues();failure.put("state","BLOCKED");failure.put("error","依赖内容尚未确认："+e.getMessage());db.getWritableDatabase().update("sync_operations",failure,"operation_id=?",new String[]{op.optString("operationId")});LocalRepository.IO.execute(()->uploadOperations(g));}
+ }
+ private boolean waitingForOrder(JSONObject op,JSONArray waiting,LocalDatabase db){
+  if(!op.optString("action").equals("afterSale.create"))return false;
+  JSONObject order=db.entity(space,"buyerOrders",op.optJSONObject("payload").optString("orderId"));
+  if(order==null)return false;
+  String group=order.optString("checkout_group_id");
+  JSONObject checkout=db.entity(space,"checkouts",group);
+  String canonical=checkout==null?group:checkout.optString("id",group);
+  for(int i=0;i<waiting.length();i++){
+   JSONObject row=waiting.optJSONObject(i);
+   if(row!=null&&row.optString("resource").equals("checkouts")&&row.optString("entityId").equals(canonical))return true;
+  }
+  return false;
  }
  private Object resolvePayload(Object value,String key)throws Exception{
   LocalDatabase db=LocalDatabase.get(context);

@@ -19,7 +19,7 @@ import javax.crypto.spec.PBEKeySpec;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** Only server-verified accounts can be cached. Passwords are never stored. */
+/** Local password verifiers and encrypted, pending registration requests. */
 public final class OfflineAccounts {
     private static final String KEY="huimeng.offline-accounts.v1";
     private static final int ITERATIONS=120000;
@@ -61,13 +61,67 @@ public final class OfflineAccounts {
     }
     public void save(String origin,String account,String password,JSONObject result)throws Exception{
         JSONObject user=result.getJSONObject("user");if(user.optString("id").isEmpty()||result.optString("token").isEmpty())throw new IllegalArgumentException("请先连接服务器验证账号");
+        store(origin,account,password,result,null);
+    }
+    public JSONObject register(String origin,JSONObject request)throws Exception{
+        String username=request.getString("username");
+        for(String alias:new String[]{username,request.optString("email"),request.optString("phone")}){
+            if(!alias.isEmpty()&&preferences.contains(accountKey(origin,alias)))throw new IllegalArgumentException("账号、邮箱或手机号已在本机使用");
+        }
+        String id="L"+java.util.UUID.randomUUID();
+        request.put("localId",id);
+        JSONObject user=new JSONObject().put("id",id).put("username",username).put("name",request.getString("nickname"))
+            .put("email",request.optString("email")).put("phone",request.optString("phone"))
+            .put("activeRole","USER").put("roles",new JSONArray().put("USER"));
+        JSONObject result=new JSONObject().put("user",user).put("token","");
+        store(origin,username,request.getString("password"),result,request);
+        return result;
+    }
+    public JSONObject pendingRegistration(String origin,String id)throws Exception{
+        String encrypted=preferences.getString("pending:"+id,"");
+        if(encrypted.isEmpty())return null;
+        JSONObject pending=decrypt(encrypted);
+        return origin.equals(pending.getString("origin"))?pending.getJSONObject("request"):null;
+    }
+    public void finishRegistration(String id){preferences.edit().remove("pending:"+id).commit();}
+    public boolean isPendingAccount(String origin,String account)throws Exception{
+        String encrypted=preferences.getString(accountKey(origin,account),"");
+        if(encrypted.isEmpty())return false;
+        String id=decrypt(encrypted).getJSONObject("result").getJSONObject("user").getString("id");
+        return pendingRegistration(origin,id)!=null;
+    }
+    public void forgetNetworkSessions(String origin,String id)throws Exception{
+        SharedPreferences.Editor edit=preferences.edit();
+        for(var entry:preferences.getAll().entrySet()){
+            if(entry.getKey().startsWith("pending:"))continue;
+            JSONObject record;
+            try{record=decrypt(String.valueOf(entry.getValue()));}catch(Exception ignored){continue;}
+            JSONObject result=record.getJSONObject("result");
+            if(!origin.equals(record.optString("origin"))||!id.equals(result.getJSONObject("user").optString("id")))continue;
+            JSONObject grants=verifiedResults(record);
+            for(String role:new String[]{"USER","MERCHANT"}){
+                JSONObject grant=grants.optJSONObject(role);
+                if(grant!=null)grant.put("token","");
+            }
+            result.put("token","");
+            record.put("results",grants);
+            edit.putString(entry.getKey(),encrypt(record));
+        }
+        if(!edit.commit())throw new IllegalStateException("本机登录记录更新失败");
+    }
+    private void store(String origin,String account,String password,JSONObject result,JSONObject registration)throws Exception{
+        JSONObject user=result.getJSONObject("user");
         String activeRole=user.optString("activeRole","USER");
         JSONObject results=new JSONObject();
         JSONArray roles=user.optJSONArray("roles");
         java.util.Set<String> aliases=new java.util.HashSet<>(), scanned=new java.util.HashSet<>();
         aliases.add(accountKey(origin,account));
         aliases.add(accountKey(origin,user.getString("username")));
+        if(registration!=null)for(String field:new String[]{"email","phone"}){
+            String alias=registration.optString(field);if(!alias.isEmpty())aliases.add(accountKey(origin,alias));
+        }
         for(java.util.Map.Entry<String,?> entry:preferences.getAll().entrySet())try{
+            if(entry.getKey().startsWith("pending:"))continue;
             String cached=String.valueOf(entry.getValue());
             JSONObject previous=decrypt(cached);
             if(!origin.equals(previous.optString("origin"))||!user.getString("id").equals(previous.getJSONObject("result").getJSONObject("user").optString("id")))continue;
@@ -85,6 +139,7 @@ public final class OfflineAccounts {
             .put("verifier",Base64.encodeToString(verifier(password,salt),Base64.NO_WRAP)).put("result",result).put("results",results);
         String encrypted=encrypt(record);SharedPreferences.Editor edit=preferences.edit();
         for(String alias:aliases)edit.putString(alias,encrypted);
+        if(registration!=null)edit.putString("pending:"+user.getString("id"),encrypt(new JSONObject().put("origin",origin).put("request",registration)));
         if(!edit.commit())throw new IllegalStateException("本机登录记录保存失败");
     }
     public void forgetAccount(String origin,String id)throws Exception{
@@ -106,7 +161,7 @@ public final class OfflineAccounts {
         JSONObject latest=record.getJSONObject("result"),user=latest.getJSONObject("user");
         if(!allows(user.optJSONArray("roles"),role))throw new IllegalArgumentException("此账号没有所选角色，请选择正确的登录身份");
         JSONObject verified=verifiedResults(record).optJSONObject(role);
-        if("MERCHANT".equals(role)&&verified==null)throw new IllegalArgumentException("首次以商家身份登录需要连接服务器");
+        if("MERCHANT".equals(role)&&verified==null)throw new IllegalArgumentException("本机尚无该商家身份");
         JSONObject result=new JSONObject((verified==null?latest:verified).toString());
         String expires=result.optString("expiresAt");
         if(verified==null||expires.isEmpty()||!Instant.parse(expires).isAfter(Instant.now()))result.put("token","");

@@ -16,11 +16,16 @@ test('candidate_builder_rejects_junction_ancestors_before_creating_database',asy
 });
 test('migration_preserves_all_ids_snapshots_and_ordered_duplicates',async()=>{
  const build=await builder(),fixture=await createNormalizationFixture({through:'011',case:'cross-shop-partial'}),targetPath=join(fixture.uploadDir,'..','target.db'),manifestPath=join(fixture.uploadDir,'..','manifest.json');
- const source=new Database(fixture.databasePath,{readonly:true}),before=captureBusinessBaseline(source,'legacy');source.close();const sourceHash=hash(fixture.databasePath);
+ const source=new Database(fixture.databasePath);
+ source.exec("CREATE TABLE ai_config (id INTEGER PRIMARY KEY, endpoint TEXT, model TEXT, enabled INTEGER, encrypted_key TEXT); INSERT INTO ai_config VALUES(1,'https://fixture.invalid/v1','fixture-model',1,'fixture-ciphertext')");
+ const before=captureBusinessBaseline(source,'legacy');source.close();const sourceHash=hash(fixture.databasePath);
  try{
   const manifest=await build({sourcePath:fixture.databasePath,targetPath,manifestPath,uploadDir:fixture.uploadDir});assert.equal(manifest.comparison.equal,true);assert.equal(manifest.restoreVerified,false);
   const target=new Database(targetPath,{readonly:true});try{
    assert.equal(compareBusinessBaselines(before,captureBusinessBaseline(target,'normalized')).equal,true);
+   assert.deepEqual(target.prepare('SELECT endpoint, model, enabled, encrypted_key FROM ai_config').get(),{
+    endpoint:'https://fixture.invalid/v1',model:'fixture-model',enabled:1,encrypted_key:'fixture-ciphertext',
+   });
    assert.deepEqual(target.pragma('foreign_key_check'),[]);assert.equal(target.pragma('integrity_check',{simple:true}),'ok');
    assert.equal((target.prepare('SELECT COUNT(*) n FROM product_revision_images').get() as any).n,6);
    assert.ok(!(target.prepare('PRAGMA table_info(orders)').all() as any[]).some(c=>c.name==='user_id'));

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="34dp" android:height="34dp" android:drawable="@drawable/bg_search" />
+    <item android:width="21dp" android:height="21dp" android:gravity="center">
+        <vector android:width="21dp" android:height="21dp" android:viewportWidth="24"
+            android:viewportHeight="24" android:tint="@color/cool_green_dark">
+            <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M5,18H19L17,15V10A5,5 0,0 0,7 10V15ZM10,20H14"/>
+        </vector>
+    </item>
+</layer-list>

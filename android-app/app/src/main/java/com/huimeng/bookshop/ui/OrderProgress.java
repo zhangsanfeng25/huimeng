@@ -22,8 +22,8 @@ final class OrderProgress {
     }
     static String format(JSONObject order,boolean expanded){
         boolean local="LOCAL".equals(order.optString("confirmedState"));
-        String current=local?"待联网确认":current(order);
-        if(local)return "当前："+current+"\n\n订单意向已保存在本机，尚未提交至平台。";
+        String current=current(order);
+        if(local)return "当前："+current;
         List<Step> steps=steps(order);
         StringBuilder text=new StringBuilder("当前："+current);
         for(Step step:steps){text.append("\n\n● ").append(step.title());if(!step.note().isEmpty())text.append("\n   ").append(step.note());if(!step.time().isEmpty())text.append("\n   ").append(date(step.time()));if(!expanded)break;}

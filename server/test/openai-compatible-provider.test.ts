@@ -1,9 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createOpenAiCompatibleProvider} from '../src/services/openai-compatible-provider.js';
+import {createOpenAiCompatibleProvider, resolvePublicDestination} from '../src/services/openai-compatible-provider.js';
 
 const credentials={endpoint:'https://discovery-api.intern-ai.org.cn/v1',model:'Agents-A1',apiKey:'fixture-only'};
 const signal=new AbortController().signal;
+
+test('proxy DNS placeholders use verified public answers and still reject private targets',async()=>{
+  const local=[{address:'198.18.0.225',family:4}];
+  assert.deepEqual(await resolvePublicDestination('discovery-api.intern-ai.org.cn',local,signal,async()=>[
+    {address:'47.100.69.224',family:4},
+  ]),{address:'47.100.69.224',family:4});
+  assert.deepEqual(await resolvePublicDestination('other-provider.example',local,signal,async()=>[
+    {address:'93.184.216.34',family:4},
+  ]),{address:'93.184.216.34',family:4});
+  assert.deepEqual(await resolvePublicDestination('discovery-api.intern-ai.org.cn',[
+    ...local,{address:'2001:2::89',family:6},
+  ],signal,async()=>[
+    {address:'47.100.69.224',family:4},
+  ]),{address:'47.100.69.224',family:4});
+  await assert.rejects(resolvePublicDestination('198.18.0.225',local,signal,async()=>{
+    assert.fail('IP literals must not trigger a fallback');
+  }),/可公开访问/);
+  await assert.rejects(resolvePublicDestination('discovery-api.intern-ai.org.cn',local,signal,async()=>[
+    {address:'127.0.0.1',family:4},
+  ]),/可公开访问/);
+  await assert.rejects(resolvePublicDestination('discovery-api.intern-ai.org.cn',[{address:'10.1.2.3',family:4}],signal,async()=>{
+    assert.fail('private DNS result must not trigger a fallback');
+  }),/可公开访问/);
+});
 
 test('the selected model and key are sent to each configured Chat Completions endpoint',async()=>{
   const calls:unknown[][]=[];
@@ -19,12 +43,14 @@ test('the selected model and key are sent to each configured Chat Completions en
   assert.equal(options.signal,signal);
   assert.equal(new Headers(options.headers).get('Authorization'),'Bearer fixture-only');
   assert.equal(JSON.parse(String(options.body)).model,'Agents-A1');
+  assert.deepEqual(JSON.parse(String(options.body)).thinking,{type:'disabled'});
   const second={endpoint:'https://second.invalid/gateway/v1/chat/completions/',model:'second-model',apiKey:'second-key'};
   await provider.test(second,signal);
   assert.equal(calls[2][0],'https://second.invalid/gateway/v1/chat/completions');
   const secondOptions=calls[2][1] as RequestInit;
   assert.equal(new Headers(secondOptions.headers).get('Authorization'),'Bearer second-key');
   assert.equal(JSON.parse(String(secondOptions.body)).model,'second-model');
+  assert.equal(JSON.parse(String(secondOptions.body)).thinking,undefined);
 });
 
 test('private destinations are rejected and provider errors are redacted',async()=>{

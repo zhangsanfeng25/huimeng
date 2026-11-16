@@ -46,6 +46,8 @@ public class HomeFragment extends Fragment implements LocalDataRefresh {
 
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){
         binding=FragmentHomeBinding.inflate(inflater,container,false);
+        // NestedScrollView prefers its descendants by default, including off-screen product cards.
+        binding.scroll.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
         binding.greeting.setText("你好，"+new SessionStore(requireContext()).name());
         binding.bannerCarousel.setBanners(List.of(
             new BannerCarouselView.Banner(R.drawable.banner_reading,"翻开绘本，看见更大的世界"),
@@ -56,14 +58,27 @@ public class HomeFragment extends Fragment implements LocalDataRefresh {
         ));
         binding.bannerCarousel.setOnBannerClickListener(this::openBanner);
         products=new ProductAdapter(this::openProduct,this::quickAdd);
-        binding.productList.setLayoutManager(new GridLayoutManager(requireContext(),2));binding.productList.setAdapter(products);binding.productList.setNestedScrollingEnabled(false);binding.productList.setItemAnimator(null);
+        var configuration=getResources().getConfiguration();
+        boolean compact=configuration.screenWidthDp<360||configuration.fontScale>1.25f;
+        if(compact){
+            for(com.google.android.material.button.MaterialButton choice :
+                    List.of(binding.themeBedtime,binding.themeEmotion,binding.themeScience)){
+                choice.setSingleLine(false);
+                choice.setIconGravity(com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_TOP);
+                var params=choice.getLayoutParams();
+                params.height=ViewGroup.LayoutParams.WRAP_CONTENT;
+                choice.setLayoutParams(params);
+            }
+        }
+        int columns=ProductAdapter.columns(configuration);
+        binding.productList.setLayoutManager(new GridLayoutManager(requireContext(),columns));binding.productList.setAdapter(products);binding.productList.setNestedScrollingEnabled(false);binding.productList.setItemAnimator(null);
         posts=new HomePostAdapter(row->startActivity(new Intent(requireContext(),CommunityDetailActivity.class).putExtra("post_id",row.id())));
         binding.communityPosts.setLayoutManager(new LinearLayoutManager(requireContext()));binding.communityPosts.setAdapter(posts);binding.communityPosts.setNestedScrollingEnabled(false);
         bindChoice(binding.ageBaby,"0-3",true);bindChoice(binding.agePreschool,"3-6",true);bindChoice(binding.ageSchool,"6-9",true);bindChoice(binding.ageOlder,"9-plus",true);
         bindChoice(binding.themeBedtime,"bedtime",false);bindChoice(binding.themeEmotion,"emotion",false);bindChoice(binding.themeScience,"science",false);
         binding.sortComprehensive.setOnClickListener(v->chooseSort("comprehensive"));binding.sortNewest.setOnClickListener(v->chooseSort("newest"));
         binding.sortPrice.setOnClickListener(v->chooseSort("price_asc".equals(sort)?"price_desc":"price_asc"));
-        binding.searchButton.setOnClickListener(v->startActivity(new Intent(requireContext(),SearchActivity.class).putExtra("query",String.valueOf(binding.searchInput.getText()).trim())));binding.searchInput.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_SEARCH){search();return true;}return false;});
+        binding.searchButton.setOnClickListener(v->search());binding.searchInput.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_SEARCH){search();return true;}return false;});
         binding.searchInput.setOnItemClickListener((parent,view,position,id)->search());updateHistory();
         binding.allCategories.setOnClickListener(v->startActivity(new Intent(requireContext(),CategoriesActivity.class)));binding.clearFilters.setOnClickListener(v->clearFilters());binding.allProducts.setOnClickListener(v->startActivity(new Intent(requireContext(),SearchActivity.class).putExtra("browse_title","全部绘本")));
         binding.retry.setOnClickListener(v->loadProducts(false));binding.loadMore.setOnClickListener(v->loadProducts(true));
@@ -73,12 +88,22 @@ public class HomeFragment extends Fragment implements LocalDataRefresh {
         for(View button:new View[]{binding.searchButton,binding.cartButton,binding.allProducts,binding.communityMore})TapMotion.attach(button);
         binding.searchInput.setText(query);binding.sortGroup.check("newest".equals(sort)?R.id.sortNewest:sort.startsWith("price")?R.id.sortPrice:R.id.sortComprehensive);binding.sortPrice.setText("price_asc".equals(sort)?"价格 ↑":"price_desc".equals(sort)?"价格 ↓":"价格 ↑↓");renderFilters();loadProducts(false);loadPosts();refreshCartBadge();return binding.getRoot();
     }
+    void scrollToTop(){if(binding!=null)binding.scroll.smoothScrollTo(0,0);}
+    void resetScrollOnOpen(){
+        if(binding==null)return;
+        binding.scroll.requestFocus();
+        binding.scroll.scrollTo(0,0);
+    }
+    @Override public void onViewStateRestored(@Nullable Bundle state){
+        super.onViewStateRestored(state);
+        resetScrollOnOpen();
+    }
     private void bindChoice(TextView view,String value,boolean isAge){view.setOnClickListener(v->startActivity(new Intent(requireContext(),SearchActivity.class).putExtra(isAge?"age":"theme",value).putExtra("browse_title",view.getText().toString()+(isAge?"绘本":""))));TapMotion.attach(view);}
     private void chooseSort(String value){sort=value;binding.sortGroup.check("newest".equals(sort)?R.id.sortNewest:sort.startsWith("price")?R.id.sortPrice:R.id.sortComprehensive);binding.sortPrice.setText("price_asc".equals(sort)?"价格 ↑":"price_desc".equals(sort)?"价格 ↓":"价格 ↑↓");loadProducts(false);}
     private void renderFilters(){binding.ageBaby.setSelected("0-3".equals(age));binding.agePreschool.setSelected("3-6".equals(age));binding.ageSchool.setSelected("6-9".equals(age));binding.ageOlder.setSelected("9-plus".equals(age));binding.themeBedtime.setSelected("bedtime".equals(theme));binding.themeEmotion.setSelected("emotion".equals(theme));binding.themeScience.setSelected("science".equals(theme));binding.clearFilters.setVisibility(age.isEmpty()&&theme.isEmpty()&&query.isEmpty()&&category.isEmpty()?View.GONE:View.VISIBLE);}
-    private void search(){String value=String.valueOf(binding.searchInput.getText()).trim();if(value.length()>100){toast("搜索关键词最多 100 字");return;}query=value;binding.searchInput.dismissDropDown();
-        if(!query.isEmpty()){List<String> values=history();values.remove(query);values.add(0,query);if(values.size()>8)values=values.subList(0,8);requireContext().getSharedPreferences("huimeng_search",Context.MODE_PRIVATE).edit().putString(historyKey(),new JSONArray(values).toString()).apply();updateHistory();}
-        ((InputMethodManager)requireContext().getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(binding.searchInput.getWindowToken(),0);binding.searchInput.clearFocus();renderFilters();loadProducts(false);
+    private void search(){String value=String.valueOf(binding.searchInput.getText()).trim();if(value.length()>100){toast("搜索关键词最多 100 字");return;}binding.searchInput.dismissDropDown();
+        if(!value.isEmpty()){List<String> values=history();values.remove(value);values.add(0,value);if(values.size()>8)values=values.subList(0,8);requireContext().getSharedPreferences("huimeng_search",Context.MODE_PRIVATE).edit().putString(historyKey(),new JSONArray(values).toString()).apply();updateHistory();}
+        ((InputMethodManager)requireContext().getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(binding.searchInput.getWindowToken(),0);binding.searchInput.clearFocus();startActivity(new Intent(requireContext(),SearchActivity.class).putExtra("search_mode",true).putExtra("query",value));
     }
     private String historyKey(){return "history_"+new SessionStore(requireContext()).accountId();}
     private List<String> history(){List<String> values=new ArrayList<>();try{JSONArray rows=new JSONArray(requireContext().getSharedPreferences("huimeng_search",Context.MODE_PRIVATE).getString(historyKey(),"[]"));for(int i=0;i<rows.length();i++)values.add(rows.optString(i));}catch(Exception ignored){}return values;}

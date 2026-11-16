@@ -4,5 +4,9 @@
     <TextView android:id="@+id/subtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/muted" android:textSize="14sp"/>
     <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="36dp" android:indeterminateTint="@color/cool_green"/>
     <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="32dp" android:gravity="center" android:text="暂无收藏的绘本" android:textColor="@color/muted" android:visibility="gone"/>
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/emptyAction" style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp"
+        android:layout_gravity="center_horizontal" android:layout_marginTop="8dp" android:visibility="gone"/>
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="18dp" android:layout_weight="1"/>
 </LinearLayout>

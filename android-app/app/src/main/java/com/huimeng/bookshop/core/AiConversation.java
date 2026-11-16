@@ -10,7 +10,7 @@ import org.json.JSONObject;
 
 /** An in-memory conversation associated with the current login. */
 public final class AiConversation {
-    public record Turn(boolean user, String text, JSONArray products, boolean failed) {}
+    public record Turn(boolean user, String text, JSONArray products, JSONArray suggestions, boolean failed) {}
 
     private static AiConversation current = new AiConversation();
     public static AiConversation current() { return current; }
@@ -53,19 +53,19 @@ public final class AiConversation {
         waiting = true;
         error = "";
         draft = "";
-        turns.add(new Turn(true, text, null, false));
+        turns.add(new Turn(true, text, null, null, false));
         notifyChange();
         api.chat(body, result -> {
             if (this != current) return;
-            turns.add(new Turn(false, result.optString("text"), result.optJSONArray("products"), false));
+            turns.add(new Turn(false, result.optString("text"), result.optJSONArray("products"), result.optJSONArray("suggestions"), false));
             demo = "demo".equals(result.optString("mode"));
             waiting = false;
             notifyChange();
-        }, message -> {
+        }, ignored -> {
             if (this != current) return;
-            turns.set(turns.size() - 1, new Turn(true, text, null, true));
+            turns.set(turns.size() - 1, new Turn(true, text, null, null, true));
             draft = text;
-            error = message;
+            error = "AI 助手暂不可用，请联系管理员";
             waiting = false;
             notifyChange();
         });

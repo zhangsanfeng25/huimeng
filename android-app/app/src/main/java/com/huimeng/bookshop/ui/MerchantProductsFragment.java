@@ -34,11 +34,13 @@ public class MerchantProductsFragment extends Fragment implements LocalDataRefre
     public void applyStatusFilter(String status){if(controls!=null)controls.reset(status);}
     private void load(boolean explicit){
         if(reading||binding==null)return;reading=true;int current=++request;
+        if(adapter.getItemCount()==0){binding.loading.setVisibility(View.VISIBLE);binding.emptyState.setVisibility(View.GONE);}
         new ApiClient(requireContext()).get("merchant/products",result->{
             if(binding==null||current!=request)return;reading=false;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);
-            JSONArray data=result.optJSONArray("data");products=data==null?new JSONArray():data;controls.categories(products);render();
+            JSONArray data=result.optJSONArray("data");products=data==null?new JSONArray():data;controls.setLoadError(null);controls.categories(products);render();
         },message->{if(binding==null||current!=request)return;reading=false;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);
-            if(explicit||adapter.getItemCount()==0){binding.empty.setText(message);binding.empty.setVisibility(adapter.getItemCount()==0?View.VISIBLE:View.GONE);Toast.makeText(requireContext(),message,Toast.LENGTH_SHORT).show();}
+            controls.setLoadError(message);render();
+            if(explicit&&adapter.getItemCount()>0)Toast.makeText(requireContext(),message,Toast.LENGTH_SHORT).show();
         });
     }
     private void render(){
@@ -50,8 +52,9 @@ public class MerchantProductsFragment extends Fragment implements LocalDataRefre
             String rejection=item.isNull("rejectionReason")?"":item.optString("rejectionReason");if(!rejection.isEmpty())note+="\n驳回原因："+rejection;
             rows.add(new ActionAdapter.Row(item.optString("id"),item.optString("name"),note,MerchantWork.productAction(item),true,item.optString("coverUrl"),item.optString("name")));
         }
-        adapter.submit(rows);binding.resultCount.setText("显示 "+rows.size()+" / "+products.length()+" 件商品");
-        binding.empty.setText(products.length()==0?"暂无商品，点击右上角新增商品":"没有符合条件的商品，可点击重置清除筛选");binding.empty.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);
+        adapter.submit(rows);
+        controls.showResults(rows.size(),products.length(),"件商品","暂无商品","新增商品",
+            ()->binding.add.performClick(),()->load(true));
     }
     private void open(ActionAdapter.Row row){editor.launch(new Intent(requireContext(),ManageProductActivity.class).putExtra("product_id",row.id()));}
     @Override public void onSaveInstanceState(@NonNull Bundle state){if(controls!=null)state.putBundle("filters",controls.save());super.onSaveInstanceState(state);}

@@ -24,5 +24,19 @@ public class InterfaceCompletionTest extends InstrumentationTestCase {
     public void testCategoriesScreenHasDistinctPage() throws Exception {open("CategoriesActivity",null);assertTrue(contains(activity.getWindow().getDecorView(),"绘本分类"));}
     public void testRatingsScreenHasIndependentTitle() throws Exception {open("RatingsActivity","P0001");assertTrue(contains(activity.getWindow().getDecorView(),"读者评价"));}
     public void testApplicationScreenHasFormAndTerms() throws Exception {open("MerchantApplicationActivity",null);assertTrue(contains(activity.getWindow().getDecorView(),"申请成为商家"));assertTrue(contains(activity.getWindow().getDecorView(),"真实"));}
+    public void testCropPreviewPreservesRatioWithinShortViewport() throws Throwable {
+        runTestOnUiThread(()->{
+            int width=View.MeasureSpec.makeMeasureSpec(720,View.MeasureSpec.AT_MOST);
+            int height=View.MeasureSpec.makeMeasureSpec(240,View.MeasureSpec.AT_MOST);
+            CropImageView book=new CropImageView(getInstrumentation().getTargetContext(),false);
+            book.measure(width,height);
+            assertEquals(320,book.getMeasuredWidth());
+            assertEquals(240,book.getMeasuredHeight());
+            CropImageView avatar=new CropImageView(getInstrumentation().getTargetContext(),true);
+            avatar.measure(width,height);
+            assertEquals(240,avatar.getMeasuredWidth());
+            assertEquals(240,avatar.getMeasuredHeight());
+        });
+    }
     @Override protected void tearDown() throws Exception {if(activity!=null)getInstrumentation().runOnMainSync(()->activity.finish());super.tearDown();}
 }

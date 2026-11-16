@@ -44,6 +44,46 @@ public class CustomerServicesLiveTest extends InstrumentationTestCase {
     private interface Check{boolean ready()throws Exception;}
     private void waitFor(Check condition,long timeout,String message)throws Exception{long end=SystemClock.uptimeMillis()+timeout;while(SystemClock.uptimeMillis()<end){if(condition.ready())return;SystemClock.sleep(200);}fail(message);}
     private void capture(Activity a,String name)throws Exception{final android.graphics.Bitmap[] frame={null};getInstrumentation().runOnMainSync(()->{View view=a.getWindow().getDecorView();frame[0]=android.graphics.Bitmap.createBitmap(view.getWidth(),view.getHeight(),android.graphics.Bitmap.Config.ARGB_8888);view.draw(new android.graphics.Canvas(frame[0]));});try(var out=new java.io.FileOutputStream(new java.io.File(a.getExternalFilesDir(null),name+".png"))){frame[0].compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}finally{frame[0].recycle();}}
+    public void testMerchantProductAppearsAfterCreateEditAndSubmit() throws Exception {
+        login("merchant_a","MERCHANT");
+        open(MainActivity.class,null);
+        String space=new SessionStore(context()).localSpaceId();
+        waitFor(()->!LocalDatabase.get(context()).metadata("last-sync:"+space).isEmpty(),45000,"初始同步未完成");
+        Activity create=open(AddProductActivity.class,null);
+        waitFor(()->((android.widget.Spinner)create.findViewById(R.id.category)).getCount()>0,15000,"商品分类未就绪");
+        getInstrumentation().runOnMainSync(()->{
+            ((EditText)create.findViewById(R.id.name)).setText("QA 模拟器新建绘本");
+            ((EditText)create.findViewById(R.id.summary)).setText("验证模拟器新增、修改和送审");
+            ((EditText)create.findViewById(R.id.age)).setText("3–6岁");
+            ((EditText)create.findViewById(R.id.price)).setText("23.50");
+            ((EditText)create.findViewById(R.id.stock)).setText("9");
+            create.findViewById(R.id.save).performClick();
+        });
+        final String[] id={null};
+        waitFor(()->{
+            JSONArray rows=http("GET","merchant/products",null).getJSONArray("data");
+            for(int i=0;i<rows.length();i++){
+                JSONObject row=rows.getJSONObject(i);
+                if("QA 模拟器新建绘本".equals(row.optString("name"))){
+                    id[0]=row.getString("id");
+                    return true;
+                }
+            }
+            return false;
+        },45000,"模拟器新增绘本未同步到服务端");
+        Activity edit=open(ManageProductActivity.class,new Intent().putExtra("product_id",id[0]));
+        waitFor(()->edit.findViewById(R.id.save).isEnabled(),15000,"商品编辑未就绪");
+        getInstrumentation().runOnMainSync(()->{
+            ((EditText)edit.findViewById(R.id.name)).setText("QA 模拟器已修改绘本");
+            ((EditText)edit.findViewById(R.id.price)).setText("31.25");
+            edit.findViewById(R.id.submitReview).performClick();
+        });
+        waitFor(()->{
+            JSONObject row=http("GET","merchant/products/"+id[0],null).getJSONObject("data");
+            return "QA 模拟器已修改绘本".equals(row.optString("name"))
+                && row.optInt("priceCents")==3125 && MerchantWork.reviewPending(row);
+        },45000,"商品修改或送审未同步到服务端");
+    }
     public void testPurchaseChatFeedbackAndAfterSale()throws Exception{
         login("xiaoxiong","USER");Activity main=open(MainActivity.class,null);String space=new SessionStore(context()).localSpaceId();
         waitFor(()->!LocalDatabase.get(context()).metadata("last-sync:"+space).isEmpty(),45000,"初始同步未完成");

@@ -19,7 +19,7 @@ final class ProductStockEditor {
         client.get("merchant/products/"+productId,result->{
             if(activity.isFinishing()||activity.isDestroyed())return;
             JSONObject product=result.optJSONObject("data");
-            if(result.optBoolean("cached")||product==null){message(activity,"请联网读取实时库存后重试");return;}
+            if(result.optBoolean("cached")||product==null){message(activity,"库存暂不可编辑，请重试");return;}
             int expected=product.optInt("stock");
             LinearLayout content=new LinearLayout(activity);content.setOrientation(LinearLayout.VERTICAL);
             int padding=Math.round(24*activity.getResources().getDisplayMetrics().density);content.setPadding(padding,0,padding,0);

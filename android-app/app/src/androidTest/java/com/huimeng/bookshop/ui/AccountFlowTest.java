@@ -89,16 +89,88 @@ public class AccountFlowTest extends RefreshNavigationTest {
         cacheAccount();authFailure(0);opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
         Instrumentation.ActivityMonitor main=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);enterCachedLogin();opened=next(main);assertEquals("offline-qa-user",new SessionStore(opened).accountId());assertTrue(new SessionStore(opened).authenticated());
     }
+    public void testLoginMarksEachEmptyField()throws Exception{
+        getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());
+        opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+        getInstrumentation().runOnMainSync(()->{
+            EditText account=opened.findViewById(R.id.accountInput);
+            EditText password=opened.findViewById(R.id.passwordInput);
+            opened.findViewById(R.id.loginButton).performClick();
+            assertEquals("请输入账号",account.getHint().toString());
+            assertEquals("请输入密码",password.getHint().toString());
+            assertTrue(account.hasFocus());
+        });
+        if(android.os.Build.VERSION.SDK_INT>=35){
+            View root=opened.findViewById(android.R.id.content);
+            int top=root.getRootWindowInsets().getInsets(android.view.WindowInsets.Type.statusBars()).top;
+            int[] location=new int[2];
+            opened.findViewById(R.id.heroFrame).getLocationOnScreen(location);
+            assertTrue("登录内容应在状态栏下方",location[1]>=top);
+        }
+    }
     public void testServerRejectionNeverFallsBackToCachedPassword()throws Exception{
         getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());
         cacheAccount();authFailure(401);opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));enterCachedLogin();
-        await(()->"账号或密码错误".contentEquals(((TextView)opened.findViewById(R.id.message)).getText()),6000);assertFalse(opened.isFinishing());assertFalse("offline-qa-user".equals(new SessionStore(opened).accountId()));
+        await(()->"账号或密码错误".equals(String.valueOf(((com.google.android.material.textfield.TextInputLayout)opened.findViewById(R.id.passwordInput).getParent().getParent()).getError())),6000);assertFalse(opened.isFinishing());assertFalse("offline-qa-user".equals(new SessionStore(opened).accountId()));
         assertNull(new com.huimeng.bookshop.core.OfflineAccounts(activity).login(com.huimeng.bookshop.BuildConfig.API_BASE_URL,"offline-qa","fixture-password","USER"));
     }
-    public void testRegistrationRequiresConnection()throws Exception{
-        authFailure(0);int before=activity.getSharedPreferences("huimeng_offline_accounts",0).getAll().size();opened=getInstrumentation().startActivitySync(new Intent(activity,RegisterActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
-        getInstrumentation().runOnMainSync(()->{((EditText)opened.findViewById(R.id.username)).setText("offline_must_not_register");((EditText)opened.findViewById(R.id.nickname)).setText("未注册读者");((EditText)opened.findViewById(R.id.password)).setText("fixture-password");opened.findViewById(R.id.submit).performClick();});
-        await(()->opened.findViewById(R.id.submit).isEnabled(),6000);assertFalse(opened.isFinishing());assertEquals(before,activity.getSharedPreferences("huimeng_offline_accounts",0).getAll().size());
+    public void testRegistrationAndLoginWithoutConnection()throws Exception{
+        getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());authFailure(0);String username="reader-"+java.util.UUID.randomUUID().toString().substring(0,8);opened=getInstrumentation().startActivitySync(new Intent(activity,RegisterActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+        getInstrumentation().runOnMainSync(()->{((EditText)opened.findViewById(R.id.username)).setText(username);((EditText)opened.findViewById(R.id.nickname)).setText("未注册读者");((EditText)opened.findViewById(R.id.password)).setText("fixture-password");opened.findViewById(R.id.submit).performClick();});
+                await(()->opened.isFinishing(),6000);
+        var account=new com.huimeng.bookshop.core.OfflineAccounts(activity);
+        String origin=com.huimeng.bookshop.BuildConfig.API_BASE_URL;
+        JSONObject saved=account.login(origin,username,"fixture-password","USER");
+        assertNotNull(saved);
+        String id=saved.getJSONObject("user").getString("id");
+        assertNotNull(account.pendingRegistration(origin,id));
+        assertEquals("",saved.getString("token"));
+        opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+        Instrumentation.ActivityMonitor main=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);
+        getInstrumentation().runOnMainSync(()->{
+            ((EditText)opened.findViewById(R.id.accountInput)).setText(username);
+            ((EditText)opened.findViewById(R.id.passwordInput)).setText("fixture-password");
+            opened.findViewById(R.id.loginButton).performClick();
+        });
+        opened=next(main);
+        assertEquals(id,new SessionStore(opened).accountId());
+        assertTrue(new SessionStore(opened).authenticated());
+    }
+    public void testPendingRegistrationSyncsIntoSameAccountSpace()throws Exception{
+        getInstrumentation().runOnMainSync(()->new SessionStore(activity).clear());
+        String username="reader-"+java.util.UUID.randomUUID().toString().substring(0,8);
+        String origin=com.huimeng.bookshop.BuildConfig.API_BASE_URL;
+        var accounts=new com.huimeng.bookshop.core.OfflineAccounts(activity);
+        JSONObject result=accounts.register(origin,new JSONObject().put("username",username)
+            .put("nickname","同步验收读者").put("password","fixture-password"));
+        String id=result.getJSONObject("user").getString("id");
+        var queue=((com.huimeng.bookshop.HuiMengApp)activity.getApplication()).requests();
+        java.lang.reflect.Field field=com.huimeng.bookshop.HuiMengApp.class.getDeclaredField("requestQueue");
+        field.setAccessible(true);
+        com.android.volley.RequestQueue live=com.android.volley.toolbox.Volley.newRequestQueue(activity.getApplicationContext());
+        field.set(activity.getApplication(),live);
+        try{
+            opened=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+            Instrumentation.ActivityMonitor main=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);
+            getInstrumentation().runOnMainSync(()->{
+                ((EditText)opened.findViewById(R.id.accountInput)).setText(username);
+                ((EditText)opened.findViewById(R.id.passwordInput)).setText("fixture-password");
+                opened.findViewById(R.id.loginButton).performClick();
+            });
+            opened=next(main);
+            SessionStore session=new SessionStore(opened);
+            String space=session.localSpaceId();
+            await(()->!session.token().isEmpty(),20000);
+            assertEquals(id,session.accountId());
+            assertEquals(space,session.localSpaceId());
+            assertNull(accounts.pendingRegistration(origin,id));
+        }finally{
+            getInstrumentation().runOnMainSync(()->com.huimeng.bookshop.core.sync.SyncCoordinator.get(activity).stop());
+            live.stop();field.set(activity.getApplication(),queue);
+        }
     }
     private EditText findInput(View view){if(view instanceof EditText)return (EditText)view;if(view instanceof ViewGroup group)for(int i=0;i<group.getChildCount();i++){EditText found=findInput(group.getChildAt(i));if(found!=null)return found;}return null;}
     private void screenshot(String name)throws Exception{android.graphics.Bitmap bitmap=getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(bitmap);try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getInstrumentation().getTargetContext().getExternalFilesDir(null),name+".png"))){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}finally{bitmap.recycle();}}

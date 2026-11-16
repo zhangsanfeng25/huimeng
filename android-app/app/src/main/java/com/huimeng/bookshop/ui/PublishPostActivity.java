@@ -53,7 +53,7 @@ public class PublishPostActivity extends AppCompatActivity{
     }
     private void nextCrop(){Uri next=waiting.poll();if(next!=null){Intent intent=new Intent(this,CropImageActivity.class);intent.setData(next);intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);cropper.launch(intent);}}
     private void renderImages(){binding.images.removeAllViews();float density=getResources().getDisplayMetrics().density;int size=(int)(density*108),buttonSize=(int)(density*48);
-        binding.emptyImages.setVisibility(cropped.isEmpty()?View.VISIBLE:View.GONE);
+        binding.imagePreview.setVisibility(cropped.isEmpty()?View.GONE:View.VISIBLE);
         int index=0;
         for(String path:new ArrayList<>(cropped)){
             FrameLayout cell=new FrameLayout(this);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(size,size);params.setMargins(0,0,(int)(density*10),0);binding.images.addView(cell,params);
@@ -62,7 +62,7 @@ public class PublishPostActivity extends AppCompatActivity{
             FrameLayout.LayoutParams overlay=new FrameLayout.LayoutParams(buttonSize,buttonSize,Gravity.END|Gravity.TOP);cell.addView(remove,overlay);
             remove.setOnClickListener(v->{if(publishing)return;cropped.remove(path);new File(path).delete();renderImages();});
         }
-        binding.imageHint.setText("已选 "+cropped.size()+"/9 张 · 逐张裁剪后上传");binding.addImages.setVisibility(cropped.size()>=9?View.GONE:View.VISIBLE);
+        binding.imageHint.setText("图片 "+cropped.size()+"/9");binding.addImages.setVisibility(cropped.size()>=9?View.GONE:View.VISIBLE);
     }
     private void publish(){if(publishing)return;String title=String.valueOf(binding.titleInput.getText()).trim(),content=String.valueOf(binding.contentInput.getText()).trim();
         if(title.isEmpty()||content.isEmpty()){toast("请填写标题和分享内容");return;}publishing=true;binding.publish.setEnabled(false);binding.publish.setText("正在上传图片…");
@@ -70,12 +70,12 @@ public class PublishPostActivity extends AppCompatActivity{
     }
     private void uploadNext(int index,JSONArray urls,String title,String content){
         if(index==cropped.size()){try{JSONObject body=new JSONObject().put("title",title).put("content",content).put("images",urls);
-            binding.publish.setText("正在发布…");new ApiClient(this).post("community/posts",body,result->{for(String path:cropped)new File(path).delete();toast(result.optBoolean("pending")?"帖子已保存在本地，待联网发布":"发布成功");finish();},this::fail);
+            binding.publish.setText("正在发布…");new ApiClient(this).post("community/posts",body,result->{for(String path:cropped)new File(path).delete();toast(result.optBoolean("pending")?"帖子已保存":"发布成功");finish();},this::fail);
         }catch(Exception error){fail("发布失败，请重试");}return;}
         try{byte[] bytes=Files.readAllBytes(new File(cropped.get(index)).toPath());if(bytes.length>3*1024*1024){fail("第 "+(index+1)+" 张图片超过 3 MB");return;}
             binding.publish.setText("正在上传 "+(index+1)+"/"+cropped.size());new ApiClient(this).uploadJpeg(bytes,result->{String url=result.optString("url");if(url.isEmpty()){fail("图片上传失败");return;}urls.put(url);uploadNext(index+1,urls,title,content);},this::fail);
         }catch(Exception error){fail("无法读取已裁剪的图片");}
     }
-    private void fail(String message){publishing=false;binding.publish.setEnabled(true);binding.publish.setText("立即发布");toast(message);}
+    private void fail(String message){publishing=false;binding.publish.setEnabled(true);binding.publish.setText("发布");toast(message);}
     private void toast(String message){Toast.makeText(this,message,Toast.LENGTH_SHORT).show();}
 }

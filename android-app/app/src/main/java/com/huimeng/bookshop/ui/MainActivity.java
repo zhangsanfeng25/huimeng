@@ -25,11 +25,14 @@ public class MainActivity extends AppCompatActivity {
         com.huimeng.bookshop.core.sync.SyncStatusStore.observe(this,status->refreshVisibleLocalData());
         buildNavigation(binding.bottomNav,session.role());
         binding.bottomNav.setBackgroundTintList(null);
-        binding.bottomNav.setItemActiveIndicatorColor(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(this,R.color.nav_indicator)));
+        binding.bottomNav.setItemActiveIndicatorEnabled(false);
+        binding.bottomNav.setItemBackgroundResource(R.drawable.bg_nav_item);
         int initial=state==null?(getIntent().getBooleanExtra("show_guest_profile",false)?4:1):state.getInt("selected_tab",1);
         binding.bottomNav.setSelectedItemId(tabId(initial));
         binding.bottomNav.setOnItemSelectedListener(item->{show(tabPosition(item.getItemId()));return true;});
-        binding.bottomNav.setOnItemReselectedListener(item->{});
+        binding.bottomNav.setOnItemReselectedListener(item->{
+            if(getSupportFragmentManager().getPrimaryNavigationFragment() instanceof HomeFragment home)home.scrollToTop();
+        });
         show(initial);
         if(session.authenticated())aiAssistant=new AiAssistant(this,binding.getRoot(),binding.content,session);
     }
@@ -74,6 +77,10 @@ public class MainActivity extends AppCompatActivity {
     public void showMerchantOrders(String filter){selectTab(3);Fragment page=getSupportFragmentManager().getPrimaryNavigationFragment();if(page instanceof MerchantOrdersFragment orders)orders.applyStatusFilter(filter);}
     public void setMerchantMessageUnread(int chats,int notices){if(chats>=0)merchantUnreadChats=chats;if(notices>=0)merchantUnreadNotices=notices;int count=merchantUnreadChats+merchantUnreadNotices;if(binding==null||session==null||!"MERCHANT".equals(session.role()))return;if(count<=0)binding.bottomNav.removeBadge(R.id.nav_fourth);else{var badge=binding.bottomNav.getOrCreateBadge(R.id.nav_fourth);badge.setNumber(count);badge.setVisible(true);}}
     @Override protected void onResume(){super.onResume();refreshVisibleLocalData();}
+    public void onAppForeground(){
+        if(binding!=null&&getSupportFragmentManager().getPrimaryNavigationFragment() instanceof HomeFragment home)
+            home.resetScrollOnOpen();
+    }
     private void refreshVisibleLocalData(){if(binding==null||session==null||!session.hasLocalSpace())return;Fragment fragment=getSupportFragmentManager().getPrimaryNavigationFragment();if(fragment instanceof LocalDataRefresh)((LocalDataRefresh)fragment).refreshLocalData();}
     private boolean loggingOut;
     @Override protected void onDestroy(){if(aiAssistant!=null)aiAssistant.destroy();super.onDestroy();}
@@ -81,10 +88,15 @@ public class MainActivity extends AppCompatActivity {
         if(loggingOut)return;
         loggingOut=true;
         var progress=new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setMessage("正在同步并退出，未同步的数据会保留在本机。").setCancelable(false).show();
+            .setMessage("正在退出…").setCancelable(false).show();
         var coordinator=com.huimeng.bookshop.core.sync.SyncCoordinator.get(this);
         coordinator.flushBeforeLogout(()->{
             coordinator.stop();
+            String accountId=session.accountId();
+            com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{
+                try{new com.huimeng.bookshop.core.OfflineAccounts(this).forgetNetworkSessions(com.huimeng.bookshop.BuildConfig.API_BASE_URL,accountId);}
+                catch(Exception error){android.util.Log.w("HuiMengLogin","Could not clear cached session",error);}
+            });
             if(!session.token().isEmpty())new ApiClient(this).post("auth/logout",new org.json.JSONObject(),result->{},error->{});
             session.clear();
             if(!isDestroyed())progress.dismiss();

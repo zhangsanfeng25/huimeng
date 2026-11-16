@@ -8,10 +8,16 @@ import com.google.android.material.button.MaterialButton;
 public final class ServiceEntries {
     private ServiceEntries(){}
     public static android.widget.TextView menuBefore(View anchor,String label,int icon,Runnable click){
+        return menuEntry(anchor,label,icon,click,0);
+    }
+    public static void menuAfter(View anchor,String label,int icon,Runnable click){
+        menuEntry(anchor,label,icon,click,1);
+    }
+    private static android.widget.TextView menuEntry(View anchor,String label,int icon,Runnable click,int offset){
         android.content.Context c=anchor.getContext();android.widget.TextView row=new android.widget.TextView(c,null,0,com.huimeng.bookshop.R.style.ProfileMenu);
         row.setText(label);row.setCompoundDrawablesWithIntrinsicBounds(icon,0,com.huimeng.bookshop.R.drawable.ic_chevron,0);row.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(c.getColor(com.huimeng.bookshop.R.color.cool_green_dark)));row.setCompoundDrawablePadding(Math.round(12*c.getResources().getDisplayMetrics().density));
         android.util.TypedValue value=new android.util.TypedValue();c.getTheme().resolveAttribute(android.R.attr.selectableItemBackground,value,true);row.setBackgroundResource(value.resourceId);row.setClickable(true);row.setFocusable(true);row.setOnClickListener(v->click.run());
-        ViewGroup parent=(ViewGroup)anchor.getParent();parent.addView(row,parent.indexOfChild(anchor),new LinearLayout.LayoutParams(-1,Math.round(58*c.getResources().getDisplayMetrics().density)));return row;
+        ViewGroup parent=(ViewGroup)anchor.getParent();parent.addView(row,parent.indexOfChild(anchor)+offset,new LinearLayout.LayoutParams(-1,Math.round(58*c.getResources().getDisplayMetrics().density)));return row;
     }
     public static MaterialButton compactBefore(View anchor,String label,Runnable click){MaterialButton b=before(anchor,label,click);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.gravity=android.view.Gravity.END;b.setLayoutParams(lp);b.setIconResource(com.huimeng.bookshop.R.drawable.ic_community);b.setIconSize(Math.round(18*anchor.getResources().getDisplayMetrics().density));return b;}
     public static MaterialButton messageTabs(View anchor,Runnable chat){

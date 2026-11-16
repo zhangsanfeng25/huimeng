@@ -21,7 +21,7 @@ public class MerchantApplicationActivity extends AppCompatActivity {
         if(data!=null&&!prefilled){binding.shopName.setText(data.optString("shopName"));binding.contactName.setText(data.optString("contactName"));binding.contactPhone.setText(data.optString("contactPhone"));binding.businessAddress.setText(data.optString("businessAddress"));binding.description.setText(data.optString("description"));binding.terms.setChecked(true);prefilled=true;}
         boolean editable="NONE".equals(status)||"LOCAL_DRAFT".equals(status)||"REJECTED".equals(status);for(View v:new View[]{binding.shopName,binding.contactName,binding.contactPhone,binding.businessAddress,binding.description,binding.terms})v.setEnabled(editable);
         binding.submit.setEnabled(editable);
-        if("LOCAL_DRAFT".equals(status)){binding.status.setText("申请已保存在本地 · 待联网提交");binding.statusNote.setText("资料可继续修改，关联网络账号后上传，由平台审核。");binding.submit.setText("保存本地修改");}
+        if("LOCAL_DRAFT".equals(status)){binding.status.setText("申请草稿");binding.statusNote.setText("");binding.submit.setText("保存本地修改");}
         else if("PENDING".equals(status)){binding.status.setText("申请已提交 · 待审核");binding.statusNote.setText("管理员正在审核资料。此页面会自动同步审核结果，通过后请退出登录，再选择商家身份登录。");binding.submit.setText("等待平台审核");}
         else if("APPROVED".equals(status)){boolean open="OPEN".equals(businessStatus);binding.status.setText(open?"审核通过 · 欢迎入驻":"申请已通过 · 店铺已停用");binding.statusNote.setText(open?"商家身份已开通。请退出登录，再在登录页选择商家身份。":"请联系平台管理员确认店铺经营状态。");binding.submit.setText(open?"已开通商家身份":"店铺暂不可用");}
         else if("REJECTED".equals(status)){binding.status.setText("申请未通过 · 可修改后重提");binding.statusNote.setText("驳回原因："+data.optString("rejectionReason","请完善申请资料"));binding.submit.setText("修改并重新提交");}

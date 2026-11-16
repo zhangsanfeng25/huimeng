@@ -7,13 +7,15 @@ import {noticeRead,noticeDelete} from '../services/notices.js';
 import {profileSave,profileAvatar} from '../services/profile.js';
 import {merchantApply} from '../services/merchant.js';
 import {productSave} from '../services/products.js';
+import {serviceAction} from '../services/customer-services.js';
+import {refundableItems} from '../services/after-sale-items.js';
 import {productSubmit,productOffline} from '../services/product-status.js';
 import {runBusiness,type BusinessHandler} from '../services/context.js';
 import {expirePendingCheckouts} from '../core/order-lifecycle.js';
 import {SyncError,type Actor,type SyncEnvelope,type SyncResult} from './types.js';
 
-const supportedActions=new Set(['address.save','address.delete','favorite.set','cart.set','cart.remove','profile.save','profile.avatar','post.create','comment.create','post.like','notice.read','notice.delete','merchant.apply','merchant.profile','product.save','product.submit','product.offline','checkout.create','checkout.pay','order.cancel','order.confirm','order.ship','order.advance','rating.create']);
-export function resourceForAction(action:string){if(!supportedActions.has(action))return undefined;return ({address:'addresses',favorite:'favorites',cart:'cart',profile:'profile',post:'posts',comment:'comments',notice:'notifications',merchant:'merchantApplication',product:'merchantProducts',checkout:'checkouts',order:'buyerOrders',rating:'ownRatings'} as Record<string,string>)[action.split('.')[0]];}
+const supportedActions=new Set(['address.save','address.delete','favorite.set','cart.set','cart.remove','profile.save','profile.avatar','post.create','comment.create','post.like','notice.read','notice.delete','merchant.apply','merchant.profile','product.save','product.submit','product.offline','checkout.create','checkout.pay','order.cancel','order.confirm','order.ship','order.advance','rating.create','feedback.create','feedback.reply','afterSale.create','afterSale.cancel','afterSale.return']);
+export function resourceForAction(action:string){if(!supportedActions.has(action))return undefined;return ({address:'addresses',favorite:'favorites',cart:'cart',profile:'profile',post:'posts',comment:'comments',notice:'notifications',merchant:'merchantApplication',product:'merchantProducts',checkout:'checkouts',order:'buyerOrders',rating:'ownRatings',feedback:'feedback',afterSale:'after-sales'} as Record<string,string>)[action.split('.')[0]];}
 export function remoteId(actor:Actor,resource:string,id:unknown):string{
  const key=String(id||'');const row=db.prepare('SELECT remote_id FROM sync_entity_map WHERE user_id=? AND resource=? AND local_id=?').get(actor.id,resource,key) as {remote_id:string}|undefined;
  return row?.remote_id||key;
@@ -37,7 +39,7 @@ export function applyOperation(actor:Actor,op:SyncEnvelope):{result:SyncResult;e
  const resource=authorizeOperation(actor,op);
  const p={...op.payload};const id=remoteId(actor,resource,op.entityId||p.id||'');
  for(const [key,type] of [['productId','merchantProducts'],['postId','posts'],['addressId','addresses'],['groupId','checkouts'],['orderId','buyerOrders']] as const)if(p[key])p[key]=remoteId(actor,type,p[key]);
- if(Array.isArray(p.items))p.items=p.items.map((item:any)=>({...item,productId:remoteId(actor,'merchantProducts',item.productId)}));
+ if(Array.isArray(p.items))p.items=p.items.map((item:any)=>({...item,...(item.productId ? {productId:remoteId(actor,'merchantProducts',item.productId)} : {})}));
  version(actor,op,id);
  const params:Record<string,string>={id,productId:String(p.productId||id),orderId:String(p.orderId||id),groupId:String(p.groupId||id)};
  let handler:BusinessHandler|undefined;
@@ -69,6 +71,23 @@ export function applyOperation(actor:Actor,op:SyncEnvelope):{result:SyncResult;e
   case 'checkout.pay':{expirePendingCheckouts();const group=db.prepare('SELECT total_cents FROM checkout_groups WHERE id=? AND user_id=?').get(params.groupId,actor.id) as {total_cents:number}|undefined;if(!group||group.total_cents!==p.expectedTotalCents)throw new SyncError(409,'PRICE_CHANGED','付款金额无法确认，请查看订单');handler=checkoutPay;break;}
   case 'order.cancel':handler=orderCancel;break;case 'order.confirm':handler=orderConfirm;break;case 'order.ship':handler=orderShip;break;case 'order.advance':handler=orderAdvance;break;
   case 'rating.create':handler=ratingCreate;break;
+  case 'feedback.create':case 'feedback.reply':
+  case 'afterSale.create':case 'afterSale.cancel':case 'afterSale.return':{
+   if(actor.activeRole!=='USER')throw new SyncError(403,'ROLE_REQUIRED','请使用买家账号操作');
+   const [service,action]=op.action.split('.');
+   params.kind=service==='feedback'?'feedback':'after-sales';
+   p.action=action;
+   if(op.action==='afterSale.create'&&Array.isArray(p.items)&&p.items.some(item=>String(item.orderItemId).startsWith('local-'))){
+    const available=refundableItems(String(p.orderId));
+    p.items=p.items.map(item=>{
+     if(!String(item.orderItemId).startsWith('local-'))return item;
+     const matches=available.filter(line=>line.product_id===item.productId);
+     if(matches.length!==1)throw new SyncError(409,'SERVICE_ITEM_CHANGED','订单商品无法匹配');
+     return {...item,orderItemId:matches[0].id};
+    });
+   }
+   handler=serviceAction;break;
+  }
  }
  if(!handler)throw new SyncError(400,'UNKNOWN_ACTION','不支持的同步操作');
  let output:ReturnType<typeof runBusiness>;try{output=runBusiness(handler,actor,p,params,{'idempotency-key':op.operationId});}catch(error){if(error instanceof z.ZodError)throw new SyncError(400,'INVALID_INPUT','同步信息格式不正确');throw error;}

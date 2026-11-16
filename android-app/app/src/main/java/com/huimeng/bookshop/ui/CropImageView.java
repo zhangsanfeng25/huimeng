@@ -11,9 +11,22 @@ import android.view.View;
 /** 4:3 touch crop: drag to reposition, pinch to zoom. */
 public final class CropImageView extends View{
     private Bitmap bitmap;
+    private final float aspectRatio;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private float scale,offsetX,offsetY,lastX,lastY,lastDistance;
-    public CropImageView(Context context){super(context);setBackgroundColor(Color.BLACK);}
+    public CropImageView(Context context,boolean square){
+        super(context);
+        aspectRatio=square?1f:4f/3f;
+        setBackgroundColor(Color.BLACK);
+    }
+    @Override protected void onMeasure(int widthSpec,int heightSpec){
+        int width=MeasureSpec.getSize(widthSpec);
+        int height=Math.round(width/aspectRatio);
+        if(MeasureSpec.getMode(heightSpec)!=MeasureSpec.UNSPECIFIED){
+            height=Math.min(height,MeasureSpec.getSize(heightSpec));
+        }
+        setMeasuredDimension(Math.round(height*aspectRatio),height);
+    }
     public void setBitmap(Bitmap value){bitmap=value;reset();invalidate();}
     private void reset(){if(bitmap==null||getWidth()==0||getHeight()==0)return;scale=Math.max((float)getWidth()/bitmap.getWidth(),(float)getHeight()/bitmap.getHeight());offsetX=(getWidth()-bitmap.getWidth()*scale)/2;offsetY=(getHeight()-bitmap.getHeight()*scale)/2;}
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);reset();}

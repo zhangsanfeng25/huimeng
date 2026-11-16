@@ -1,6 +1,6 @@
 import { SyncStatus } from './SyncStatus';
 import { lazy, ReactNode, Suspense, useEffect, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, BookOpen, Bot, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FolderTree, Gauge, LogOut, Menu, MessageSquare, PackageCheck, Settings, ShieldCheck, ShoppingBag, Star, Store, Users } from 'lucide-react';
 import { api, realtime, session } from '../api';
 import { applyAppearance, readAppearance } from '../theme';
@@ -44,9 +44,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   return <div className={`app ${collapsed ? 'is-collapsed' : ''}`}>
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark"><img src="/images/app_icon-c3.webp" alt="绘梦儿童管理网站图标" /></span><span className="brand-copy"><strong>绘梦儿童管理网站</strong><small>让好绘本，陪伴更多孩子</small></span></div>
-      <nav>
+    <a className="skip-link" href="#main-content">跳到主要内容</a>
+    <aside className="sidebar" id="admin-sidebar">
+      <div className="brand"><span className="brand-mark"><img src="/images/app_icon-c3.webp" alt="" width={40} height={40} /></span><span className="brand-copy"><strong>绘梦管理后台</strong></span></div>
+      <nav aria-label="后台导航">
         {navGroups.map((group,index) => {
           const expanded=!group.label||Boolean(expandedGroups[group.label]),GroupIcon=group.items[0].icon;
           const active=group.items.some(item=>item.to===location.pathname);
@@ -61,15 +62,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>;
         })}
       </nav>
-      <div className="sidebar-art"><img src="/images/app_icon-c3.webp" alt="绘梦软件图标" /><span>用绘本<br />点亮孩子更大的世界</span></div>
     </aside>
     {!collapsed?<button className="sidebar-backdrop" aria-label="关闭导航菜单" onClick={()=>setCollapsed(true)}/>:null}
     <header className="topbar">
-      <button className="icon-button" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? '展开侧栏' : '收起侧栏'}>{collapsed ? <ChevronRight /> : <Menu />}</button>
-      <div className="breadcrumb">工作台 <span>/</span> <strong>{current}</strong></div>
-      <div className="top-actions"><SyncStatus/><button className="notification" aria-label="通知中心" onClick={() => navigate('/notices')}><Bell size={20} /></button><button className="admin admin-button" onClick={() => navigate('/account')}><span><ShieldCheck size={18} /></span><strong>{adminName}</strong></button><button className="logout" onClick={logout}><LogOut size={18} />退出登录</button></div>
+      <button className="icon-button" onClick={() => setCollapsed(value => !value)} aria-controls="admin-sidebar" aria-expanded={!collapsed} aria-label={collapsed ? '展开侧栏' : '收起侧栏'}>{collapsed ? <ChevronRight /> : <Menu />}</button>
+      <div className="breadcrumb">{location.pathname !== '/' ? <><Link to="/">工作台</Link> <span>/</span> </> : null}<strong>{current}</strong></div>
+      <div className="top-actions"><SyncStatus/><Link className="notification" to="/notices" aria-label="通知中心"><Bell size={20} /></Link><Link className="admin admin-button" to="/account" aria-label={`账户安全，${adminName}`}><span><ShieldCheck size={18} /></span><strong>{adminName}</strong></Link><button className="logout" onClick={logout}><LogOut size={18} />退出登录</button></div>
     </header>
-    <main>{children}</main>
+    <main id="main-content" tabIndex={-1}>{children}</main>
     {isAdmin&&<Suspense fallback={null}><AdminAiAssistant/></Suspense>}
     <button className="collapse-fab" onClick={() => setCollapsed(value => !value)} aria-label="切换侧栏"><ChevronLeft size={17} /></button>
   </div>;

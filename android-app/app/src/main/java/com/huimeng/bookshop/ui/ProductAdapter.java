@@ -3,6 +3,7 @@ package com.huimeng.bookshop.ui;
 import android.view.View;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
+import android.content.res.Configuration;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
@@ -17,6 +18,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.Holder>{
+    static int columns(Configuration configuration){
+        if(configuration.screenWidthDp<360||configuration.fontScale>1.25f)return 1;
+        return configuration.screenWidthDp>=600?3:2;
+    }
     private final List<Product> items=new ArrayList<>();
     private final Consumer<Product> listener;
     private final Consumer<Product> add;

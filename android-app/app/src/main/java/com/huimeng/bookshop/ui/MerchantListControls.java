@@ -23,6 +23,7 @@ final class MerchantListControls {
     private JSONArray lastRows=new JSONArray();
     private String category="",selectedCategoryName="";
     private boolean updating;
+    private String loadError;
     MerchantListControls(FragmentMerchantListBinding binding,boolean products,Bundle saved,Runnable changed){
         this.binding=binding;this.changed=changed;values=products?MerchantWork.PRODUCT_FILTERS:MerchantWork.ORDER_FILTERS;
         binding.searchQuery.setHint(products?"搜索商品名称或编号":"搜索订单号、买家或商品");
@@ -40,6 +41,28 @@ final class MerchantListControls {
     String query(){return binding.searchQuery.getText().toString();}
     String status(){return values[Math.max(0,Math.min(values.length-1,binding.statusFilter.getSelectedItemPosition()))];}
     String category(){return category;}
+    void setLoadError(String message){loadError=message;}
+    void showResults(int visible,int total,String unit,String emptyMessage,String emptyAction,Runnable onEmpty,Runnable retry){
+        boolean hasEmptyState=visible==0&&binding.loading.getVisibility()!=View.VISIBLE;
+        binding.resultCount.setVisibility(hasEmptyState?View.GONE:View.VISIBLE);
+        binding.resultCount.setText("显示 "+visible+" / "+total+" "+unit);
+        binding.emptyState.setVisibility(hasEmptyState?View.VISIBLE:View.GONE);
+        if(!hasEmptyState)return;
+
+        String message=total==0?emptyMessage:"没有符合条件的记录";
+        String label=total==0?emptyAction:"清除筛选";
+        Runnable action=total==0?onEmpty:()->reset("");
+        if(loadError!=null){
+            message=loadError;
+            label="重试加载";
+            action=retry;
+        }
+        binding.empty.setText(message);
+        binding.emptyAction.setVisibility(action==null?View.GONE:View.VISIBLE);
+        binding.emptyAction.setText(label);
+        Runnable selectedAction=action;
+        binding.emptyAction.setOnClickListener(action==null?null:v->selectedAction.run());
+    }
     private int index(String value){int index=java.util.Arrays.asList(values).indexOf(value);return Math.max(0,index);}
     void reset(String status){category="";binding.searchQuery.setText("");binding.categoryFilter.setSelection(0);binding.statusFilter.setSelection(index(status));changed.run();}
     Bundle save(){Bundle saved=new Bundle();saved.putString("query",query());saved.putString("status",status());saved.putString("category",category);saved.putString("categoryName",selectedCategoryName);return saved;}

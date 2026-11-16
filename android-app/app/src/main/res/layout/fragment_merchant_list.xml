@@ -16,7 +16,10 @@
         </LinearLayout>
         <TextView android:id="@+id/resultCount" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="@color/muted" android:textSize="12sp" />
         <ProgressBar android:id="@+id/loading" android:layout_width="32dp" android:layout_height="32dp" android:layout_gravity="center_horizontal" android:layout_marginTop="16dp" android:indeterminateTint="@color/cool_green" />
-        <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="32dp" android:gravity="center" android:text="暂无数据" android:textColor="@color/muted" android:visibility="gone" />
+        <LinearLayout android:id="@+id/emptyState" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:background="@drawable/bg_book_card" android:orientation="vertical" android:gravity="center_horizontal" android:padding="16dp" android:visibility="gone">
+            <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textColor="@color/ink" android:textSize="15sp" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/emptyAction" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:layout_marginTop="6dp" />
+        </LinearLayout>
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="12dp" android:layout_weight="1" />
     </LinearLayout>
 </com.huimeng.bookshop.ui.PullRefreshLayout>

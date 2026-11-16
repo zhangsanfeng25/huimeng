@@ -32,6 +32,10 @@ public final class SessionStore {
     public String localSpaceId(){return preferences.getString("local_space","");}
     public void localSpace(String id){preferences.edit().putString("local_space",id).putBoolean("local_ready",true).apply();}
     public void clearNetworkSession(){temporaryToken="";preferences.edit().remove("token").apply();}
+    public void attachNetworkSession(String token){
+        temporaryToken=remembered()?"":token;
+        if(remembered())preferences.edit().putString("token",token).apply();
+    }
     public void invalidateNetworkCredentials(Context context){
         String id=accountId();clearNetworkSession();
         com.huimeng.bookshop.core.local.LocalRepository.IO.execute(()->{try{new OfflineAccounts(context).forgetAccount(com.huimeng.bookshop.BuildConfig.API_BASE_URL,id);}catch(Exception ignored){}});

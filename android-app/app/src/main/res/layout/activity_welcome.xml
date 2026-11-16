@@ -21,22 +21,9 @@
         android:paddingTop="76dp"
         android:paddingEnd="28dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:letterSpacing="0.06"
-            android:text="绘梦书城"
-            android:textColor="@color/welcome_ink"
-            android:textSize="36sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="让好故事，陪伴每一次成长"
-            android:textColor="@color/welcome_muted"
-            android:textSize="15sp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="绘梦书城" android:textColor="@color/welcome_ink"
+            android:textSize="36sp" android:textStyle="bold" />
     </LinearLayout>
 
     <TextView

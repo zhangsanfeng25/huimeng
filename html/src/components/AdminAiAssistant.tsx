@@ -1,15 +1,16 @@
 import {useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent} from 'react';
-import {Bot, LoaderCircle, Send, X} from 'lucide-react';
-import {Link} from 'react-router-dom';
+import {LoaderCircle, Send, X} from 'lucide-react';
 import {api} from '../api';
+import robotIcon from './ai-robot-button.png';
 import './admin-ai-assistant.css';
 
 type Product = {id:string; name:string; priceCents:number; coverUrl:string|null; reason:string};
 type Turn = {role:'user'|'assistant'; text:string; products?:Product[]; failed?:boolean};
-type Availability = {config:{enabled:boolean}; mode:'demo'|'live'|'unconnected'};
+type Availability = {config:{enabled:boolean;endpoint:string;model:string;keyConfigured:boolean}; mode:'demo'|'live'|'unconnected'};
 type Placement = {edge:'left'|'right'; height:number};
 const placementKey='huimeng:admin-ai-position';
 const margin=12, buttonSize=52;
+const unavailable='AI 助手暂不可用，请联系管理员';
 const clamp=(value:number,min:number,max:number)=>Math.min(Math.max(value,min),max);
 
 function readPlacement():Placement {
@@ -39,15 +40,15 @@ export function AdminAiAssistant() {
 
   const trigger=useRef<HTMLButtonElement>(null);
   const closeButton=useRef<HTMLButtonElement>(null);
-  const available=Boolean(availability?.config.enabled&&availability.mode!=='unconnected');
+  const available=Boolean(availability?.config.enabled&&(availability.mode==='demo'||(availability.mode==='live'&&availability.config.endpoint&&availability.config.model&&availability.config.keyConfigured)));
 
   useEffect(()=>{
     if(!open)return;
     const controller=new AbortController();
     const refresh=()=>{
       setConfigError('');
-      api<Availability>('/admin/ai/config',{signal:controller.signal}).then(setAvailability).catch(error=>{
-        if(!controller.signal.aborted){setAvailability(undefined);setConfigError(error.message);}
+      api<Availability>('/admin/ai/config',{signal:controller.signal}).then(setAvailability).catch(()=>{
+        if(!controller.signal.aborted){setAvailability(undefined);setConfigError(unavailable);}
       });
     };
     refresh();
@@ -125,10 +126,10 @@ export function AdminAiAssistant() {
           .map(({role,text})=>({role,text:text.slice(0,2000)}))}),
       });
       setMessages(previous=>[...previous,{role:'assistant',text:result.text,products:result.products}]);
-    } catch(error) {
+    } catch {
       setMessages(previous=>previous.map((turn,index)=>index===previous.length-1?{...turn,failed:true}:turn));
       setInput(text);
-      setChatError((error as Error).message);
+      setChatError(unavailable);
     } finally {
       setWaiting(false);
     }
@@ -141,21 +142,21 @@ export function AdminAiAssistant() {
   } as CSSProperties;
   const lastUser=messages.length-(messages.at(-1)?.role==='user'?1:2);
   return <div className={`admin-ai admin-ai-${placement.edge} ${placement.height>=.5?'admin-ai-above':'admin-ai-below'}${dragPosition?' is-dragging':''}`} style={positionStyle}>
-    <button ref={trigger} type="button" className="primary admin-ai-trigger" aria-label={open?'收起 AI 助手':'打开 AI 助手'}
+    <button ref={trigger} type="button" className="admin-ai-trigger" aria-label={open?'收起 AI 助手':'打开 AI 助手'}
       aria-expanded={open} aria-controls={open?'admin-ai-dialog':undefined}
       onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={event=>endDrag(event)}
       onPointerCancel={event=>endDrag(event,true)} onLostPointerCapture={event=>endDrag(event,true)}
       onClick={event=>{if(event.detail&&suppressClick.current)return;open?close():setOpen(true);}}>
-      <Bot size={24} aria-hidden="true"/>
+      <img src={robotIcon} alt="" width="52" height="52" draggable={false}/>
     </button>
     {open&&<section id="admin-ai-dialog" className="panel admin-ai-dialog" role="dialog" aria-labelledby="admin-ai-title"
       onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();close();}}}>
       <header className="admin-ai-header">
-        <div><h2 id="admin-ai-title">AI 运营助手</h2>{availability?.mode==='demo'&&<p>模拟联调</p>}</div>
+        <div><h2 id="admin-ai-title">AI 运营助手</h2></div>
         <button ref={closeButton} type="button" className="icon-button" aria-label="关闭对话" onClick={close}><X size={19}/></button>
       </header>
       {configError?<p className="page-error" role="alert">{configError}</p>:availability&&!available&&
-        <p className="data-note">AI 助手当前不可用，请检查<Link to="/ai" onClick={close}>AI 配置</Link>。</p>}
+        <p className="data-note" role="status">{unavailable}</p>}
         <div className="ai-conversation" ref={conversation} role="log" aria-label="AI 对话">
           {!messages.length&&<p className="data-note">直接提问，例如「最近 30 天订单有什么变化？」</p>}
           {messages.map((message,index)=><div className={`ai-message ${message.role}`} key={index} ref={index===lastUser?lastUserMessage:undefined}>
@@ -166,12 +167,11 @@ export function AdminAiAssistant() {
               <div><strong>{product.name} · ¥{(product.priceCents/100).toFixed(2)}</strong><p>{product.reason}</p></div>
             </div>)}
           </div>)}
-          {waiting&&<p className="ai-waiting" role="status"><LoaderCircle className="ai-spin" size={16}/>正在生成答复…</p>}
         </div>
         {chatError&&<p className="page-error" role="alert">{chatError}</p>}
         <form className="ai-compose form-grid" onSubmit={send}>
           <input aria-label="输入消息" maxLength={2000} value={input} readOnly={waiting} onChange={event=>setInput(event.target.value)} placeholder="输入消息"/>
-          <button className="primary" disabled={!input.trim()||waiting||!available}><Send size={16}/>发送</button>
+          <button className="primary" disabled={!input.trim()||waiting||!available}>{waiting?<LoaderCircle className="ai-spin" size={16}/>:<Send size={16}/>}{waiting?'正在生成答复…':'发送'}</button>
         </form>
     </section>}
   </div>;

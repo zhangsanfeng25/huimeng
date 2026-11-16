@@ -25,6 +25,7 @@ app.use(aiRouter);
 const providerInputs:AiContext[]=[];
 const replyModels:string[]=[];
 const testedModels:string[]=[];
+let providerUnavailable=false;
 process.env.HUIMENG_AI_DEMO = '0';
 app.use('/live',createAiRouter({
   async test(credentials,signal){
@@ -34,6 +35,7 @@ app.use('/live',createAiRouter({
     assert.equal(signal.aborted,false);
   },
   async reply(credentials,context){
+    if(providerUnavailable||context.message==='触发服务商故障')throw new Error('fixture provider failure');
     replyModels.push(credentials.model);
     providerInputs.push(context);
     return `已处理 ${context.feature}`;
@@ -50,10 +52,15 @@ function call(path: string, token = '', method = 'GET', body?: object) {
     body: body && JSON.stringify(body)});
 }
 
+const tokens=new Map<string,string>();
 async function login(username: string, role: string) {
+  const cached=tokens.get(username);
+  if(cached)return cached;
   const result = await call('/auth/login', '', 'POST', {username, role, password: role === 'ADMIN' ? 'huimeng123' : 'demo12345'});
   assert.equal(result.status, 200);
-  return (await result.json()).token as string;
+  const token=(await result.json()).token as string;
+  tokens.set(username,token);
+  return token;
 }
 
 test('administrator config is encrypted, redacted and preserved on blank update', async () => {
@@ -61,6 +68,7 @@ test('administrator config is encrypted, redacted and preserved on blank update'
   const buyer = await login('xingxing', 'USER');
   const path = '/admin/ai/config';
   assert.equal((await call(path, buyer)).status, 403);
+  assert.equal((await (await call(path,admin)).json()).config.enabled,true);
   assert.equal((await call('/admin/ai/connection-test', admin, 'POST', {})).status, 400);
   const fields = {endpoint: 'https://example.invalid/v1', model: 'fixture', enabled: true};
   const key = 'fixture-key-for-tests';
@@ -83,7 +91,7 @@ test('chat honors session role, uses real products, and reports calls without tr
   const path = '/ai/chat';
   assert.equal((await call(path, '', 'POST', {feature:'reading', message:'阅读建议'})).status, 401);
   assert.equal((await call(path, buyer, 'POST', {feature:'operations', message:'运营建议'})).status, 403);
-  const ask = await call(path, buyer, 'POST', {feature:'recommend', message:'帮我推荐绘本'});
+  const ask = await call(path, buyer, 'POST', {feature:'recommend', message:'能推荐一本绘本给我的孩子吗？'});
   assert.equal(ask.status, 200);
   assert.equal((await ask.json()).products.length, 0);
   const result = await call(path, buyer, 'POST', {feature:'popular', message:'有哪些热门绘本'});
@@ -123,6 +131,19 @@ test('age ranges and new preferences override previous conversation turns', () =
   assert.deepEqual(preferences.age,[5,5]);
   assert.equal(preferences.budget,3000);
   assert.deepEqual(preferences.wanted,[]);
+});
+
+test('connection test uses unsaved fields without overwriting the stored configuration', async () => {
+  const admin=await login('admin','ADMIN');
+  const path='/live/admin/ai/config';
+  const before=(await (await call(path,admin)).json()).config;
+  const result=await call('/live/admin/ai/connection-test',admin,'POST',{
+    endpoint:'https://second.invalid/v1',model:'fixture-second',apiKey:'fixture-second-key',
+  });
+  assert.equal(result.status,200);
+  assert.equal((await result.text()).includes('fixture-second-key'),false);
+  assert.deepEqual((await (await call(path,admin)).json()).config,before);
+  assert.equal(testedModels.pop(),'fixture-second');
 });
 
 test('all twelve feature entries reach the provider with scoped data', async () => {
@@ -199,4 +220,83 @@ test('all twelve feature entries reach the provider with scoped data', async () 
   ]});
   assert.equal(followUp.status,200);
   assert.equal((await followUp.json()).text,'已处理 recommend');
+  const failed=await call('/live/ai/chat',buyer,'POST',{message:'触发服务商故障'});
+  assert.equal(failed.status,502);
+  assert.equal((await failed.json()).message,'AI 助手暂不可用，请联系管理员');
+});
+
+test('natural product requests and mixed admin questions use current role-scoped records', async () => {
+  const buyer=await login('xingxing','USER');
+  const merchant=await login('merchant_a','MERCHANT');
+  const admin=await login('admin','ADMIN');
+  const chat=async(token:string,message:string)=>{
+    const response=await call('/live/ai/chat',token,'POST',{message});
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  for(const message of ['Gei wo tui jian','给我推荐商品','推荐几本']){
+    const result=await chat(buyer,message);
+    assert.ok(result.products.length>0,message);
+    assert.match(result.text,/年龄/);
+  }
+  const bare=await chat(buyer,'推荐');
+  assert.ok(bare.products.length>0);
+  assert.match(bare.text,/在售/);
+  assert.deepEqual(bare.suggestions,['0–3岁','3–6岁','6–9岁','9岁以上']);
+  const refined=await call('/live/ai/chat',buyer,'POST',{message:'6–9岁',history:[
+    {role:'user',text:'推荐'},{role:'assistant',text:bare.text},
+  ]});
+  assert.equal(refined.status,200);
+  const recommendation=await refined.json();
+  assert.ok(recommendation.products.length>0);
+  assert.deepEqual(recommendation.products.map((product:{id:string})=>product.id),
+    (await chat(buyer,'推荐几本适合 6–9 岁的绘本')).products.map((product:{id:string})=>product.id));
+  const theme=await call('/live/ai/chat',buyer,'POST',{message:'睡前',history:[
+    {role:'user',text:'推荐'},{role:'assistant',text:bare.text},
+  ]});
+  assert.equal(theme.status,200);
+  assert.equal((await theme.json()).text,'已处理 recommend');
+  for (const message of ['Gei wo tui jian ji Ben 8 sui de shu.','gěi wǒ tuījiàn jǐ běn 8 suì de shū','推荐几本 8 sui 的书']) {
+    const result=await chat(buyer,message);
+    assert.ok(result.products.length,message);
+    assert.deepEqual(result.products.map((product:{id:string})=>product.id),
+      (await chat(buyer,'推荐几本适合 8 岁的书')).products.map((product:{id:string})=>product.id));
+  }
+  const book=(db.prepare("SELECT r.name FROM products p JOIN product_revisions r ON r.id=p.published_revision_id WHERE p.status='ONLINE' AND p.stock_available>0 LIMIT 1").get() as {name:string}).name;
+  const lookup=await chat(buyer,`查一下《${book}》多少钱`);
+  assert.equal(lookup.products[0]?.name,book);
+  assert.equal((await chat(buyer,'查看《没有这本绘本的测试书名》')).products.length,0);
+  const merchantReply=await chat(merchant,'看看我店里的商品和库存');
+  assert.ok(merchantReply.text);
+  const merchantContext=providerInputs.at(-1)!;
+  assert.ok(merchantContext.shopProducts?.length);
+  assert.equal(merchantContext.metrics?.totalProducts,(db.prepare("SELECT COUNT(*) n FROM products WHERE merchant_id='M20001'").get() as {n:number}).n);
+  for(const product of merchantContext.shopProducts!){
+    assert.ok(db.prepare("SELECT 1 FROM products WHERE id=? AND merchant_id='M20001'").get(product.id));
+  }
+  assert.equal(merchantContext.adminOverview,undefined);
+
+  db.prepare(`INSERT INTO feedbacks(id,user_id,submitter_role,title,type,content,status,client_id,created_at,updated_at)
+    VALUES('AI_FEEDBACK','U10001','USER','测试','功能问题','仅供内部核对','OPEN','test-ai-feedback',?,?)`)
+    .run(new Date().toISOString(),new Date().toISOString());
+  const counts=await chat(admin,'目前一共有多少的商品，还有多少审核信息，还有多少反馈bug的信息');
+  const productCount=(db.prepare('SELECT COUNT(*) n FROM products').get() as {n:number}).n;
+  const pending=(db.prepare("SELECT COUNT(*) n FROM product_revisions WHERE review_status='PENDING'").get() as {n:number}).n;
+  assert.match(counts.text,new RegExp(`商品共 ${productCount} 件`));
+  assert.match(counts.text,new RegExp(`商品待审核 ${pending} 条`));
+  assert.match(counts.text,/功能问题反馈共 1 条/);
+  await chat(admin,'整理待审核商品和功能反馈，给出处理建议');
+  const summary=providerInputs.at(-1)!;
+  assert.equal(summary.adminOverview?.productReviews.pending,pending);
+  assert.equal(summary.adminOverview?.feedback.functionalTotal,1);
+  assert.doesNotMatch(JSON.stringify(summary.adminOverview),/仅供内部核对|U10001/);
+  providerUnavailable=true;
+  try {
+    const recommendation=await chat(buyer,'给我推荐商品');
+    assert.ok(recommendation.products.length);
+    assert.match(recommendation.text,/当前在售/);
+    const inventory=await chat(merchant,'列出本店商品和库存');
+    assert.match(inventory.text,new RegExp(`共 ${merchantContext.metrics!.totalProducts} 件商品`));
+    assert.match(inventory.text,/库存/);
+  } finally {providerUnavailable=false;}
 });

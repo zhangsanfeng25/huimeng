@@ -45,17 +45,19 @@ public final class WallpaperStore{
             activity.getWindow().setBackgroundDrawable(new ColorDrawable(ContextCompat.getColor(activity,R.color.page_background)));
         }
         View content=activity.findViewById(android.R.id.content);
-        if(content!=null)updatePageSurfaces(content,ContextCompat.getColor(activity,R.color.page_background),selected);
+        if(content!=null)updatePageSurfaces(content,ContextCompat.getColor(activity,R.color.page_background),ContextCompat.getColor(activity,R.color.auth_cream),selected);
     }
-    private void updatePageSurfaces(View view,int pageColor,boolean selected){
+    private void updatePageSurfaces(View view,int pageColor,int warmPageColor,boolean selected){
         Drawable background=view.getBackground();
-        boolean marked=Boolean.TRUE.equals(view.getTag(R.id.wallpaper_surface_tag));
-        if(marked || (background instanceof ColorDrawable && ((ColorDrawable)background).getColor()==pageColor)){
-            view.setTag(R.id.wallpaper_surface_tag,Boolean.TRUE);
-            view.setBackgroundColor(selected?Color.TRANSPARENT:pageColor);
+        Object surface=view.getTag(R.id.wallpaper_surface_tag);
+        if(surface instanceof Integer color){
+            view.setBackgroundColor(selected?Color.TRANSPARENT:color);
+        }else if(background instanceof ColorDrawable color && (color.getColor()==pageColor || color.getColor()==warmPageColor)){
+            view.setTag(R.id.wallpaper_surface_tag,color.getColor());
+            view.setBackgroundColor(selected?Color.TRANSPARENT:color.getColor());
         }
         if(view instanceof ViewGroup group){
-            for(int i=0;i<group.getChildCount();i++)updatePageSurfaces(group.getChildAt(i),pageColor,selected);
+            for(int i=0;i<group.getChildCount();i++)updatePageSurfaces(group.getChildAt(i),pageColor,warmPageColor,selected);
         }
     }
 }

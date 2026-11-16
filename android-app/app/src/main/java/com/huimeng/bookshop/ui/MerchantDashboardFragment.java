@@ -17,7 +17,7 @@ public class MerchantDashboardFragment extends Fragment implements LocalDataRefr
     private int pending,generation,productsTotal=-1,ordersTotal=-1,reviewTotal=-1,chats=-1,notices=-1;
     private boolean failed,cached;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,@Nullable ViewGroup container,@Nullable Bundle state){
-        binding=FragmentMerchantDashboardBinding.inflate(inflater,container,false);binding.name.setText("你好，"+new SessionStore(requireContext()).name()+" · 先处理今天的待办");
+        binding=FragmentMerchantDashboardBinding.inflate(inflater,container,false);binding.name.setText("你好，"+new SessionStore(requireContext()).name());
         binding.newProduct.setOnClickListener(v->startActivity(new Intent(requireContext(),AddProductActivity.class)));
         binding.todoShip.setOnClickListener(v->((MainActivity)requireActivity()).showMerchantOrders("TO_SHIP"));
         binding.todoProducts.setOnClickListener(v->((MainActivity)requireActivity()).showMerchantProducts("ACTION"));
@@ -52,7 +52,7 @@ public class MerchantDashboardFragment extends Fragment implements LocalDataRefr
     private void messages(){if(chats>=0&&notices>=0){int count=chats+notices;binding.todoMessages.setText(count+"\n未读消息");if(getActivity() instanceof MainActivity main)main.setMerchantMessageUnread(chats,notices);}}
     private void complete(){
         binding.summary.setText("商品 "+number(productsTotal)+" 件    ·    订单 "+number(ordersTotal)+" 笔\n审核中 / 待同步 "+number(reviewTotal)+" 件");
-        if(--pending<=0){binding.getRoot().setRefreshing(false);binding.dataHint.setText(failed?"部分数据未更新，下拉重试":cached?"部分待办显示已保存记录，联网后更新":"待办已更新 · 点击数字直达对应记录");}
+        if(--pending<=0){binding.getRoot().setRefreshing(false);binding.dataHint.setVisibility(android.view.View.GONE);}
     }
     private String number(int count){return count<0?"—":String.valueOf(count);}
     @Override public void onDestroyView(){generation++;pending=0;binding=null;super.onDestroyView();}

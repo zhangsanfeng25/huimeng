@@ -38,7 +38,7 @@ public class LocalFirstFlowTest extends InstrumentationTestCase {
  }
  public void testWelcomeEntersWithoutNetworkLogin()throws Exception{
   android.app.Instrumentation.ActivityMonitor monitor=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);
-  Activity welcome=getInstrumentation().startActivitySync(new Intent(context,WelcomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+  Activity welcome=getInstrumentation().startActivitySync(new Intent(context,WelcomeActivity.class).putExtra("show_guest_profile",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
   try{activity=getInstrumentation().waitForMonitorWithTimeout(monitor,8000);assertNotNull("Welcome must prepare SQLite and enter without a network token",activity);assertTrue(new SessionStore(context).hasLocalSpace());assertTrue(new SessionStore(context).token().isEmpty());screenshot("welcome-local-home.png");}finally{getInstrumentation().removeMonitor(monitor);getInstrumentation().runOnMainSync(()->welcome.finish());}
  }
  public void testPendingOrderAndSyncScreens()throws Exception{
@@ -54,6 +54,6 @@ public class LocalFirstFlowTest extends InstrumentationTestCase {
   assertTrue("Original products must replace the one-book sample",db.list(space,"products").length()>1);assertTrue(db.list(space,"posts").length()>0);assertTrue(db.list(space,"notifications").length()>0);assertNull(db.entity(space,"products","sample-book"));assertTrue(new SessionStore(context).token().isEmpty());
   int oldBanner=context.getResources().getIdentifier("syncStatus","id",context.getPackageName());assertTrue(oldBanner==0||activity.findViewById(oldBanner)==null);
   long until=System.currentTimeMillis()+10000;while(!db.metadata("service-connected:"+space).equals("1")&&System.currentTimeMillis()<until)Thread.sleep(100);assertEquals("Service health must be detected without login","1",db.metadata("service-connected:"+space));screenshot("recovery-home.png");
-  getInstrumentation().runOnMainSync(()->activity.finish());activity=getInstrumentation().startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));assertNotNull(activity.findViewById(com.huimeng.bookshop.R.id.localSync));screenshot("recovery-settings.png");
+  getInstrumentation().runOnMainSync(()->activity.finish());activity=getInstrumentation().startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));assertEquals(0,context.getResources().getIdentifier("localSync","id",context.getPackageName()));screenshot("recovery-settings.png");
  }
 }

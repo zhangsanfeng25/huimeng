@@ -12,9 +12,10 @@ import android.graphics.drawable.Drawable;
 
 /** A readable local cover for demo products whose uploaded cover is unavailable. */
 public final class BookCoverDrawable extends Drawable {
+    private static final int WIDTH=200, HEIGHT=260;
     private static final int[] COLORS={0xFF6C65A9,0xFF4E8D9A,0xFFAB765A,0xFF708B62,0xFF9A6A92};
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF coverBounds=new RectF(0,0,200,260),frameBounds=new RectF(24,24,176,236);
+    private final RectF coverBounds=new RectF(0,0,WIDTH,HEIGHT),frameBounds=new RectF(24,24,176,236);
     private final Typeface titleTypeface=Typeface.create("sans-serif-medium",Typeface.BOLD);
     private final int mainColor;
     private final String firstLine,secondLine;
@@ -28,7 +29,10 @@ public final class BookCoverDrawable extends Drawable {
     }
     @Override public void draw(Canvas canvas){
         Rect r=getBounds();if(r.isEmpty())return;
-        canvas.save();canvas.translate(r.left,r.top);canvas.scale(r.width()/200f,r.height()/260f);
+        float scale=Math.min(r.width()/(float)WIDTH,r.height()/(float)HEIGHT);
+        canvas.save();
+        canvas.translate(r.exactCenterX()-WIDTH*scale/2,r.exactCenterY()-HEIGHT*scale/2);
+        canvas.scale(scale,scale);
         paint.setColor(mainColor);paint.setAlpha(alpha);canvas.drawRoundRect(coverBounds,12,12,paint);
         paint.setColor(0x44FFFFFF);canvas.drawCircle(160,47,59,paint);canvas.drawCircle(27,230,63,paint);
         paint.setColor(0xFFFFF7DF);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(3);
@@ -46,6 +50,8 @@ public final class BookCoverDrawable extends Drawable {
         else canvas.drawText(firstLine,100,153,paint);
         canvas.restore();
     }
+    @Override public int getIntrinsicWidth(){return WIDTH;}
+    @Override public int getIntrinsicHeight(){return HEIGHT;}
     @Override public void setAlpha(int value){alpha=value;invalidateSelf();}
     @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);invalidateSelf();}
     @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}

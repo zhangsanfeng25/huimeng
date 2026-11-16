@@ -24,7 +24,9 @@ public final class UserProfileActivity extends AppCompatActivity {
         userId=getIntent().getStringExtra("user_id");if(userId==null||userId.isEmpty()){finish();return;}
         binding.back.setOnClickListener(v->finish());
         adapter=new AuthorPostsAdapter(post->startActivity(new Intent(this,CommunityDetailActivity.class).putExtra("post_id",post.id())));
-        binding.posts.setLayoutManager(new GridLayoutManager(this,2));binding.posts.setAdapter(adapter);
+        var configuration=getResources().getConfiguration();
+        int columns=configuration.screenWidthDp<360||configuration.fontScale>1.25f?1:2;
+        binding.posts.setLayoutManager(new GridLayoutManager(this,columns));binding.posts.setAdapter(adapter);
         binding.getRoot().setOnRefreshListener(this::load);
     }
     @Override protected void onResume(){super.onResume();load();}

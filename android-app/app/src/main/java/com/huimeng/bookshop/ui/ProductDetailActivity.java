@@ -9,7 +9,6 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
 import com.huimeng.bookshop.R;
 import com.huimeng.bookshop.core.ApiClient;
@@ -70,10 +69,8 @@ public class ProductDetailActivity extends AppCompatActivity{
     private void loadFavorite(){new ApiClient(this).get("me/favorites",result->{JSONArray rows=result.optJSONArray("data");
         boolean found=false;if(rows!=null)for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&productId.equals(row.optString("id"))){found=true;break;}}
         favorite=found;renderFavorite();},error->{});}
-    private void renderFavorite(){binding.favorite.setText(favorite?"已收藏":"收藏");
-        binding.favorite.setContentDescription(favorite?"取消收藏":"收藏绘本");
-        binding.favorite.setCompoundDrawablesWithIntrinsicBounds(favorite?R.drawable.ic_heart_filled:R.drawable.ic_heart,0,0,0);
-        binding.favorite.setTextColor(ContextCompat.getColor(this,favorite?R.color.price_red:R.color.cool_green_dark));}
+    private void renderFavorite(){binding.favorite.setContentDescription(favorite?"取消收藏":"收藏绘本");
+        binding.favorite.setImageResource(favorite?R.drawable.ic_heart_filled:R.drawable.ic_heart);}
     private void toggleFavorite(){if(busy)return;busy=true;
         if(favorite)new ApiClient(this).delete("me/favorites/"+productId,result->changeFavorite(false),this::favoriteError);
         else new ApiClient(this).post("me/favorites/"+productId,new JSONObject(),result->changeFavorite(true),this::favoriteError);

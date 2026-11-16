@@ -485,3 +485,11 @@ CREATE TRIGGER merchants_sync_version AFTER UPDATE ON merchants WHEN NEW.version
 CREATE TRIGGER products_sync_version AFTER UPDATE ON products WHEN NEW.version=OLD.version BEGIN UPDATE products SET version=OLD.version+1 WHERE id=NEW.id; END;
 
 CREATE TRIGGER users_sync_version AFTER UPDATE ON users WHEN NEW.version=OLD.version BEGIN UPDATE users SET version=OLD.version+1 WHERE id=NEW.id; END;
+CREATE TABLE IF NOT EXISTS ai_config (
+  id INTEGER PRIMARY KEY CHECK(id=1), endpoint TEXT NOT NULL, model TEXT NOT NULL,
+  enabled INTEGER NOT NULL CHECK(enabled IN (0,1)), encrypted_key TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_usage (
+  role TEXT PRIMARY KEY, succeeded INTEGER NOT NULL, failed INTEGER NOT NULL, duration_ms INTEGER NOT NULL
+);

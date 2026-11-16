@@ -1,4 +1,6 @@
 import {createCipheriv, createDecipheriv, randomBytes} from 'node:crypto';
+import {readFileSync, writeFileSync} from 'node:fs';
+import {config} from '../config.js';
 import {db} from '../core/db.js';
 import {sameAiEndpoint} from './ai-endpoint.js';
 
@@ -22,15 +24,27 @@ function readConfig() {
   return db.prepare('SELECT endpoint,model,enabled,encrypted_key FROM ai_config WHERE id=1').get() as ConfigRow | undefined;
 }
 
-function masterKey() {
-  const key = Buffer.from(process.env.HUIMENG_AI_MASTER_KEY ?? '', 'base64');
+function masterKey(create = false) {
+  let encoded=process.env.HUIMENG_AI_MASTER_KEY?.trim();
+  if(!encoded){
+    const path=config.databasePath+'.ai.key';
+    try { encoded=readFileSync(path,'utf8'); }
+    catch(error){
+      if(!create||(error as NodeJS.ErrnoException).code!=='ENOENT')throw error;
+      const generated=randomBytes(32).toString('base64');
+      try { writeFileSync(path,generated,{flag:'wx',mode:0o600}); }
+      catch(writeError){ if((writeError as NodeJS.ErrnoException).code!=='EEXIST')throw writeError; }
+      encoded=readFileSync(path,'utf8');
+    }
+  }
+  const key = Buffer.from(encoded, 'base64');
   if (key.length !== 32) throw new Error('请在服务端设置 32 字节的 AI 加密主密钥');
   return key;
 }
 
 function encrypt(value: string) {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', masterKey(), iv);
+  const cipher = createCipheriv('aes-256-gcm', masterKey(true), iv);
   const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
   return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString('base64')).join('.');
 }
@@ -47,7 +61,7 @@ export function readAiCredentials() {
 
 export function publicAiConfig() {
   const row = readConfig();
-  return {endpoint: row?.endpoint ?? '', model: row?.model ?? '', enabled: row?.enabled === 1, keyConfigured: Boolean(row?.encrypted_key)};
+  return {endpoint: row?.endpoint ?? '', model: row?.model ?? '', enabled: row ? row.enabled === 1 : true, keyConfigured: Boolean(row?.encrypted_key)};
 }
 
 export function saveAiConfig(settings: Settings, key: string) {

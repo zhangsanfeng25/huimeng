@@ -32,10 +32,22 @@ authRouter.post('/login',loginLimit,asyncRoute(async(req,res)=>{
   return res.json({token,expiresAt,user:{id:user.id,username:user.username,name:user.nickname,avatarUrl:user.avatar_url||'',roles,activeRole,version:user.version}});
 }));
 
-authRouter.post('/register',loginLimit,asyncRoute(async(req,res)=>{
-  const parsed=z.object({username:z.string().min(3).max(32),password:z.string().min(8).max(64),nickname:z.string().min(1).max(30),email:z.string().email().optional(),phone:z.string().min(6).max(20).optional()}).safeParse(req.body);
+authRouter.post(['/register','/register-local'],loginLimit,asyncRoute(async(req,res)=>{
+  const parsed=z.object({username:z.string().min(3).max(32),password:z.string().min(8).max(64),nickname:z.string().min(1).max(30),email:z.string().email().optional(),phone:z.string().min(6).max(20).optional(),localId:z.string().regex(/^L[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/).optional()}).safeParse(req.body);
   if(!parsed.success) return res.status(400).json({message:'注册信息格式不正确'});
-  const value=parsed.data,id=`U${Date.now().toString().slice(-10)}`,stamp=now();
+  if(req.path==='/register-local'&&!parsed.data.localId)return res.status(400).json({message:'缺少本机账号标识'});
+  const value=parsed.data,id=value.localId??`U${Date.now().toString().slice(-10)}`,stamp=now();
+  if(value.localId){
+    const existing=db.prepare('SELECT username,password_hash,status FROM users WHERE id=?').get(id) as {username:string;password_hash:string;status:string}|undefined;
+    if(existing?.status==='ACTIVE'&&existing.username===value.username&&verifyPassword(value.password,existing.password_hash)){
+      return res.json({id,message:'注册成功'});
+    }
+    const aliases=[value.username,value.email,value.phone].filter((alias):alias is string=>Boolean(alias));
+    const slots=aliases.map(()=>'?').join(',');
+    if(existing||db.prepare(`SELECT 1 FROM users WHERE username IN (${slots}) OR email IN (${slots}) OR phone IN (${slots})`).get(...aliases,...aliases,...aliases)){
+      return res.status(409).json({message:'账号、邮箱或手机号已被使用'});
+    }
+  }
   try{
     db.transaction(()=>{
       db.prepare(`INSERT INTO users(id,username,email,phone,nickname,password_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'ACTIVE',?,?)`).run(id,value.username,value.email||null,value.phone||null,value.nickname,hashPassword(value.password),stamp,stamp);

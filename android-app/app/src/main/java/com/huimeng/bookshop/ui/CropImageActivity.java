@@ -20,11 +20,14 @@ import java.io.InputStream;
 public final class CropImageActivity extends AppCompatActivity{
     private CropImageView crop;
     @Override protected void onCreate(Bundle state){super.onCreate(state);
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(18,24,18,24);root.setBackgroundColor(0xff1c2639);
-        TextView tip=new TextView(this);tip.setText("裁剪图片 · 拖动调整位置，双指缩放");tip.setTextColor(-1);tip.setTextSize(17);tip.setGravity(Gravity.CENTER);root.addView(tip,new LinearLayout.LayoutParams(-1,70));
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(16),dp(12),dp(16),dp(12));root.setBackgroundColor(0xff1c2639);
+        TextView tip=new TextView(this);tip.setText("裁剪图片 · 拖动调整位置，双指缩放");tip.setTextColor(-1);tip.setTextSize(17);tip.setGravity(Gravity.CENTER);tip.setPadding(0,0,0,dp(8));root.addView(tip,new LinearLayout.LayoutParams(-1,-2));
         boolean avatar=getIntent().getBooleanExtra("square_crop",false);
-        crop=new CropImageView(this);int width=getResources().getDisplayMetrics().widthPixels-36;root.addView(crop,new LinearLayout.LayoutParams(-1,avatar?width:width*3/4));
-        MaterialButton done=new MaterialButton(this);done.setText("使用这张图片");root.addView(done,new LinearLayout.LayoutParams(-1,64));setContentView(root);
+        android.widget.FrameLayout preview=new android.widget.FrameLayout(this);
+        root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
+        crop=new CropImageView(this,avatar);
+        preview.addView(crop,new android.widget.FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
+        MaterialButton done=new MaterialButton(this);done.setText("使用这张图片");done.setMinHeight(dp(48));root.addView(done,new LinearLayout.LayoutParams(-1,-2));setContentView(root);
         try{Uri uri=getIntent().getData();if(uri==null)throw new IllegalArgumentException();BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;
             try(InputStream input=getContentResolver().openInputStream(uri)){BitmapFactory.decodeStream(input,null,options);}int sample=1;while(Math.max(options.outWidth,options.outHeight)/sample>2048)sample*=2;
             options.inJustDecodeBounds=false;options.inSampleSize=sample;Bitmap image;
@@ -37,4 +40,5 @@ public final class CropImageActivity extends AppCompatActivity{
         }catch(Exception error){Toast.makeText(this,"无法读取图片，请重新选择",Toast.LENGTH_SHORT).show();finish();return;}
         done.setOnClickListener(v->{try{Bitmap image=avatar?crop.crop(600,600):crop.crop();File file=File.createTempFile("image-crop-",".jpg",getCacheDir());try(FileOutputStream stream=new FileOutputStream(file)){image.compress(Bitmap.CompressFormat.JPEG,82,stream);}image.recycle();setResult(Activity.RESULT_OK,new android.content.Intent().putExtra("cropped_path",file.getAbsolutePath()));finish();}catch(Exception error){Toast.makeText(this,"裁剪失败，请重试",Toast.LENGTH_SHORT).show();}});
     }
+    private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
 }

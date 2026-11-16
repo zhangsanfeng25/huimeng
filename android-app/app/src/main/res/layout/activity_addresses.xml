@@ -9,6 +9,11 @@
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="管理绘本订单的收货信息" android:textColor="@color/muted" android:textSize="14sp" />
         <ProgressBar android:id="@+id/loading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="28dp" />
         <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="48dp" android:gravity="center" android:text="还没有收货地址\n点击右下角＋添加" android:textColor="@color/muted" android:visibility="gone" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retry" style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:layout_gravity="center_horizontal" android:layout_marginTop="8dp"
+            android:text="重试加载" android:visibility="gone" />
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="16dp" android:layout_weight="1" android:clipToPadding="false" android:paddingBottom="100dp" />
     </LinearLayout>
     <com.google.android.material.floatingactionbutton.FloatingActionButton android:id="@+id/add" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|end" android:layout_marginEnd="24dp" android:layout_marginBottom="40dp" android:contentDescription="添加收货地址" android:src="@drawable/ic_add" app:fabSize="normal" app:backgroundTint="@color/cool_green" app:tint="@color/ink" app:shapeAppearanceOverlay="@style/ShapeAppearance.HuiMeng.Circle" />

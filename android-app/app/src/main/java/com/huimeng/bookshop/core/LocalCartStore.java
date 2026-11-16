@@ -54,6 +54,20 @@ public final class LocalCartStore {
         for(int i=0;i<existing.length();i++){JSONObject row=existing.optJSONObject(i);if(row!=null&&!productId.equals(row.optString("id")))next.put(row);}
         save(next);
     }
+    public void removePurchased(java.util.Set<String> purchased){
+        JSONArray existing=read(),next=new JSONArray();
+        for(int i=0;i<existing.length();i++){
+            JSONObject row=existing.optJSONObject(i);
+            if(row!=null&&!purchased.contains(row.optString("id")))next.put(row);
+        }
+        save(next);
+    }
+    public static void removePurchased(Context context,java.util.Set<String> purchased){
+        SessionStore session=new SessionStore(context);
+        String account=session.accountId();
+        if(account.isEmpty())account="guest:"+session.localSpaceId();
+        new LocalCartStore(context,account).removePurchased(purchased);
+    }
     public void clearSelected(){JSONArray next=new JSONArray();for(Entry item:list())if(!item.selected()){
         try{JSONObject row=toJson(item);next.put(row);}catch(Exception ignored){}
     }save(next);}

@@ -34,17 +34,17 @@ public class AddProductActivity extends AppCompatActivity {
             double amount=Double.parseDouble(price);int quantity=Integer.parseInt(stock);if(!Double.isFinite(amount)||amount<0||amount>Integer.MAX_VALUE/100.0||quantity<0)throw new IllegalArgumentException("请填写有效的价格和库存");
             body=new JSONObject().put("name",name).put("summary",summary).put("categoryId",categoryIds.get(Math.max(0,binding.category.getSelectedItemPosition()))).put("ageRange",age).put("priceCents",Math.round(amount*100)).put("stock",quantity);imageEditor.applyTo(body);bookEditor.applyTo(body);
         }catch(Exception error){error(error instanceof NumberFormatException?"价格或库存格式不正确":error.getMessage());return;}
-        busy(true);binding.editorNotice.setText(review?"正在保存当前输入并提交审核…":"正在保存草稿…");
+        busy(true);if(review)binding.submitReview.setText("正在送审…");else binding.save.setText("正在保存…");
         java.util.function.Consumer<JSONObject> saved=result->{
             if(!alive())return;productId=result.optString("productId",result.optString("id",productId));
-            if(!review){Toast.makeText(this,result.optBoolean("pending")?"商品草稿已保存在本地，待联网同步":"商品草稿已创建",Toast.LENGTH_SHORT).show();finish();return;}
+            if(!review){Toast.makeText(this,result.optBoolean("pending")?"商品草稿已保存":"商品草稿已创建",Toast.LENGTH_SHORT).show();finish();return;}
             if(productId.isEmpty()){busy(false);error("草稿已保存，但未返回商品编号，请返回商品列表继续送审");return;}
-            new ApiClient(this).post("merchant/products/"+productId+"/submit",new JSONObject(),r->{if(alive()){Toast.makeText(this,r.optBoolean("pending")?"当前内容和送审意向已保存，待联网确认":"商品已保存并提交审核",Toast.LENGTH_LONG).show();finish();}},message->{if(alive()){busy(false);error("草稿已保存，送审未完成："+message);}});
+            new ApiClient(this).post("merchant/products/"+productId+"/submit",new JSONObject(),r->{if(alive()){Toast.makeText(this,r.optBoolean("pending")?"送审申请已保存":"商品已保存并提交审核",Toast.LENGTH_LONG).show();finish();}},message->{if(alive()){busy(false);error("草稿已保存，送审未完成："+message);}});
         };
         java.util.function.Consumer<String> failed=message->{if(alive()){busy(false);error(message);}};
         if(productId.isEmpty())new ApiClient(this).post("merchant/products",body,saved,failed);else new ApiClient(this).put("merchant/products/"+productId,body,saved,failed);
     }
-    private void busy(boolean value){busy=value;for(View view:new View[]{binding.save,binding.submitReview,binding.name,binding.summary,binding.age,binding.price,binding.stock,binding.category})view.setEnabled(!value);imageEditor.setEnabled(!value);bookEditor.setEnabled(!value);}
+    private void busy(boolean value){busy=value;if(!value){binding.save.setText("保存草稿");binding.submitReview.setText("保存并送审");}for(View view:new View[]{binding.save,binding.submitReview,binding.name,binding.summary,binding.age,binding.price,binding.stock,binding.category})view.setEnabled(!value);imageEditor.setEnabled(!value);bookEditor.setEnabled(!value);}
     private void error(String value){if(!alive())return;binding.editorNotice.setText(value==null?"操作未完成，请重试":value);Toast.makeText(this,value,Toast.LENGTH_LONG).show();}
     @Override protected void onResume(){super.onResume();imageEditor.resume();}
     @Override protected void onSaveInstanceState(Bundle state){state.putString("created_product",productId);sections.save(state);imageEditor.saveState(state);bookEditor.save(state);super.onSaveInstanceState(state);}

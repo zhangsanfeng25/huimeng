@@ -1,6 +1,6 @@
-# 当前版本：1.2.0（2026-11-13）
+# 当前版本：1.3.0（2026-11-16）
 
-安装包位于 `../output/android-1.2.0/huimeng-1.2.0.apk`，versionCode 34，Debug 模拟器演示包。改动、验证范围和 SHA-256 见 [版本说明](../docs/releases/android-1.2.0.md)。
+安装包位于 `../output/android-1.3.0/huimeng-1.3.0.apk`，versionCode 35，Debug 模拟器演示包。SHA-256：`7DE682BB6ADA5894CD744BFA52DBD69CA2EBC55F60BB5687513192CC8DF50058`。改动、验证范围和限制见 [版本说明](../docs/releases/android-1.3.0.md)。
 
 # 历史正式版本：1.1.6（2026-10-24）
 

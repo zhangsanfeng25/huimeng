@@ -97,7 +97,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         if(url.endsWith("me/addresses"))return "{\"id\":\"address-2\",\"data\":[{\"id\":\"address-1\",\"recipient\":\"测试收货人\",\"phone\":\"13800000000\",\"region\":\"辽宁省\",\"detail\":\""+editedDetail+"\",\"is_default\":1}"+(extraAddress?",{\"id\":\"address-2\",\"recipient\":\"新增收货人\",\"phone\":\"13800000001\",\"region\":\"辽宁省\",\"detail\":\"新增地址\",\"is_default\":0}":"")+"]}";
         if(url.contains("me/addresses/"))return "{\"ok\":true}";
         if(url.contains("catalog/products/book-"))return "{\"data\":{\"id\":\"book-0\",\"name\":\"晚安，小熊\",\"shop\":\"测试书店\",\"ageRange\":\"3–6岁\",\"priceCents\":2800,\"stock\":20,\"ratings\":[]}}";
-        if(url.contains("me/orders/order-test"))return "{\"data\":{\"id\":\"order-test\",\"shop\":\"测试书店\",\"status\":\"SHIPPED\",\"logistics_status\":\""+(logisticsVersion.get()==0?"SHIPPED":"IN_TRANSIT")+"\",\"total_cents\":2800,\"items\":[{\"id\":\"item-test\",\"productName\":\"晚安，小熊\",\"quantity\":1,\"subtotalCents\":2800,\"unitPriceCents\":2800}],\"events\":[]}}";
+        if(url.contains("me/orders/order-test"))return "{\"data\":{\"id\":\""+(url.endsWith("order-test-logistics")?"order-test-logistics":"order-test")+"\",\"shop\":\"测试书店\",\"status\":\"SHIPPED\",\"logistics_status\":\""+(logisticsVersion.get()==0?"SHIPPED":"IN_TRANSIT")+"\",\"total_cents\":2800,\"items\":[{\"id\":\"item-test\",\"productName\":\"晚安，小熊\",\"quantity\":1,\"subtotalCents\":2800,\"unitPriceCents\":2800}],\"events\":[]}}";
         String post="{\"id\":\"post-test\",\"title\":\"今晚的亲子共读时光\",\"content\":\"今晚的亲子共读时光，记录一段温暖、真实的阅读体验。\",\"authorId\":\"reader-test\",\"authorName\":\"星星妈妈\",\"authorRole\":\"USER\",\"avatarUrl\":\"\",\"likeCount\":2,\"commentCount\":0}";
         if(url.contains("community/users/"))return "{\"data\":{\"user\":{\"id\":\"reader-test\",\"nickname\":\"星星妈妈\",\"avatarUrl\":\"\"},\"postCount\":1,\"likeCount\":2,\"posts\":["+post+"]}}";
         if(url.contains("community/posts/post-test"))return "{\"data\":"+post.substring(0,post.length()-1)+",\"comments\":[]}}";
@@ -145,23 +145,32 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         screenshot("default-avatar-selection");runTestOnUiThread(edit::finish);
         getInstrumentation().waitForIdleSync();
     }
-    public void testAccountHasOneSaveAndOptionalPassword() throws Throwable {
+    public void testAccountOpensSeparateEditors() throws Throwable {
         Activity edit=getInstrumentation().startActivitySync(new Intent(activity,EditAccountActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        getInstrumentation().waitForIdleSync();SystemClock.sleep(400);
-        int oldButton=edit.getResources().getIdentifier("changePassword","id",edit.getPackageName());
-        assertNull("账户页只能保留一个提交按钮",edit.findViewById(oldButton));
-        assertNotNull("可选密码区",edit.findViewById(R.id.currentPassword));
-        assertNotNull(edit.findViewById(R.id.newPassword));
-        runTestOnUiThread(()->{((android.widget.TextView)edit.findViewById(R.id.username)).setText("reader_test");((android.widget.TextView)edit.findViewById(R.id.nickname)).setText("修改昵称");edit.findViewById(R.id.saveAccount).performClick();edit.findViewById(R.id.saveAccount).performClick();});
-        long deadline=SystemClock.uptimeMillis()+3000;while(accountWrites.get()<1&&SystemClock.uptimeMillis()<deadline)SystemClock.sleep(30);
-        assertEquals("重复点击只提交一次",1,accountWrites.get());assertFalse(savedAccount.has("newPassword"));assertEquals("修改昵称",savedAccount.optString("nickname"));
-        getInstrumentation().waitForIdleSync();SystemClock.sleep(100);
-        runTestOnUiThread(()->{((android.widget.TextView)edit.findViewById(R.id.newPassword)).setText("updated123");edit.findViewById(R.id.saveAccount).performClick();});
-        getInstrumentation().waitForIdleSync();assertEquals("缺少旧密码不得提交",1,accountWrites.get());
-        runTestOnUiThread(()->{((android.widget.TextView)edit.findViewById(R.id.newPassword)).setText("");((android.widget.ScrollView)((android.view.ViewGroup)edit.findViewById(android.R.id.content)).getChildAt(0)).fullScroll(View.FOCUS_DOWN);});
-        SystemClock.sleep(2000);
-        runTestOnUiThread(()->{View button=edit.findViewById(R.id.saveAccount);android.graphics.Rect visible=new android.graphics.Rect();assertTrue(button.getGlobalVisibleRect(visible));assertEquals("保存按钮必须完整显示",button.getHeight(),visible.height());});
-        screenshot("account-unified-save");runTestOnUiThread(edit::finish);
+        getInstrumentation().waitForIdleSync();
+        try {
+            assertEquals(0,edit.getResources().getIdentifier("currentPassword","id",edit.getPackageName()));
+            runTestOnUiThread(()->edit.findViewById(R.id.editPassword).performClick());
+            getInstrumentation().waitForIdleSync();
+            assertTrue("密码弹窗应可保存",awaitEditorText("保存"));
+            var root=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+            var cancel=root.findAccessibilityNodeInfosByText("取消");
+            assertFalse(cancel.isEmpty());
+            assertTrue(cancel.get(0).performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK));
+            assertTrue(awaitEditorText("显示昵称"));
+            runTestOnUiThread(()->edit.findViewById(R.id.editNickname).performClick());
+            getInstrumentation().waitForIdleSync();
+            assertTrue("昵称弹窗应可保存",awaitEditorText("保存"));
+        }finally{runTestOnUiThread(edit::finish);}
+    }
+    private boolean awaitEditorText(String text){
+        long deadline=SystemClock.uptimeMillis()+5000;
+        while(SystemClock.uptimeMillis()<deadline){
+            var root=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+            if(root!=null&&!root.findAccessibilityNodeInfosByText(text).isEmpty())return true;
+            SystemClock.sleep(100);
+        }
+        return false;
     }
     public void testSearchAgeThemeAndPriceToggleKeepCombinedQuery() throws Throwable {
         Activity browse=getInstrumentation().startActivitySync(new Intent(activity,SearchActivity.class).putExtra("query","晚安").putExtra("age","3-6").putExtra("theme","bedtime").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
@@ -178,6 +187,16 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         Activity detail=getInstrumentation().waitForMonitorWithTimeout(monitor,3000);assertNotNull(detail);assertEquals("post-test",detail.getIntent().getStringExtra("post_id"));runTestOnUiThread(detail::finish);getInstrumentation().removeMonitor(monitor);
     }
     public void testA3HomepageLayoutAndDirectCheckout() throws Throwable {
+        runTestOnUiThread(()->{
+            View banner=activity.findViewById(R.id.bannerCarousel);
+            int expectedHeight=Math.round(banner.getWidth()*17f/37f);
+            assertEquals("轮播容器应与原图比例一致，避免两侧留边",expectedHeight,banner.getHeight());
+            var nav=(com.google.android.material.bottomnavigation.BottomNavigationView)activity.findViewById(R.id.bottomNav);
+            assertTrue("底栏突出当前页面",nav.isItemActiveIndicatorEnabled());
+            assertEquals(activity.getColor(R.color.cool_green_dark),nav.getItemTextColor().getColorForState(
+                new int[]{android.R.attr.state_checked},0));
+            assertTrue("导航与内容不得重叠",nav.getTop()>=activity.findViewById(R.id.content).getBottom());
+        });
         runTestOnUiThread(()->{float density=activity.getResources().getDisplayMetrics().density;assertTrue(activity.findViewById(R.id.ageBaby).getHeight()<=64*density);assertTrue(activity.findViewById(R.id.themeBedtime).getHeight()<=56*density);});
         runTestOnUiThread(()->{for(int id:new int[]{R.id.themeBedtime,R.id.themeEmotion,R.id.themeScience}){android.widget.TextView choice=activity.findViewById(id);assertEquals(1,choice.getLineCount());assertEquals(0,choice.getLayout().getEllipsisCount(0));}});
         runTestOnUiThread(()->assertEquals(1,((android.widget.TextView)activity.findViewById(R.id.searchButton)).getLineCount()));
@@ -186,6 +205,24 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         Intent intent=new Intent(activity,CheckoutActivity.class).putExtra("product_id","book-0").putExtra("quantity",2).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         Activity checkout=getInstrumentation().startActivitySync(intent);getInstrumentation().waitForIdleSync();SystemClock.sleep(400);
         runTestOnUiThread(()->{assertEquals("¥56.00",((android.widget.TextView)checkout.findViewById(R.id.total)).getText().toString());assertTrue(checkout.findViewById(R.id.submit).isEnabled());android.widget.TextView address=checkout.findViewById(R.id.address);assertTrue("地址文字必须完整显示",address.getHeight()>=address.getLayout().getHeight()+address.getCompoundPaddingTop()+address.getCompoundPaddingBottom());});screenshot("checkout-direct");runTestOnUiThread(checkout::finish);
+    }
+    public void testCompactHomeKeepsThemeLabelsAndNavigationVisible() throws Throwable {
+        runTestOnUiThread(()->{
+            View greeting=activity.findViewById(R.id.greeting);
+            android.graphics.Rect visible=new android.graphics.Rect();
+            assertTrue(greeting.getGlobalVisibleRect(visible));
+            assertEquals("首页问候语不得被标题栏截断",greeting.getHeight(),visible.height());
+            for(int id:new int[]{R.id.themeBedtime,R.id.themeEmotion,R.id.themeScience}){
+                android.widget.TextView choice=activity.findViewById(id);
+                android.text.Layout label=choice.getLayout();
+                assertTrue("主题文字应完整显示",label.getHeight()<=choice.getHeight()
+                    -choice.getCompoundPaddingTop()-choice.getCompoundPaddingBottom());
+                for(int line=0;line<label.getLineCount();line++)assertEquals(0,label.getEllipsisCount(line));
+            }
+            View nav=activity.findViewById(R.id.bottomNav);
+            assertTrue(nav.getTop()>=activity.findViewById(R.id.content).getBottom());
+        });
+        screenshot("home-compact");
     }
     public void testLongCheckoutAddressExpandsWithoutClipping() throws Throwable {
         editedDetail="沈阳市和平区亲子阅读街道绘梦社区第三栋二单元十八楼1802室，请送到门口，联系电话与收货人信息以页面显示为准";
@@ -232,6 +269,28 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         original.put("liked",1);
         assertFalse("当前用户的点赞状态变化应被列表识别，不能只根据点赞总数判断",neutral.equals(com.huimeng.bookshop.model.CommunityPost.from(original)));
     }
+    public void testEmptyFavoritesOpensBookSearch() throws Throwable {
+        Activity favorites=getInstrumentation().startActivitySync(new Intent(activity,DataListActivity.class)
+            .putExtra("title","我的收藏").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        Instrumentation.ActivityMonitor monitor=getInstrumentation().addMonitor(SearchActivity.class.getName(),null,false);
+        Activity search=null;
+        try{
+            View browse=favorites.findViewById(R.id.emptyAction);
+            long deadline=SystemClock.uptimeMillis()+5000;
+            while(browse.getVisibility()!=View.VISIBLE&&SystemClock.uptimeMillis()<deadline)SystemClock.sleep(50);
+            runTestOnUiThread(()->{
+                assertEquals(View.VISIBLE,browse.getVisibility());
+                assertEquals("浏览绘本",((android.widget.TextView)browse).getText().toString());
+                assertTrue(browse.performClick());
+            });
+            search=getInstrumentation().waitForMonitorWithTimeout(monitor,5000);
+            assertNotNull(search);
+        }finally{
+            getInstrumentation().removeMonitor(monitor);
+            Activity opened=search;
+            runTestOnUiThread(()->{if(opened!=null)opened.finish();favorites.finish();});
+        }
+    }
     public void testAddressModifyOpensExistingRecordDirectly() throws Throwable {
         Activity addresses=getInstrumentation().startActivitySync(new Intent(activity,AddressesActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));SystemClock.sleep(600);
         Instrumentation.ActivityMonitor monitor=getInstrumentation().addMonitor(AddAddressActivity.class.getName(),null,false);
@@ -242,14 +301,54 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         runTestOnUiThread(()->{editor.finish();addresses.finish();});getInstrumentation().removeMonitor(monitor);
     }
     public void testUserAndMerchantTabsAndFormsRender() throws Throwable {
-        for(int tab=1;tab<=4;tab++){final int position=tab;runTestOnUiThread(()->activity.selectTab(position));getInstrumentation().waitForIdleSync();screenshot("user-tab-"+tab);}
+        assertNavigationSelection(activity,4,"user");
         preferences.edit().putString("role","MERCHANT").commit();
         MainActivity merchant=(MainActivity)getInstrumentation().startActivitySync(new Intent(activity,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));getInstrumentation().waitForIdleSync();
-        for(int tab=1;tab<=5;tab++){final int position=tab;runTestOnUiThread(()->merchant.selectTab(position));getInstrumentation().waitForIdleSync();screenshot("merchant-tab-"+tab);}
+        assertNavigationSelection(merchant,5,"merchant");
         preferences.edit().putString("role","USER").commit();runTestOnUiThread(merchant::finish);getInstrumentation().waitForIdleSync();
         populatedCart=true;
         Class<?>[] pages={CartActivity.class,OrdersActivity.class,AddressesActivity.class,AddAddressActivity.class,EditAccountActivity.class,SettingsActivity.class,PublishPostActivity.class,RatingActivity.class,DataListActivity.class,AddProductActivity.class,MerchantApplicationActivity.class,ProductDetailActivity.class};
-        for(Class<?> page:pages){Activity screen=getInstrumentation().startActivitySync(new Intent(activity,page).putExtra("product_id","book-0").putExtra("title","我的收藏").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));getInstrumentation().waitForIdleSync();screenshot(page.getSimpleName());runTestOnUiThread(screen::finish);getInstrumentation().waitForIdleSync();}
+        for(Class<?> page:pages){Activity screen=getInstrumentation().startActivitySync(new Intent(activity,page).putExtra("product_id","book-0").putExtra("title","我的收藏").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));getInstrumentation().waitForIdleSync();runTestOnUiThread(()->assertWithinSystemBars(screen));screenshot(page.getSimpleName());runTestOnUiThread(screen::finish);getInstrumentation().waitForIdleSync();}
+    }
+    private void assertNavigationSelection(MainActivity screen,int count,String role) throws Throwable {
+        runTestOnUiThread(()->{
+            var nav=(com.google.android.material.bottomnavigation.BottomNavigationView)screen.findViewById(R.id.bottomNav);
+            assertFalse("选中背景应包住图标与文字，不叠加仅图标指示器",nav.isItemActiveIndicatorEnabled());
+            assertNotNull(nav.getItemBackground());
+            assertWithinSystemBars(screen);
+        });
+        for(int index=0;index<count;index++){
+            final int position=index;
+            runTestOnUiThread(()->{
+                var nav=(com.google.android.material.bottomnavigation.BottomNavigationView)screen.findViewById(R.id.bottomNav);
+                var item=nav.getMenu().getItem(position);
+                screen.selectTab(position+1);
+                assertEquals(item.getItemId(),nav.getSelectedItemId());
+                assertTrue(item.isChecked());
+                assertFalse(screen.getSupportFragmentManager().getPrimaryNavigationFragment().isHidden());
+            });
+            getInstrumentation().waitForIdleSync();
+            screenshot(role+"-tab-"+(index+1));
+            runTestOnUiThread(()->{
+                View selected=screen.findViewById(((com.google.android.material.bottomnavigation.BottomNavigationView)screen.findViewById(R.id.bottomNav)).getSelectedItemId());
+                View icon=selected.findViewById(com.google.android.material.R.id.navigation_bar_item_icon_view);
+                View label=selected.findViewById(com.google.android.material.R.id.navigation_bar_item_large_label_view);
+                int[] iconPoint=new int[2],labelPoint=new int[2];icon.getLocationOnScreen(iconPoint);label.getLocationOnScreen(labelPoint);
+                assertTrue("选中项的图标与文字不能重叠",iconPoint[1]+icon.getHeight()<=labelPoint[1]);
+            });
+        }
+    }
+
+    private void assertWithinSystemBars(Activity screen) {
+        if(android.os.Build.VERSION.SDK_INT<30)return;
+        var decor=screen.getWindow().getDecorView();
+        var safe=decor.getRootWindowInsets().getInsets(android.view.WindowInsets.Type.systemBars());
+        var content=(android.view.ViewGroup)screen.findViewById(android.R.id.content);
+        var page=content.getChildAt(0);
+        int[] position=new int[2];
+        page.getLocationInWindow(position);
+        assertTrue("页面内容要避开状态栏",position[1]>=safe.top);
+        assertTrue("页面内容要避开系统导航栏",position[1]+page.getHeight()<=decor.getHeight()-safe.bottom);
     }
     public void testReturningFromPublisherAndProductEditorRefreshesLists() throws Throwable {
         runTestOnUiThread(()->activity.selectTab(2));getInstrumentation().waitForIdleSync();int before=communityReads.get();
@@ -270,10 +369,11 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         });
     }
     public void testLoginRecoveryOpensDemoContactReset() throws Throwable {
+        runTestOnUiThread(()->new SessionStore(getInstrumentation().getTargetContext()).clear());
         Activity login=getInstrumentation().startActivitySync(new Intent(activity,LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));getInstrumentation().waitForIdleSync();
         Instrumentation.ActivityMonitor recovery=getInstrumentation().addMonitor(ForgotPasswordActivity.class.getName(),null,false);
         Activity page=null;
-        try{runTestOnUiThread(()->{android.widget.TextView help=login.findViewById(R.id.forgotPassword);assertEquals("忘记密码",help.getText().toString());help.performClick();});page=getInstrumentation().waitForMonitorWithTimeout(recovery,5000);assertNotNull("应打开已确认的演示找回密码页面",page);assertNotNull(page.findViewById(R.id.confirmPassword));}
+        try{runTestOnUiThread(()->{android.widget.TextView help=login.findViewById(R.id.forgotPassword);assertEquals("忘记密码",help.getText().toString());assertTrue(help.performClick());});page=getInstrumentation().waitForMonitorWithTimeout(recovery,5000);assertNotNull("应打开已确认的演示找回密码页面",page);assertNotNull(page.findViewById(R.id.confirmPassword));}
         finally{getInstrumentation().removeMonitor(recovery);if(page!=null){Activity opened=page;runTestOnUiThread(opened::finish);}runTestOnUiThread(login::finish);}
     }
 
@@ -386,7 +486,7 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         runTestOnUiThread(()->{try{assertEquals("页面不活跃时暂停轮播",1,type.getMethod("currentPage").invoke(view[0]));}catch(Exception error){throw new RuntimeException(error);}});
     }
     public void testLogisticsUpdatesSilentlyAndSkipsUnchangedViews() throws Throwable {
-        Activity order=getInstrumentation().startActivitySync(new Intent(activity,OrderDetailActivity.class).putExtra("order_id","order-test").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        Activity order=getInstrumentation().startActivitySync(new Intent(activity,OrderDetailActivity.class).putExtra("order_id","order-test-logistics").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         getInstrumentation().waitForIdleSync();SystemClock.sleep(300);
         final View[] first=new View[1];
         runTestOnUiThread(()->{assertEquals("商品已发货",((android.widget.TextView)order.findViewById(R.id.status)).getText().toString());first[0]=((android.view.ViewGroup)order.findViewById(R.id.itemList)).getChildAt(0);assertNotNull(first[0]);});
@@ -433,6 +533,38 @@ public class RefreshNavigationTest extends InstrumentationTestCase {
         super.tearDown();
     }
     private void restorePreferences(String name,Map<String,?> saved){SharedPreferences.Editor edit=getInstrumentation().getTargetContext().getSharedPreferences(name,Context.MODE_PRIVATE).edit().clear();for(Map.Entry<String,?> entry:saved.entrySet()){Object value=entry.getValue();if(value instanceof String)edit.putString(entry.getKey(),(String)value);else if(value instanceof Boolean)edit.putBoolean(entry.getKey(),(Boolean)value);else if(value instanceof Integer)edit.putInt(entry.getKey(),(Integer)value);else if(value instanceof Long)edit.putLong(entry.getKey(),(Long)value);else if(value instanceof Float)edit.putFloat(entry.getKey(),(Float)value);}edit.commit();}
+
+    public void testHomeForegroundKeepsHeaderVisibleWithoutFocusingChildren() throws Throwable {
+        runTestOnUiThread(() -> {
+            var scroll = (androidx.core.widget.NestedScrollView) activity.findViewById(R.id.scroll);
+            var search = activity.findViewById(R.id.searchInput);
+            assertTrue(search.requestFocus());
+            scroll.scrollTo(0, 300);
+            assertTrue(scroll.getScrollY() > 0);
+            activity.onAppForeground();
+        });
+        getInstrumentation().waitForIdleSync();
+        runTestOnUiThread(() -> {
+            var scroll = (androidx.core.widget.NestedScrollView) activity.findViewById(R.id.scroll);
+            assertTrue("首页打开时应由滚动容器持有焦点", scroll.isFocused());
+            assertEquals("首页应从顶部显示", 0, scroll.getScrollY());
+        });
+    }
+
+    public void testFallbackCoverFitsWithoutStretching() throws Throwable {
+        runTestOnUiThread(() -> {
+            var image = new android.widget.ImageView(activity);
+            image.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            var cover = new BookCoverDrawable("测试封面");
+            image.setImageDrawable(cover);
+            image.layout(0, 0, 360, 130);
+            var displayed = new android.graphics.RectF(cover.getBounds());
+            image.getImageMatrix().mapRect(displayed);
+            assertEquals(100f, displayed.width(), 0.5f);
+            assertEquals(130f, displayed.height(), 0.5f);
+            assertEquals(130f, displayed.left, 0.5f);
+        });
+    }
 
     public void testSwitchTabsRetainsHomeAndDoesNotReload() throws Throwable {
         final Fragment[] home = new Fragment[1];

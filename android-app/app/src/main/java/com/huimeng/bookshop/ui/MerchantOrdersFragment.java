@@ -34,11 +34,13 @@ public class MerchantOrdersFragment extends Fragment implements LocalDataRefresh
     @Override public void onResume(){super.onResume();handler.removeCallbacks(refresh);load(false);handler.postDelayed(refresh,5000);}
     @Override public void onPause(){handler.removeCallbacks(refresh);super.onPause();}
     private void load(boolean showLoading){
-        if(binding==null||loading)return;loading=true;int current=++request;if(showLoading)binding.loading.setVisibility(View.VISIBLE);
+        if(binding==null||loading)return;loading=true;int current=++request;
+        if(showLoading){binding.loading.setVisibility(View.VISIBLE);binding.emptyState.setVisibility(View.GONE);}
         new ApiClient(requireContext()).get("merchant/orders",result->{
-            if(binding==null||current!=request)return;loading=false;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);JSONArray data=result.optJSONArray("data");orders=data==null?new JSONArray():data;render();
+            if(binding==null||current!=request)return;loading=false;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);JSONArray data=result.optJSONArray("data");orders=data==null?new JSONArray():data;controls.setLoadError(null);render();
         },message->{if(binding==null||current!=request)return;loading=false;binding.loading.setVisibility(View.GONE);binding.getRoot().setRefreshing(false);
-            if(adapter.getItemCount()==0){binding.empty.setText(message);binding.empty.setVisibility(View.VISIBLE);}if(isResumed())Toast.makeText(requireContext(),message,Toast.LENGTH_SHORT).show();
+            controls.setLoadError(message);render();
+            if(showLoading&&adapter.getItemCount()>0&&isResumed())Toast.makeText(requireContext(),message,Toast.LENGTH_SHORT).show();
         });
     }
     private void render(){
@@ -49,14 +51,15 @@ public class MerchantOrdersFragment extends Fragment implements LocalDataRefresh
             if(AfterSaleState.blocked(item)||item.has("pendingAction"))action="";
             String id=OrderPresentation.platformId(item);if(id.isEmpty())id=item.optString("id");
             String note="买家 "+item.optString("buyer")+" · "+String.format(Locale.CHINA,"¥%.2f",item.optInt("total_cents")/100.0)+"\n"+AfterSaleState.describe(item,zh(logistics))+" · "+id;
-            if(item.has("pendingAction"))note+="\n操作待联网确认";
+            if(item.has("pendingAction"))note+="\n操作待确认";
             rows.add(new ActionAdapter.Row(item.optString("id"),item.optString("productName","绘本订单"),note,action,!action.isEmpty(),item.optString("coverUrl"),item.optString("productName","绘本订单")));
         }
-        adapter.submit(rows);binding.resultCount.setText("显示 "+rows.size()+" / "+orders.length()+" 笔订单");binding.empty.setText(orders.length()==0?"暂无订单，新订单会显示在这里":"没有符合条件的订单，可点击重置清除筛选");binding.empty.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);
+        adapter.submit(rows);
+        controls.showResults(rows.size(),orders.length(),"笔订单","新订单会显示在这里",null,null,()->load(true));
     }
     private void advance(ActionAdapter.Row row){
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext()).setMessage("执行“"+row.action()+"”？这是演示物流操作，将同步更新买家订单状态。").setNegativeButton("暂不",null)
-            .setPositiveButton("确认",(dialog,which)->new ApiClient(requireContext()).post("merchant/orders/"+row.id()+"/advance",new JSONObject(),result->{if(!isAdded()||binding==null)return;Toast.makeText(requireContext(),result.optBoolean("pending")?"操作已保存，待联网确认":"订单已更新为："+zh(result.optString("toStatus")),Toast.LENGTH_LONG).show();load(false);},message->{if(isAdded())Toast.makeText(requireContext(),message,Toast.LENGTH_SHORT).show();})).show();
+            .setPositiveButton("确认",(dialog,which)->new ApiClient(requireContext()).post("merchant/orders/"+row.id()+"/advance",new JSONObject(),result->{if(!isAdded()||binding==null)return;Toast.makeText(requireContext(),result.optBoolean("pending")?"操作已保存":"订单已更新为："+zh(result.optString("toStatus")),Toast.LENGTH_LONG).show();load(false);},message->{if(isAdded())Toast.makeText(requireContext(),message,Toast.LENGTH_SHORT).show();})).show();
     }
     private String action(String value){return switch(value){case "PREPARING"->"完成出库准备";case "READY_TO_SHIP"->"确认发货";case "SHIPPED"->"更新为运输中";case "IN_TRANSIT"->"更新为派送中";default->"";};}
     private String zh(String value){return switch(value){case "PENDING_PAYMENT","WAITING_PAYMENT"->"待付款";case "PAID","PREPARING"->"准备出库";case "READY_TO_SHIP"->"待发货";case "SHIPPED"->"已发货";case "IN_TRANSIT"->"运输中";case "OUT_FOR_DELIVERY"->"派送中";case "COMPLETED"->"已完成";case "CANCELLED"->"已取消";default->value;};}

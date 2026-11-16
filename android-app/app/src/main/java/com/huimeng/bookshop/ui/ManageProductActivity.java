@@ -40,7 +40,7 @@ public class ManageProductActivity extends AppCompatActivity {
         binding.submitReview.setVisibility(("DRAFT".equals(status)||"REJECTED".equals(data.optString("reviewStatus"))||pendingReview)?View.VISIBLE:View.GONE);
         binding.offline.setVisibility("ONLINE".equals(status)?View.VISIBLE:View.GONE);
         String rejection=data.isNull("rejectionReason")?"":data.optString("rejectionReason");
-        notice(pendingReview?("submit".equals(data.optString("pendingAction"))?"送审意向已保存在本地，联网确认前暂不能修改":"商品审核中，暂不能修改；审核结果会通过消息通知")
+        notice(pendingReview?("submit".equals(data.optString("pendingAction"))?"送审申请待提交":"商品审核中，暂不能修改；审核结果会通过消息通知")
             :!rejection.isEmpty()?"驳回原因："+rejection:"ONLINE".equals(status)?"当前商品在售；保存修改后将转为草稿，需要重新送审":"保存草稿可稍后继续；保存并送审会先保存当前输入，再提交审核");
         busy=false;editable(!pendingReview);buttons();
     },message->{if(alive()){busy=false;editable(loaded&&!pendingReview);buttons();error(message);}});}
@@ -54,16 +54,16 @@ public class ManageProductActivity extends AppCompatActivity {
     private void save(boolean review){
         if(busy||pendingReview||!loaded)return;if(imageEditor.isBusy()){error("请等待图片上传完成");return;}
         final JSONObject value;try{value=body();}catch(Exception e){error(e instanceof NumberFormatException?"请完整填写正确的价格和库存":e.getMessage());return;}
-        busy=true;editable(false);buttons();notice(review?"正在保存当前输入并提交审核…":"正在保存草稿…");
+        busy=true;editable(false);buttons();if(review)binding.submitReview.setText("正在送审…");else binding.save.setText("正在保存…");
         new ApiClient(this).put("merchant/products/"+productId,value,result->{if(!alive())return;
-            if(review)postReview();else{Toast.makeText(this,result.optBoolean("pending")?"草稿已保存在本地，待联网同步":"草稿已保存",Toast.LENGTH_SHORT).show();load();}
+            if(review)postReview();else{Toast.makeText(this,result.optBoolean("pending")?"草稿已保存":"草稿已保存",Toast.LENGTH_SHORT).show();load();}
         },message->{if(!alive())return;busy=false;editable(true);buttons();error(message);});
     }
-    private void postReview(){new ApiClient(this).post("merchant/products/"+productId+"/submit",new JSONObject(),result->{if(!alive())return;Toast.makeText(this,result.optBoolean("pending")?"当前内容和送审意向已保存，待联网确认":"当前内容已保存并提交管理员审核",Toast.LENGTH_LONG).show();load();},message->{if(!alive())return;busy=false;editable(true);buttons();error("草稿已保存，送审未完成："+message);});}
+    private void postReview(){new ApiClient(this).post("merchant/products/"+productId+"/submit",new JSONObject(),result->{if(!alive())return;Toast.makeText(this,result.optBoolean("pending")?"送审申请已保存":"当前内容已保存并提交管理员审核",Toast.LENGTH_LONG).show();load();},message->{if(!alive())return;busy=false;editable(true);buttons();error("草稿已保存，送审未完成："+message);});}
     private void offline(){if(busy)return;new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setMessage("下架此商品？下架后买家将无法继续购买。").setNegativeButton("暂不",null).setPositiveButton("确认下架",(d,w)->{
-        busy=true;editable(false);buttons();new ApiClient(this).post("merchant/products/"+productId+"/offline",new JSONObject(),r->{if(alive()){Toast.makeText(this,r.optBoolean("pending")?"下架意向已保存，待联网确认":"商品已下架",Toast.LENGTH_SHORT).show();load();}},message->{if(alive()){busy=false;editable(!pendingReview);buttons();error(message);}});
+        busy=true;editable(false);buttons();new ApiClient(this).post("merchant/products/"+productId+"/offline",new JSONObject(),r->{if(alive()){Toast.makeText(this,r.optBoolean("pending")?"下架申请已保存":"商品已下架",Toast.LENGTH_SHORT).show();load();}},message->{if(alive()){busy=false;editable(!pendingReview);buttons();error(message);}});
     }).show();}
-    private void buttons(){binding.save.setEnabled(loaded&&!busy&&!pendingReview);binding.submitReview.setEnabled(loaded&&!busy&&!pendingReview);binding.offline.setEnabled(loaded&&!busy&&!pendingReview);binding.stockQuick.setEnabled(stockEligible&&!busy);}
+    private void buttons(){if(!busy){binding.save.setText("保存草稿");binding.submitReview.setText("保存并送审");}binding.save.setEnabled(loaded&&!busy&&!pendingReview);binding.submitReview.setEnabled(loaded&&!busy&&!pendingReview);binding.offline.setEnabled(loaded&&!busy&&!pendingReview);binding.stockQuick.setEnabled(stockEligible&&!busy);}
     private void editable(boolean enabled){for(View view:new View[]{binding.name,binding.summary,binding.age,binding.price,binding.stock,binding.category})view.setEnabled(enabled);imageEditor.setEnabled(enabled);bookEditor.setEnabled(enabled);}
     private void notice(String value){binding.editorNotice.setText(value);binding.editorNotice.setVisibility(View.VISIBLE);}
     private void error(String value){if(!alive())return;notice(value==null?"操作未完成，请重试":value);Toast.makeText(this,value,Toast.LENGTH_LONG).show();}

@@ -28,9 +28,22 @@ final class BookDetailsView {
         }
     }
     void save(Bundle state){state.putBoolean("book_summary_expanded",expanded);}
-    void bind(JSONObject data){BookDetails book=new BookDetails(data);ui.bookMetadata.setText("作者："+book.authorText()+"\n出版社："+(book.text("publisher").isEmpty()?"暂未填写":book.text("publisher"))+"\n发售日期："+book.dateText());ui.demoHint.setVisibility("fictional_demo".equals(book.text("metadataSource"))?View.VISIBLE:View.GONE);
+    void bind(JSONObject data){BookDetails book=new BookDetails(data);
+        java.util.List<String> metadata=new java.util.ArrayList<>();
+        if(!book.text("authorName").isEmpty()||!book.text("illustratorName").isEmpty())metadata.add("作者："+book.authorText());
+        if(!book.text("publisher").isEmpty())metadata.add("出版社："+book.text("publisher"));
+        if(!book.text("publicationDate").isEmpty())metadata.add("发售日期："+book.dateText());
+        boolean demo="fictional_demo".equals(book.text("metadataSource"));
+        ui.bookMetadata.setText(String.join("\n",metadata));
+        ui.bookMetadata.setVisibility(metadata.isEmpty()?View.GONE:View.VISIBLE);
+        ui.metadataCard.setVisibility(metadata.isEmpty()&&!demo?View.GONE:View.VISIBLE);
+        ui.demoHint.setVisibility(demo?View.VISIBLE:View.GONE);
+        ui.summaryCard.setVisibility(ui.summary.getText().toString().trim().isEmpty()?View.GONE:View.VISIBLE);
         JSONArray chapters=book.chapters();StringBuilder preview=new StringBuilder();for(int i=0;i<Math.min(3,chapters.length());i++){if(i>0)preview.append('\n');preview.append(i+1).append(". ").append(chapters.optString(i));}ui.contentsPreview.setText(preview.length()==0?"暂未填写目录":preview);ui.contentsCard.setEnabled(chapters.length()>0);ui.contentsAction.setVisibility(chapters.length()>0?View.VISIBLE:View.GONE);ui.contentsCard.setOnClickListener(view->BookDetailsSheet.open(page,"目录",chapters.toString(),true));
         boolean author=!book.text("authorName").isEmpty()||!book.text("authorBio").isEmpty()||!book.text("illustratorName").isEmpty()||!book.text("illustratorBio").isEmpty();ui.authorPreview.setText(author?book.authorText()+"\n"+(book.text("authorBio").isEmpty()?book.text("illustratorBio"):book.text("authorBio")):"暂未填写作者资料");ui.authorCard.setEnabled(author);ui.authorAction.setVisibility(author?View.VISIBLE:View.GONE);ui.authorCard.setOnClickListener(view->BookDetailsSheet.open(page,"作者简介",book.authorBody(),false));
+        ui.contentsCard.setVisibility(chapters.length()>0?View.VISIBLE:View.GONE);
+        ui.authorCard.setVisibility(author?View.VISIBLE:View.GONE);
+        ui.bookPreviewCards.setVisibility(author||chapters.length()>0?View.VISIBLE:View.GONE);
         ui.editorialReview.setText(book.text("editorialReview"));ui.editorialCard.setVisibility(book.text("editorialReview").isEmpty()?View.GONE:View.VISIBLE);showSummary();ratings(data.optJSONArray("ratings"),data.optString("id"));recommendations(data.optJSONArray("recommendations"),data.optString("id"));
     }
     private void showSummary(){ui.summary.setMaxLines(expanded?Integer.MAX_VALUE:4);ui.summary.setEllipsize(expanded?null:android.text.TextUtils.TruncateAt.END);ui.expandSummary.setText(expanded?"收起全文 ⌃":"展开全文 ⌄");ui.summary.post(()->{var layout=ui.summary.getLayout();boolean clipped=layout!=null&&layout.getLineCount()>0&&layout.getEllipsisCount(layout.getLineCount()-1)>0;ui.expandSummary.setVisibility(expanded||clipped?View.VISIBLE:View.GONE);});}

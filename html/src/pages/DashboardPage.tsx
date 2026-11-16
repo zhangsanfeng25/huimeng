@@ -1,5 +1,5 @@
 import {
-  Activity, Banknote, BookOpen, Box, Clock3, PackageCheck, RefreshCw,
+  Activity, Banknote, BookOpen, Box, Clock3, PackageCheck,
   ShoppingCart, Truck, Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -139,16 +139,21 @@ export function DashboardPage() {
     <header className="dashboard-v3-heading">
       <div>
         <h1>经营工作台</h1>
-        <p>集中查看商城经营数据、订单趋势与待处理事项。</p>
-      </div>
-      <div className="dashboard-live-state">
-        <button onClick={() => load(days)} disabled={loading} aria-label="刷新工作台数据">
-          <RefreshCw className={loading ? 'is-spinning' : ''} size={17} /> 刷新
-        </button>
       </div>
     </header>
 
-    {error ? <div className="dashboard-error">{error}<button onClick={() => load(days)}>重新加载</button></div> : null}
+    {error ? <div className="dashboard-error" role="alert">{error}<button onClick={() => load(days)}>重新加载</button></div> : null}
+
+    <section className="dashboard-queue" aria-label="待处理事项">
+      <button onClick={() => navigate('/reviews?queue=review')}>
+        <PackageCheck size={18} aria-hidden="true" /> 待审核
+        <strong>{data ? metrics.pendingReviews : '—'}</strong>
+      </button>
+      <button onClick={() => navigate('/orders?queue=shipment')}>
+        <Truck size={18} aria-hidden="true" /> 待发货
+        <strong>{data ? metrics.pendingShipment : '—'}</strong>
+      </button>
+    </section>
 
     <section className="dashboard-v3-metrics" aria-label="核心经营指标">
       {metricCards.map(({ label, value, note, icon: Icon, color, values, trendLabel }) => <article className="dashboard-v3-metric" key={label}>
@@ -166,6 +171,34 @@ export function DashboardPage() {
       </article>)}
     </section>
 
+    <section className="dashboard-v3-bottom">
+      <article className="panel dashboard-orders-card">
+        <header>
+          <div><h2>最近订单</h2></div>
+          <button onClick={() => navigate('/orders')}>查看全部订单</button>
+        </header>
+        <div className="table-scroll">
+          <table>
+            <thead><tr><th>订单编号</th><th>购买用户</th><th>所属商家</th><th>订单金额</th><th>当前状态</th><th>下单时间</th></tr></thead>
+            <tbody>{(data?.recentOrders ?? []).map(order => <tr key={order.id}>
+              <td><strong>{order.id}</strong></td><td>{order.buyer}</td><td>{order.shop}</td><td>{formatMoney(Number(order.amount || 0))}</td><td><StatusTag value={order.status} />{order.after_sale_state?<StatusTag value={order.after_sale_state}/>:null}</td><td>{new Date(order.orderedAt).toLocaleString('zh-CN')}</td>
+            </tr>)}</tbody>
+          </table>
+          {!loading && !(data?.recentOrders?.length) ? <div className="dashboard-table-empty">暂无订单记录</div> : null}
+        </div>
+      </article>
+
+      <article className="panel dashboard-activity-card">
+        <header><div><h2>最新动态</h2></div><Clock3 size={18} /></header>
+        <div className="dashboard-timeline">
+          {activities.map(item => <div className={`dashboard-timeline-item tone-${item.tone}`} key={`${item.id}-${item.title}`}>
+            <i />
+            <div><strong>{item.title}</strong><span>{item.detail}</span></div>
+          </div>)}
+          {!loading && activities.length === 0 ? <div className="dashboard-side-empty"><Clock3 size={30} />暂无最新动态</div> : null}
+        </div>
+      </article>
+    </section>
     <section className="dashboard-v3-analysis">
       <article className="panel dashboard-analysis-card">
         <header>
@@ -190,7 +223,7 @@ export function DashboardPage() {
       </article>
 
       <article className="panel dashboard-category-card">
-        <header><div><h2>商品分类占比</h2><p>按当前在库商品实时统计</p></div><button onClick={() => navigate('/categories')}>分类管理</button></header>
+        <header><div><h2>商品分类占比</h2></div><button onClick={() => navigate('/categories')}>分类管理</button></header>
         <div className="dashboard-category-list">
           {(data?.distribution ?? []).filter(item=>item.value>0).map((item, index) => {
             const percent = totalProducts ? item.value / totalProducts * 100 : 0;
@@ -205,38 +238,6 @@ export function DashboardPage() {
       </article>
     </section>
 
-    <section className="dashboard-v3-bottom">
-      <article className="panel dashboard-orders-card">
-        <header>
-          <div><h2>最近订单</h2><p>最新产生的商城订单与履约状态</p></div>
-          <button onClick={() => navigate('/orders')}>查看全部订单</button>
-        </header>
-        <div className="table-scroll">
-          <table>
-            <thead><tr><th>订单编号</th><th>购买用户</th><th>所属商家</th><th>订单金额</th><th>当前状态</th><th>下单时间</th></tr></thead>
-            <tbody>{(data?.recentOrders ?? []).map(order => <tr key={order.id}>
-              <td><strong>{order.id}</strong></td><td>{order.buyer}</td><td>{order.shop}</td><td>{formatMoney(Number(order.amount || 0))}</td><td><StatusTag value={order.status} />{order.after_sale_state?<StatusTag value={order.after_sale_state}/>:null}</td><td>{new Date(order.orderedAt).toLocaleString('zh-CN')}</td>
-            </tr>)}</tbody>
-          </table>
-          {!loading && !(data?.recentOrders?.length) ? <div className="dashboard-table-empty">暂无订单记录</div> : null}
-        </div>
-      </article>
-
-      <article className="panel dashboard-activity-card">
-        <header><div><h2>最新动态</h2><p>管理操作、审核与订单按时间更新</p></div><Clock3 size={18} /></header>
-        <div className="dashboard-timeline">
-          {activities.map(item => <div className={`dashboard-timeline-item tone-${item.tone}`} key={`${item.id}-${item.title}`}>
-            <i />
-            <div><strong>{item.title}</strong><span>{item.detail}</span></div>
-          </div>)}
-          {!loading && activities.length === 0 ? <div className="dashboard-side-empty"><Clock3 size={30} />暂无最新动态</div> : null}
-        </div>
-        <footer>
-          <button onClick={() => navigate('/reviews')}><PackageCheck size={15} />待审核 {metrics.pendingReviews}</button>
-          <button onClick={() => navigate('/orders')}><Truck size={15} />待发货 {metrics.pendingShipment}</button>
-        </footer>
-      </article>
-    </section>
     {tooltip?createPortal(<div id="dashboard-chart-tooltip" role="tooltip" className="dashboard-chart-tooltip" style={{left:tooltip.x,top:tooltip.y}}>{tooltip.text}</div>,document.body):null}
   </div>;
 }

@@ -12,8 +12,6 @@
             <TextView android:id="@+id/heading" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="绘梦 AI 助手" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/ink"
                 android:accessibilityHeading="true"/>
-            <TextView android:id="@+id/mode" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="模拟联调" android:textSize="13sp" android:textColor="@color/muted" android:visibility="gone"/>
         </LinearLayout>
         <com.google.android.material.button.MaterialButton android:id="@+id/expand"
             style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content"
@@ -25,24 +23,15 @@
             app:iconGravity="textStart" app:iconPadding="0dp" app:iconTint="@color/ink"/>
     </LinearLayout>
 
-    <ScrollView android:id="@+id/history_scroll" android:layout_width="match_parent"
+    <androidx.core.widget.NestedScrollView android:id="@+id/history_scroll" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true"
         android:layout_marginTop="8dp" android:layout_marginBottom="10dp" android:clipToOutline="true">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="vertical" android:padding="12dp">
             <LinearLayout android:id="@+id/history" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:orientation="vertical"/>
-            <LinearLayout android:id="@+id/loading" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical"
-                android:minHeight="36dp" android:visibility="gone" android:accessibilityLiveRegion="polite">
-                <com.google.android.material.progressindicator.CircularProgressIndicator android:layout_width="24dp"
-                    android:layout_height="24dp" android:indeterminate="true" app:indicatorSize="18dp"
-                    app:trackThickness="2dp" app:indicatorColor="@color/cool_green"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp" android:text="正在生成答复…" android:textColor="@color/muted"/>
-            </LinearLayout>
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
     <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:paddingBottom="8dp" android:textColor="@color/price_red"
@@ -58,7 +47,7 @@
             android:maxLength="2000" android:minHeight="48dp"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/send"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginStart="8dp" android:minHeight="48dp" android:text="发送"
+            android:layout_marginStart="8dp" android:minHeight="48dp" android:text="发送" android:accessibilityLiveRegion="polite"
             android:insetTop="0dp" android:insetBottom="0dp" app:cornerRadius="12dp"/>
     </LinearLayout>
 </LinearLayout>

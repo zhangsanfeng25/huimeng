@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.LinearLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -28,26 +27,45 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SearchActivity extends AppCompatActivity {
-    private boolean compactBrowse,searchExpanded;private View searchField,searchActions;
+    private boolean compactBrowse,searchExpanded;private View searchField,searchActions,historyHeading,historyContainer;
+    private final android.os.Handler suggestions=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable suggest=()->load(false);private SearchSuggestionAdapter suggestionAdapter;
     private ActivityBrowseBinding binding;private ProductAdapter adapter;private TextInputEditText input;private ChipGroup history,sorts;
     private final List<Product> rows=new ArrayList<>();private String query="",category="",categoryName="",age="",theme="",sort="comprehensive";private int page=1,requestId;private boolean busy,failedAppend,readyForMore;
     @Override protected void onCreate(Bundle state){super.onCreate(state);binding=ActivityBrowseBinding.inflate(getLayoutInflater());setContentView(binding.getRoot());binding.title.setText("搜索绘本");binding.back.setOnClickListener(v->finish());
         query=restoredString(state,"query","");category=restoredString(state,"category","");categoryName=restoredString(state,"category_name","");if(state!=null)sort=state.getString("sort","comprehensive");
         age=restoredString(state,"age","");theme=restoredString(state,"theme","");
         compactBrowse=state==null?!getIntent().getBooleanExtra("search_mode",false)&&(!category.isEmpty()||!age.isEmpty()||!theme.isEmpty()||getIntent().hasExtra("browse_title")):state.getBoolean("compact_browse");
-        searchExpanded=state!=null&&state.getBoolean("search_expanded");
+        searchExpanded=state!=null&&state.getBoolean("search_expanded");if(!compactBrowse){category="";categoryName="";age="";theme="";sort="comprehensive";
+            android.view.ViewGroup root=(android.view.ViewGroup)binding.subtitle.getParent();root.removeView(binding.subtitle);root.addView(binding.subtitle,2);
+        }
         binding.title.setText(restoredString(state,"browse_title",compactBrowse?(categoryName.isEmpty()?"全部绘本":categoryName):"搜索绘本"));
         binding.search.setVisibility(compactBrowse?View.VISIBLE:View.GONE);
         binding.search.setOnClickListener(v->{searchExpanded=!searchExpanded;updateSearchVisibility();if(searchExpanded){input.requestFocus();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(input,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);}else{input.clearFocus();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}});
-        TextInputLayout field=new TextInputLayout(this);field.setHint("搜索绘本名称或内容");input=new TextInputEditText(this);input.setSingleLine(true);input.setImeOptions(EditorInfo.IME_ACTION_SEARCH);field.addView(input,new LinearLayout.LayoutParams(-1,-2));binding.controls.addView(field);searchField=field;input.setText(state==null?query:state.getString("input",query));
+        TextInputLayout field=new TextInputLayout(this);field.setHint("搜索绘本名称或内容");field.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);field.setBoxCornerRadii(dp(16),dp(16),dp(16),dp(16));field.setEndIconMode(TextInputLayout.END_ICON_CLEAR_TEXT);input=new TextInputEditText(this);input.setSingleLine(true);input.setImeOptions(EditorInfo.IME_ACTION_SEARCH);input.setPadding(dp(14),dp(12),dp(8),dp(12));field.addView(input,new LinearLayout.LayoutParams(-1,-2));searchField=field;input.setText(state==null?query:state.getString("input",query));
         input.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_SEARCH){search();return true;}return false;});
-        LinearLayout actions=new LinearLayout(this);MaterialButton go=button("搜索"),categories=button("分类");actions.addView(go,new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(categories,new LinearLayout.LayoutParams(0,dp(48),1));binding.controls.addView(actions);searchActions=actions;categories.setVisibility(compactBrowse?View.GONE:View.VISIBLE);go.setOnClickListener(v->search());categories.setOnClickListener(v->startActivity(new Intent(this,CategoriesActivity.class)));
-        if(!compactBrowse){LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);TextView title=new TextView(this);title.setText("搜索历史");title.setTextColor(ContextCompat.getColor(this,R.color.muted));heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));MaterialButton clear=button("清空");heading.addView(clear);binding.controls.addView(heading);clear.setOnClickListener(v->{getSharedPreferences("huimeng_search",Context.MODE_PRIVATE).edit().remove(historyKey()).apply();renderHistory();});
-        history=new ChipGroup(this);history.setSingleLine(true);HorizontalScrollView historyScroll=new HorizontalScrollView(this);historyScroll.setHorizontalScrollBarEnabled(false);historyScroll.addView(history);binding.controls.addView(historyScroll);renderHistory();}
+        LinearLayout actions=new LinearLayout(this);actions.setGravity(android.view.Gravity.CENTER_VERTICAL);MaterialButton go=button("搜索");go.setMinWidth(dp(76));go.setMinHeight(dp(48));go.setInsetTop(0);go.setInsetBottom(0);go.setPadding(dp(14),0,dp(14),0);LinearLayout.LayoutParams fieldParams=new LinearLayout.LayoutParams(0,-2,1);fieldParams.setMarginEnd(dp(8));actions.addView(field,fieldParams);actions.addView(go,new LinearLayout.LayoutParams(-2,dp(48)));binding.controls.addView(actions);searchActions=actions;go.setOnClickListener(v->search());
+        if(!compactBrowse){LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setPadding(dp(2),dp(16),dp(2),dp(6));TextView title=new TextView(this);title.setText("搜索历史");title.setTextColor(ContextCompat.getColor(this,R.color.ink));title.setTextSize(15);title.setTypeface(null,android.graphics.Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView clear=new TextView(this);clear.setText("清空");clear.setTextColor(ContextCompat.getColor(this,R.color.cool_green_dark));clear.setTextSize(14);clear.setGravity(android.view.Gravity.CENTER);clear.setPadding(dp(12),dp(8),dp(8),dp(8));clear.setBackgroundResource(R.drawable.bg_search);clear.setClickable(true);clear.setFocusable(true);clear.setContentDescription("清空搜索历史");heading.addView(clear);binding.controls.addView(heading);historyHeading=heading;clear.setOnClickListener(v->{getSharedPreferences("huimeng_search",Context.MODE_PRIVATE).edit().remove(historyKey()).apply();renderHistory();});
+        history=new ChipGroup(this);history.setSingleLine(false);history.setChipSpacingHorizontal(dp(6));history.setChipSpacingVertical(dp(4));binding.controls.addView(history);historyContainer=history;renderHistory();}
         updateSearchVisibility();
-        sorts=new ChipGroup(this);sorts.setSingleLine(true);sorts.setSingleSelection(true);for(String label:new String[]{"综合","最新","价格 ↑↓"}){Chip chip=new Chip(this);chip.setText(label);chip.setCheckable(true);chip.setChecked((label.equals("综合")&&sort.equals("comprehensive"))||(label.equals("最新")&&sort.equals("newest"))||(label.startsWith("价格")&&sort.startsWith("price")));chip.setOnClickListener(v->{sort=label.equals("综合")?"comprehensive":label.equals("最新")?"newest":sort.equals("price_asc")?"price_desc":"price_asc";if(label.startsWith("价格"))chip.setText(sort.equals("price_asc")?"价格 ↑":"价格 ↓");load(false);});sorts.addView(chip);}binding.controls.addView(sorts);
-        if(!compactBrowse&&(!category.isEmpty()||!age.isEmpty()||!theme.isEmpty())){MaterialButton reset=button(filterLabel()+" × 清除筛选");binding.controls.addView(reset);reset.setOnClickListener(v->{category="";categoryName="";age="";theme="";binding.title.setText("全部绘本");binding.controls.removeView(reset);load(false);});}
-        adapter=new ProductAdapter(item->startActivity(new Intent(this,ProductDetailActivity.class).putExtra("product_id",item.id())));binding.list.setLayoutManager(new GridLayoutManager(this,2));binding.list.setAdapter(adapter);binding.more.setOnClickListener(v->load(true));binding.retry.setOnClickListener(v->load(failedAppend));load(false);
+        if(compactBrowse){sorts=new ChipGroup(this);sorts.setSingleSelection(true);for(String label:new String[]{"综合","最新","价格 ↑↓"}){Chip chip=new Chip(this);chip.setText(label);chip.setCheckable(true);chip.setChecked((label.equals("综合")&&sort.equals("comprehensive"))||(label.equals("最新")&&sort.equals("newest"))||(label.startsWith("价格")&&sort.startsWith("price")));chip.setOnClickListener(v->{sort=label.equals("综合")?"comprehensive":label.equals("最新")?"newest":sort.equals("price_asc")?"price_desc":"price_asc";if(label.startsWith("价格"))chip.setText(sort.equals("price_asc")?"价格 ↑":"价格 ↓");load(false);});sorts.addView(chip);}binding.controls.addView(sorts);}
+        java.util.function.Consumer<Product> open=item->{rememberQuery();startActivity(new Intent(this,ProductDetailActivity.class).putExtra("product_id",item.id()));};
+        if(compactBrowse){adapter=new ProductAdapter(open);binding.list.setLayoutManager(new GridLayoutManager(this,ProductAdapter.columns(getResources().getConfiguration())));binding.list.setAdapter(adapter);}
+        else{suggestionAdapter=new SearchSuggestionAdapter(open);binding.list.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));binding.list.setAdapter(suggestionAdapter);}
+        binding.more.setOnClickListener(v->load(true));binding.retry.setOnClickListener(v->load(failedAppend));
+        if(!compactBrowse){
+            query=String.valueOf(input.getText()).trim();
+            input.addTextChangedListener(new android.text.TextWatcher(){
+                public void beforeTextChanged(CharSequence value,int start,int count,int after){}
+                public void onTextChanged(CharSequence value,int start,int before,int count){
+                    suggestions.removeCallbacks(suggest);query=value.toString().trim();clearResults();
+                    if(query.length()>100){input.setError("关键词最多 100 字");return;}
+                    if(!query.isEmpty())suggestions.postDelayed(suggest,300);
+                }
+                public void afterTextChanged(android.text.Editable value){}
+            });
+        }
+        load(false);
     }
     private void updateSearchVisibility(){
         int visibility=!compactBrowse||searchExpanded?View.VISIBLE:View.GONE;
@@ -58,14 +76,31 @@ public class SearchActivity extends AppCompatActivity {
         String value=state==null?getIntent().getStringExtra(key):state.getString(key);
         return value==null?fallback:value;
     }
-    private MaterialButton button(String label){MaterialButton v=new MaterialButton(this,null,com.google.android.material.R.attr.borderlessButtonStyle);v.setText(label);v.setMinHeight(dp(48));return v;}
+    private MaterialButton button(String label){MaterialButton v=new MaterialButton(this);v.setText(label);v.setMinHeight(dp(48));return v;}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
-    private String historyKey(){return "history_"+new SessionStore(this).accountId();}
+    private String historyKey(){SessionStore session=new SessionStore(this);String account=session.accountId();return "history_"+(account.isEmpty()?"guest:"+session.localSpaceId():account);}
     private List<String> previous(){List<String> values=new ArrayList<>();try{JSONArray data=new JSONArray(getSharedPreferences("huimeng_search",0).getString(historyKey(),"[]"));for(int i=0;i<data.length();i++)values.add(data.optString(i));}catch(Exception ignored){}return values;}
     private void renderHistory(){if(history==null)return;history.removeAllViews();List<String> values=previous();if(values.isEmpty()){TextView empty=new TextView(this);empty.setText("暂无搜索历史");empty.setTextColor(ContextCompat.getColor(this,R.color.muted));history.addView(empty);}for(String value:values){Chip chip=new Chip(this);chip.setText(value);chip.setOnClickListener(v->{input.setText(value);search();});history.addView(chip);}}
-    private void search(){query=String.valueOf(input.getText()).trim();if(query.length()>100){input.setError("关键词最多 100 字");return;}if(!query.isEmpty()){List<String> values=previous();values.remove(query);values.add(0,query);getSharedPreferences("huimeng_search",0).edit().putString(historyKey(),new JSONArray(values.subList(0,Math.min(8,values.size()))).toString()).apply();renderHistory();}input.clearFocus();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);if(compactBrowse){searchExpanded=false;updateSearchVisibility();}load(false);}
-    private void load(boolean append){if(append&&(busy||!readyForMore))return;if(!append){readyForMore=false;binding.more.setVisibility(View.GONE);}busy=true;int id=++requestId,target=append?page+1:1;binding.loading.setVisibility(View.VISIBLE);binding.empty.setVisibility(View.GONE);binding.retry.setVisibility(View.GONE);binding.more.setEnabled(false);
-        new ApiClient(this).get("catalog/products?q="+Uri.encode(query)+"&category="+Uri.encode(category)+"&age="+Uri.encode(age)+"&theme="+Uri.encode(theme)+"&sort="+sort+"&page="+target+"&pageSize=12",result->{if(isFinishing()||isDestroyed()||id!=requestId)return;busy=false;readyForMore=true;page=target;if(!append)rows.clear();JSONArray data=result.optJSONArray("data");if(data!=null)for(int i=0;i<data.length();i++){JSONObject item=data.optJSONObject(i);if(item!=null)rows.add(Product.from(item));}adapter.submit(new ArrayList<>(rows));String label=filterLabel();binding.subtitle.setText((compactBrowse?(query.isEmpty()?"":"“"+query+"” · "):(label.isEmpty()?"":label+" · "))+"共 "+result.optInt("total")+" 本绘本");binding.loading.setVisibility(View.GONE);binding.empty.setText("没有找到相关绘本，试试其他关键词或分类");binding.empty.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);binding.more.setEnabled(true);binding.more.setVisibility(result.optBoolean("hasMore")?View.VISIBLE:View.GONE);},error->{if(isFinishing()||isDestroyed()||id!=requestId)return;busy=false;failedAppend=append;if(!append){rows.clear();adapter.submit(new ArrayList<>());page=1;binding.more.setVisibility(View.GONE);}binding.loading.setVisibility(View.GONE);binding.more.setEnabled(true);binding.empty.setText(error);binding.empty.setVisibility(View.VISIBLE);binding.retry.setVisibility(View.VISIBLE);});
+    private void rememberQuery(){
+        String value=String.valueOf(input.getText()).trim();if(value.isEmpty()||value.length()>100)return;
+        List<String> values=previous();values.remove(value);values.add(0,value);
+        getSharedPreferences("huimeng_search",0).edit().putString(historyKey(),new JSONArray(values.subList(0,Math.min(8,values.size()))).toString()).apply();renderHistory();
+    }
+    private void search(){
+        suggestions.removeCallbacks(suggest);query=String.valueOf(input.getText()).trim();
+        if(query.length()>100){input.setError("关键词最多 100 字");return;}rememberQuery();
+        input.clearFocus();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
+        if(compactBrowse){searchExpanded=false;updateSearchVisibility();}load(false);
+    }
+    private void submitRows(){if(compactBrowse)adapter.submit(new ArrayList<>(rows));else suggestionAdapter.submit(new ArrayList<>(rows));}
+    private void updateHistoryVisibility(){if(historyHeading!=null){int visibility=query.isEmpty()?View.VISIBLE:View.GONE;historyHeading.setVisibility(visibility);historyContainer.setVisibility(visibility);}}
+    private void clearResults(){
+        requestId++;busy=false;readyForMore=false;failedAppend=false;page=1;rows.clear();submitRows();updateHistoryVisibility();
+        binding.subtitle.setVisibility(View.GONE);binding.loading.setVisibility(View.GONE);binding.empty.setVisibility(View.GONE);binding.retry.setVisibility(View.GONE);binding.more.setVisibility(View.GONE);
+    }
+    @Override protected void onDestroy(){suggestions.removeCallbacksAndMessages(null);requestId++;super.onDestroy();}
+    private void load(boolean append){if(!compactBrowse&&query.isEmpty()){clearResults();return;}if(append&&(busy||!readyForMore))return;if(!append){readyForMore=false;binding.more.setVisibility(View.GONE);}busy=true;int id=++requestId,target=append?page+1:1;binding.subtitle.setVisibility(View.GONE);updateHistoryVisibility();binding.loading.setVisibility(View.VISIBLE);binding.empty.setVisibility(View.GONE);binding.retry.setVisibility(View.GONE);binding.more.setEnabled(false);
+        new ApiClient(this).get("catalog/products?q="+Uri.encode(query)+"&category="+Uri.encode(category)+"&age="+Uri.encode(age)+"&theme="+Uri.encode(theme)+"&sort="+sort+"&page="+target+"&pageSize=12",result->{if(isFinishing()||isDestroyed()||id!=requestId)return;busy=false;readyForMore=true;page=target;if(!append)rows.clear();JSONArray data=result.optJSONArray("data");if(data!=null)for(int i=0;i<data.length();i++){JSONObject item=data.optJSONObject(i);if(item!=null)rows.add(Product.from(item));}submitRows();String label=filterLabel();binding.subtitle.setVisibility(View.VISIBLE);binding.subtitle.setText((compactBrowse?(query.isEmpty()?"":"“"+query+"” · "):(label.isEmpty()?"":label+" · "))+"共 "+result.optInt("total")+" 本绘本");binding.loading.setVisibility(View.GONE);binding.empty.setText(compactBrowse?"没有找到相关绘本，试试其他关键词或分类":"没有找到相关绘本，试试其他名称");binding.empty.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);binding.more.setEnabled(true);binding.more.setVisibility(result.optBoolean("hasMore")?View.VISIBLE:View.GONE);},error->{if(isFinishing()||isDestroyed()||id!=requestId)return;busy=false;failedAppend=append;if(!append){rows.clear();submitRows();page=1;binding.more.setVisibility(View.GONE);}binding.loading.setVisibility(View.GONE);binding.more.setEnabled(true);binding.empty.setText(error);binding.empty.setVisibility(View.VISIBLE);binding.retry.setVisibility(View.VISIBLE);});
     }
     private String filterLabel(){List<String> labels=new ArrayList<>();if(!categoryName.isEmpty())labels.add(categoryName);if(!age.isEmpty())labels.add(age.equals("9-plus")?"9岁以上":age.replace('-','–')+"岁");if(!theme.isEmpty())labels.add(theme.equals("bedtime")?"睡前故事":theme.equals("emotion")?"情绪成长":"科普启蒙");return android.text.TextUtils.join(" · ",labels);}
     @Override protected void onSaveInstanceState(Bundle state){state.putBoolean("compact_browse",compactBrowse);state.putBoolean("search_expanded",searchExpanded);state.putString("query",query);state.putString("input",String.valueOf(input.getText()));state.putString("category",category);state.putString("category_name",categoryName);state.putString("age",age);state.putString("theme",theme);state.putString("browse_title",binding.title.getText().toString());state.putString("sort",sort);super.onSaveInstanceState(state);}

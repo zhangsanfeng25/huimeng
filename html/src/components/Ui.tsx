@@ -1,12 +1,18 @@
 import { ReactNode, useEffect, useId, useRef } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
+const dateTime = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' });
+export function formatDateTime(value: unknown) {
+    if (value == null || value === '') return '—';
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? String(value) : dateTime.format(date);
+}
 export function PageHeader({ title, description, action, onAction }: {
     title: string;
-    description: string;
+    description?: string;
     action?: string;
     onAction?: () => void;
 }) {
-    return <div className="page-header"><div><h1>{title}</h1><p>{description}</p></div>{action ? <button className="primary" onClick={onAction}>{action}</button> : null}</div>;
+    return <div className="page-header"><div><h1>{title}</h1>{description&&<p>{description}</p>}</div>{action ? <button className="primary" onClick={onAction}>{action}</button> : null}</div>;
 }
 export function StatusTag({ value }: {
     value: string | number;
@@ -21,7 +27,7 @@ export function Toast({ message, onClose }: {
     onClose: () => void;
 }) {
     useEffect(() => { const id = window.setTimeout(onClose, 2600); return () => window.clearTimeout(id); }, [onClose]);
-    return <div className="toast"><CheckCircle2 size={18}/><span>{message}</span><button onClick={onClose}><X size={15}/></button></div>;
+    return <div className="toast"><CheckCircle2 size={18} aria-hidden="true"/><span role="status">{message}</span><button aria-label="关闭提示" onClick={onClose}><X size={15}/></button></div>;
 }
 export function Modal({ title, children, onClose, onConfirm, confirmText = '确认', hideCancel = false, danger = false, busy = false }: {
     title: string;

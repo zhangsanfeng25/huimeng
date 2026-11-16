@@ -41,7 +41,7 @@ public class PartialRecoveryFlowTest extends RefreshNavigationTest {
     public void testForgotPasswordChecksConfirmationAndReturnsToLogin()throws Exception{
         opened=getInstrumentation().startActivitySync(new Intent(activity,ForgotPasswordActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
         getInstrumentation().runOnMainSync(()->{((EditText)opened.findViewById(R.id.account)).setText("13900000001");((EditText)opened.findViewById(R.id.password)).setText("new-fixture-password");((EditText)opened.findViewById(R.id.confirmPassword)).setText("different-password");opened.findViewById(R.id.submit).performClick();});
-        assertNull(reset);assertEquals("两次输入的密码不一致",((TextView)opened.findViewById(R.id.message)).getText().toString());
+        assertNull(reset);assertEquals("两次输入的密码不一致",((com.google.android.material.textfield.TextInputLayout)opened.findViewById(R.id.confirmPassword).getParent().getParent()).getError().toString());
         getInstrumentation().runOnMainSync(()->((EditText)opened.findViewById(R.id.confirmPassword)).setText("new-fixture-password"));shot("demo-password-recovery");
         getInstrumentation().runOnMainSync(()->opened.findViewById(R.id.submit).performClick());await(()->opened.isFinishing());assertEquals("13900000001",reset.getString("account"));assertEquals("new-fixture-password",reset.getString("newPassword"));
     }

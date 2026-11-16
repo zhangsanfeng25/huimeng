@@ -8,7 +8,7 @@
     <color name="auth_border">#DCE2D3</color>
     <color name="nav_surface">#D9FFFFFF</color>
     <color name="nav_border">#80FFFFFF</color>
-    <color name="nav_indicator">#2E716DC4</color>
+    <color name="nav_indicator">#DDD9F6</color>
     <color name="logout_surface">#12C94650</color>
     <color name="auth_green">#28543C</color>
     <color name="auth_accent">#28543C</color>

@@ -78,7 +78,7 @@ public final class ApiClient {
         String token=session.token();
         JsonObjectRequest request=new JsonObjectRequest(method, BuildConfig.API_BASE_URL+path,body,success::accept,error->{
             if(unauthorized(path,error.networkResponse==null?0:error.networkResponse.statusCode,token))return;
-            String message=path.equals("ai/chat")?"AI 助手需要连接服务，请检查网络后重试":"无法连接服务器，请启动控制服务后重试";
+            String message=path.equals("ai/chat")?"AI 助手暂不可用":"操作暂未完成，请重试";
             if(error.networkResponse!=null&&error.networkResponse.data!=null){try{message=new JSONObject(new String(error.networkResponse.data)).optString("message",message);}catch(Exception ignored){}}
             failure.accept(message);
         }){
@@ -86,7 +86,7 @@ public final class ApiClient {
         };
         request.setTag(context.getClass().getSimpleName());
         request.setShouldCache(false);
-        if(path.equals("ai/chat"))request.setRetryPolicy(new com.android.volley.DefaultRetryPolicy(13000,0,1f));
+        if(path.equals("ai/chat"))request.setRetryPolicy(new com.android.volley.DefaultRetryPolicy(35000,0,1f));
         ((HuiMengApp)context).requests().add(request);
     }
     private boolean unauthorized(String path,int status,String requestToken){

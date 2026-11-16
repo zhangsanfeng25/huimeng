@@ -113,7 +113,11 @@ public class MerchantOptimizationTest extends RefreshNavigationTest {
         getInstrumentation().runOnMainSync(()->{merchant.selectTab(3);merchant.selectTab(2);});assertEquals("MP2",text(merchant,R.id.searchQuery));assertEquals(1,rows());
         getInstrumentation().runOnMainSync(()->{view(merchant,R.id.clearFilters).performClick();((android.widget.Spinner)view(merchant,R.id.categoryFilter)).setSelection(2);});await(()->rows()==2);capture("merchant-products-category");
         getInstrumentation().runOnMainSync(()->view(merchant,R.id.clearFilters).performClick());await(()->rows()==4);
-        getInstrumentation().runOnMainSync(()->((TextView)view(merchant,R.id.searchQuery)).setText("不存在的商品"));await(()->rows()==0);assertTrue(text(merchant,R.id.empty).contains("重置"));
+        getInstrumentation().runOnMainSync(()->((TextView)view(merchant,R.id.searchQuery)).setText("不存在的商品"));
+        await(()->rows()==0);
+        assertEquals("清除筛选",text(merchant,R.id.emptyAction));
+        getInstrumentation().runOnMainSync(()->view(merchant,R.id.emptyAction).performClick());
+        await(()->rows()==4);
     }
     public void testMerchantOrderSearchAndAfterSaleFilter()throws Exception{
         openMerchant();getInstrumentation().runOnMainSync(()->merchant.selectTab(3));await(()->rows()==4);

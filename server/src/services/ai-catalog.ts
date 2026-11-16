@@ -1,7 +1,7 @@
 import {db, readTables} from '../core/db.js';
 import {productSelect} from './shop-data.js';
 
-type Product = {id:string; name:string; priceCents:number; coverUrl:string|null; ageRange:string|null;
+type Product = {id:string; name:string; priceCents:number; coverUrl:string|null; ageRange:string|null; stock:number;
   summary:string|null; category:string; updatedAt:string};
 export type RecommendedProduct = Pick<Product, 'id'|'name'|'priceCents'|'coverUrl'> & {reason:string};
 
@@ -59,11 +59,14 @@ export function recommendationIntent(input: string, earlier: string[] = []) {
     clear:age!==undefined||budget!==undefined||wanted!==undefined||/不限|直接推荐|都可以/.test(input)};
 }
 
-export function recommendProducts({age,budget,wanted}: ReturnType<typeof recommendationIntent>): RecommendedProduct[] {
+export function recommendProducts({age,budget,wanted}: ReturnType<typeof recommendationIntent>, title?:string, query=''): RecommendedProduct[] {
   const recent = heat();
   const products = db.prepare(`${productSelect.replace('SELECT p.id,','SELECT p.id,p.updated_at updatedAt,')}
-    WHERE p.status='ONLINE' AND p.stock_available>0 AND m.approval_status='APPROVED' AND m.business_status='OPEN'`).all() as Product[];
+    WHERE p.status='ONLINE' AND (? OR p.stock_available>0) AND m.approval_status='APPROVED' AND m.business_status='OPEN'`).all(Boolean(query)?1:0) as Product[];
+  const hasNamedMatch=Boolean(query)&&products.some(item=>query.includes(item.name));
   return products.filter(item=>{
+    if (title && !item.name.includes(title)) return false;
+    if (!title && hasNamedMatch && !query.includes(item.name)) return false;
     if (budget !== undefined && item.priceCents > budget) return false;
     if (!age) return true;
     const range = ageRange(item.ageRange ?? '');
@@ -72,14 +75,15 @@ export function recommendProducts({age,budget,wanted}: ReturnType<typeof recomme
     const counts = recent.get(item.id);
     const matches = wanted.filter(topic=>[item.name,item.category,item.summary].join(' ').includes(topic));
     const reasons = [
+      query ? `适读 ${item.ageRange || '年龄未标注'} · ${item.stock>0 ? '有货' : '暂时缺货'}` : '',
       age && item.ageRange ? `标注适读年龄 ${item.ageRange}` : '',
       matches.length ? `内容涉及${matches.join('、')}` : '',
       counts ? `近 30 天有 ${counts.posts} 篇关联帖子、${counts.likes} 次点赞和 ${counts.comments} 条公开评论` : '',
     ].filter(Boolean);
-    return {item,matches:matches.length,score:counts ? counts.posts + counts.likes + counts.comments * 2 : 0,
+    return {item,named:query.includes(item.name),matches:matches.length,score:counts ? counts.posts + counts.likes + counts.comments * 2 : 0,
       reason:reasons.join('，') || (item.summary || item.category || '当前在售且有库存').slice(0, 95)};
   }).filter(result=>!wanted.length||result.matches>0)
-    .sort((a,b)=>b.score-a.score||b.matches-a.matches||b.item.updatedAt.localeCompare(a.item.updatedAt)||a.item.id.localeCompare(b.item.id))
+    .sort((a,b)=>Number(b.named)-Number(a.named)||b.matches-a.matches||b.score-a.score||b.item.updatedAt.localeCompare(a.item.updatedAt)||a.item.id.localeCompare(b.item.id))
     .slice(0,3).map(({item:{id,name,priceCents,coverUrl},reason})=>({id,name,priceCents,coverUrl,reason}));
 }
 
@@ -104,12 +108,39 @@ export function aiDailyOrders() {
 
 export function aiShopProducts(merchantId:string,message:string) {
   return db.prepare(`SELECT p.id,r.name,r.age_range ageRange,r.price_cents priceCents,
+      p.status,p.stock_available stock,r.review_status reviewStatus,
       substr(r.summary,1,300) summary
     FROM products p JOIN ${readTables.product_revisions} r ON r.id=(
       SELECT id FROM ${readTables.product_revisions} WHERE product_id=p.id ORDER BY version DESC LIMIT 1)
     WHERE p.merchant_id=?
-    ORDER BY (instr(?,p.id)>0 OR (r.name<>'' AND instr(?,r.name)>0)) DESC,p.updated_at DESC,p.id LIMIT 6`)
-    .all(merchantId,message,message) as Array<{id:string;name:string;ageRange:string;priceCents:number;summary:string|null}>;
+    ORDER BY (instr(?,p.id)>0 OR (r.name<>'' AND instr(?,r.name)>0)) DESC,
+      CASE WHEN ? THEN p.status='ONLINE' AND p.stock_available=0 ELSE 0 END DESC,p.updated_at DESC,p.id LIMIT 6`)
+    .all(merchantId,message,message,/缺货|售罄|补货/.test(message)?1:0) as Array<{id:string;name:string;ageRange:string;priceCents:number;summary:string|null;status:string;stock:number;reviewStatus:string}>;
+}
+
+export function aiAdminOverview() {
+  const products=db.prepare(`SELECT COUNT(*) total, COUNT(CASE WHEN status='ONLINE' THEN 1 END) online FROM products`)
+    .get() as {total:number;online:number};
+  const productReviews=db.prepare(`SELECT COUNT(*) total,
+      COUNT(CASE WHEN review_status='PENDING' THEN 1 END) pending,
+      COUNT(CASE WHEN review_status='APPROVED' THEN 1 END) approved,
+      COUNT(CASE WHEN review_status='REJECTED' THEN 1 END) rejected
+    FROM ${readTables.product_revisions} WHERE review_status IN ('PENDING','APPROVED','REJECTED')`)
+    .get() as {total:number;pending:number;approved:number;rejected:number};
+  const pendingProducts=db.prepare(`SELECT r.id,r.name,m.shop_name shop,COALESCE(r.submitted_at,r.created_at) submittedAt
+    FROM ${readTables.product_revisions} r JOIN products p ON p.id=r.product_id JOIN merchants m ON m.id=p.merchant_id
+    WHERE r.review_status='PENDING' ORDER BY submittedAt,r.id LIMIT 6`).all() as Array<{id:string;name:string;shop:string;submittedAt:string}>;
+  const pendingMerchants=(db.prepare("SELECT COUNT(*) total FROM merchants WHERE approval_status='PENDING'").get() as {total:number}).total;
+  const feedback=db.prepare(`SELECT COUNT(*) total,
+      COUNT(CASE WHEN status<>'RESOLVED' THEN 1 END) unresolved,
+      COUNT(CASE WHEN type='功能问题' THEN 1 END) functionalTotal,
+      COUNT(CASE WHEN type='功能问题' AND status<>'RESOLVED' THEN 1 END) functionalUnresolved
+    FROM feedbacks`).get() as {total:number;unresolved:number;functionalTotal:number;functionalUnresolved:number};
+  const feedbackByType=db.prepare(`SELECT type,COUNT(*) total,
+      COUNT(CASE WHEN status='OPEN' THEN 1 END) open,COUNT(CASE WHEN status='PROCESSING' THEN 1 END) processing,
+      COUNT(CASE WHEN status='RESOLVED' THEN 1 END) resolved
+    FROM feedbacks GROUP BY type ORDER BY total DESC,type`).all();
+  return {products,productReviews,pendingProducts,pendingMerchants,feedback,feedbackByType};
 }
 
 export function aiCommunityTopics() {
@@ -133,8 +164,10 @@ export function aiMetrics(merchantId?: string) {
   const orders = merchantId
     ? db.prepare(`SELECT COUNT(*) total FROM ${readTables.orders} WHERE merchant_id=? AND created_at>=? AND created_at<?`).get(merchantId,start,end)
     : db.prepare(`SELECT COUNT(*) total FROM ${readTables.orders} WHERE created_at>=? AND created_at<?`).get(start,end);
-  const inventory = merchantId
-    ? db.prepare("SELECT COUNT(*) online,SUM(stock_available=0) outOfStock FROM products WHERE status='ONLINE' AND merchant_id=?").get(merchantId)
-    : db.prepare("SELECT COUNT(*) online,SUM(stock_available=0) outOfStock FROM products WHERE status='ONLINE'").get();
-  return {...orders as {total:number}, ...inventory as {online:number; outOfStock:number|null}};
+  const inventory = db.prepare(`SELECT COUNT(*) totalProducts,
+    COUNT(CASE WHEN status='ONLINE' THEN 1 END) online,
+    COUNT(CASE WHEN status='ONLINE' AND stock_available=0 THEN 1 END) outOfStock
+    FROM products ${merchantId?'WHERE merchant_id=?':''}`)
+    .get(...(merchantId?[merchantId]:[])) as {totalProducts:number;online:number;outOfStock:number};
+  return {...orders as {total:number}, ...inventory};
 }

@@ -80,7 +80,6 @@ export function LoginPage() {
 
   return <div className="login-page">
     <div key={wallpaper.src} className="login-wallpaper" style={{ backgroundImage: `url(${wallpaper.src})` }} aria-hidden="true" />
-    <section className="login-visual" aria-hidden="true" />
     <button
       className="login-wallpaper-switch"
       type="button"
@@ -92,7 +91,7 @@ export function LoginPage() {
     </button>
     <section className="login-panel">
       {recover?<form onSubmit={resetPassword} aria-label="找回密码">
-        <div className="login-title"><h2>找回密码</h2></div>
+        <div className="login-title"><h1>找回密码</h1></div>
         <p>本地演示：通过账号已保存的邮箱或手机号直接重置。</p>
         <label>邮箱／手机号<div className="input-wrap"><UserRound size={19}/><input required value={contact} onChange={e=>setContact(e.target.value)} autoComplete="username"/></div></label>
         <label>新密码<div className="input-wrap"><LockKeyhole size={19}/><input required type="password" minLength={8} maxLength={64} value={replacement} onChange={e=>setReplacement(e.target.value)} autoComplete="new-password"/></div></label>
@@ -101,13 +100,13 @@ export function LoginPage() {
         <button className="login-button" disabled={loading}>{loading?'正在重置…':'确认重置'}</button>
         <button className="link" type="button" disabled={loading} onClick={()=>{setRecover(false);setError('');}}>返回登录</button>
       </form>:<form onSubmit={submit} aria-label="管理员登录">
-        <div className="login-title"><h2>管理员登录</h2></div>
+        <div className="login-title"><img src="/images/app_icon-c3.webp" alt="" width={44} height={44}/><h1>绘梦管理后台</h1></div>
         {notice?<p role="status">{notice}</p>:null}
         <label>账号<div className="input-wrap"><UserRound size={19} /><input value={account} onChange={event => setAccount(event.target.value)} autoComplete="username" /></div></label>
         <label>密码<div className="input-wrap"><LockKeyhole size={19} /><input type={show ? 'text' : 'password'} value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" placeholder="请输入管理员密码" required /><button type="button" onClick={() => setShow(value => !value)} aria-label={show ? '隐藏密码' : '显示密码'}>{show ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
-        {error ? <p className="form-error">{error}</p> : null}
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
         <label className="remember"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} />记住登录状态</label>
-        <button className="login-button" disabled={loading}>{loading ? '正在登录…' : '登录管理网站'}</button>
+        <button className="login-button" disabled={loading}>{loading ? '正在登录…' : '登录'}</button>
         <button className="link" type="button" disabled={loading} onClick={()=>{setRecover(true);setError('');setNotice('');}}>忘记密码</button>
       </form>}
     </section>

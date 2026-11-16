@@ -3,7 +3,6 @@ package com.huimeng.bookshop.ui;
 import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -14,6 +13,7 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.core.graphics.ColorUtils;
@@ -21,7 +21,6 @@ import androidx.lifecycle.Observer;
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.button.MaterialButton;
 import com.huimeng.bookshop.R;
 import com.huimeng.bookshop.core.AiConversation;
 import com.huimeng.bookshop.core.ApiClient;
@@ -34,7 +33,7 @@ final class AiAssistant {
     private final MainActivity activity;
     private final View bounds;
     private final ViewGroup root;
-    private final MaterialButton ball;
+    private final ImageButton ball;
     private final SharedPreferences placement;
     private final boolean merchant;
     private final AiConversation chat;
@@ -56,18 +55,18 @@ final class AiAssistant {
         chat = AiConversation.current();
         placement = activity.getSharedPreferences("huimeng_ai_placement_" + session.role(), 0);
         right = placement.getBoolean("right", true);
-        position = placement.getFloat("height", .70f);
-        ball = new MaterialButton(activity);
-        ball.setText("AI");
+        position = placement.getFloat("height", 1f);
+        ball = new ImageButton(activity);
+        ball.setImageResource(R.drawable.ai_robot_button);
+        ball.setScaleType(ImageView.ScaleType.FIT_CENTER);
         ball.setContentDescription("打开绘梦 AI 助手");
-        ball.setTextColor(activity.getColor(android.R.color.white));
-        ball.setBackgroundTintList(ColorStateList.valueOf(activity.getColor(R.color.cool_green_dark)));
-        ball.setCornerRadius(dp(27));
-        ball.setInsetTop(0);
-        ball.setInsetBottom(0);
+        GradientDrawable ballBackground = new GradientDrawable();
+        ballBackground.setShape(GradientDrawable.OVAL);
+        ballBackground.setColor(0xFF5148A2);
+        ball.setBackground(ballBackground);
         ball.setPadding(0,0,0,0);
         ball.setElevation(dp(8));
-        root.addView(ball,new androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(dp(54),dp(54)));
+        root.addView(ball,new androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(dp(48),dp(48)));
         ball.setVisibility(View.INVISIBLE);
         ball.setOnClickListener(view -> open());
         ball.setOnTouchListener(this::touchBall);
@@ -172,6 +171,7 @@ final class AiAssistant {
         int height=fullScreen?available:Math.min(available,Math.max(dp(350),Math.round(available*.58f)));
         if(params.height!=height){params.height=height;sheet.setLayoutParams(params);}
         BottomSheetBehavior<?> behavior=dialog.getBehavior();
+        behavior.setDraggable(false);
         behavior.setSkipCollapsed(true);
         behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
         binding.expand.setText(fullScreen?"半屏":"全屏");
@@ -183,17 +183,19 @@ final class AiAssistant {
 
     private void render() {
         if(binding==null)return;
-        binding.mode.setVisibility(chat.demo()?View.VISIBLE:View.GONE);
         if(!chat.draft().contentEquals(binding.message.getText())){
             binding.message.setText(chat.draft());
             binding.message.setSelection(chat.draft().length());
         }
         binding.message.setEnabled(!chat.waiting());
         binding.send.setEnabled(!chat.waiting()&&!chat.draft().trim().isEmpty());
-        binding.loading.setVisibility(chat.waiting()?View.VISIBLE:View.GONE);
+        binding.send.setText(chat.waiting()?"正在生成答复…":"发送");
         binding.status.setText(chat.error());
         binding.status.setVisibility(chat.error().isEmpty()?View.GONE:View.VISIBLE);
         var history=binding.history;
+        var scroll=binding.historyScroll;
+        int previousScroll=scroll.getScrollY();
+        boolean followLatest=chat.waiting()||!scroll.canScrollVertically(1);
         history.removeAllViews();
         if(chat.turns().isEmpty()){
             TextView welcome=text(merchant?"直接提问，例如「我店里有几件绘本缺货？」"
@@ -203,17 +205,16 @@ final class AiAssistant {
         }
         View latestQuestion=null;
         for(AiConversation.Turn turn:chat.turns()){
-            View bubble=addTurn(turn);
+            View bubble=addTurn(turn,turn==chat.turns().get(chat.turns().size()-1));
             if(turn.user())latestQuestion=bubble;
         }
         if(latestQuestion!=null){
-            var scroll=binding.historyScroll;
             View question=latestQuestion;
-            scroll.post(()->scroll.scrollTo(0,history.getTop()+question.getTop()-dp(8)));
+            scroll.post(()->scroll.scrollTo(0,followLatest?history.getTop()+question.getTop()-dp(8):previousScroll));
         }
     }
 
-    private View addTurn(AiConversation.Turn turn) {
+    private View addTurn(AiConversation.Turn turn,boolean latest) {
         LinearLayout bubble=new LinearLayout(activity);
         bubble.setOrientation(LinearLayout.VERTICAL);
         bubble.setPadding(dp(12),dp(9),dp(12),dp(9));
@@ -231,13 +232,26 @@ final class AiAssistant {
             bubble.addView(failed);
         }
         boolean hasProducts=turn.products()!=null&&turn.products().length()>0;
-        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(hasProducts?-1:-2,-2);
+        boolean hasSuggestions=latest&&turn.suggestions()!=null&&turn.suggestions().length()>0;
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(hasProducts||hasSuggestions?-1:-2,-2);
         params.gravity=turn.user()?Gravity.END:Gravity.START;
         params.setMarginStart(turn.user()?dp(32):0);
         params.setMarginEnd(turn.user()?0:dp(32));
         params.topMargin=dp(4);
         params.bottomMargin=dp(4);
         binding.history.addView(bubble,params);
+        if(hasSuggestions){
+            var choices=new com.google.android.material.chip.ChipGroup(activity);
+            bubble.addView(choices,new LinearLayout.LayoutParams(-1,-2));
+            for(int i=0;i<turn.suggestions().length();i++){
+                String suggestion=turn.suggestions().optString(i);
+                if(suggestion.isBlank())continue;
+                var chip=new com.google.android.material.chip.Chip(activity);
+                chip.setText(suggestion);
+                chip.setOnClickListener(view->send(suggestion));
+                choices.addView(chip);
+            }
+        }
         if(hasProducts)for(int i=0;i<turn.products().length();i++){
             JSONObject product=turn.products().optJSONObject(i);
             if(product!=null&&!product.optString("id").isEmpty())addProduct(bubble,product);

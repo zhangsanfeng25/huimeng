@@ -58,7 +58,8 @@ public class UiPolishPreviewTest extends RefreshNavigationTest {
         new WallpaperStore(getInstrumentation().getTargetContext()).setWallpaper(WallpaperStore.OCEAN);
         MainActivity main=(MainActivity)open(MainActivity.class);capture(main,"home-nav");
         runTestOnUiThread(()->main.selectTab(4));SystemClock.sleep(300);
-        runTestOnUiThread(()->{View logout=main.findViewById(R.id.logout);logout.getParent().requestChildFocus(logout,logout);androidx.core.widget.NestedScrollView scroll=findScroll(main.findViewById(android.R.id.content));if(scroll!=null)scroll.fullScroll(View.FOCUS_DOWN);});capture(main,"profile-logout");
+        capture(main,"profile");
+        Activity settings=open(ProfileSettingsActivity.class);capture(settings,"profile-settings");runTestOnUiThread(settings::finish);
         Activity addresses=open(AddressesActivity.class);capture(addresses,"addresses");
         runTestOnUiThread(()->((TextView)addresses.findViewById(R.id.detail)).setText("辽宁省大连市高新区星海路 18 号 阅读书屋六楼 602 室（请联系收货人后送达，长地址完整换行验证）"));capture(addresses,"addresses-long");runTestOnUiThread(addresses::finish);
         Activity author=getInstrumentation().startActivitySync(new Intent(main,UserProfileActivity.class).putExtra("user_id","reader-test").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));SystemClock.sleep(600);

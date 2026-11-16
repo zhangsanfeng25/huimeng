@@ -60,7 +60,20 @@ public final class LocalDatabase extends SQLiteOpenHelper {
         }finally{db.endTransaction();}
     }
     public static JSONObject object(String value){try{return new JSONObject(value);}catch(Exception error){throw new IllegalStateException("本地数据损坏，已保留原数据",error);}}
-    public JSONObject entity(String space,String resource,String id){try(Cursor c=getReadableDatabase().rawQuery("SELECT data,version,remote_id,deleted,sample FROM local_entities WHERE space_id=? AND resource=? AND (id=? OR remote_id=?)",new String[]{space,resource,id,id})){if(!c.moveToFirst()||c.getInt(3)==1)return null;JSONObject value=object(c.getString(0));try{value.put("version",c.getLong(1));value.put("sample",c.getInt(4)==1);if(!c.isNull(2))value.put("remoteId",c.getString(2));}catch(Exception e){throw new IllegalStateException(e);}return value;}}
+    private String storedId(SQLiteDatabase db,String space,String resource,String id){
+        try(Cursor c=db.rawQuery("SELECT id FROM local_entities WHERE space_id=? AND resource=? AND (id=? OR remote_id=?) ORDER BY (id=?) DESC LIMIT 1",new String[]{space,resource,id,id,id})){
+            return c.moveToFirst()?c.getString(0):id;
+        }
+    }
+    public JSONObject entity(String space,String resource,String id){
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT data,version,remote_id,deleted,sample FROM local_entities WHERE space_id=? AND resource=? AND (id=? OR remote_id=?) ORDER BY (id=?) DESC LIMIT 1",new String[]{space,resource,id,id,id})){
+            if(!c.moveToFirst()||c.getInt(3)==1)return null;
+            JSONObject value=object(c.getString(0));
+            try{value.put("version",c.getLong(1));value.put("sample",c.getInt(4)==1);if(!c.isNull(2))value.put("remoteId",c.getString(2));}
+            catch(Exception e){throw new IllegalStateException(e);}
+            return value;
+        }
+    }
     public JSONArray list(String space,String resource){JSONArray result=new JSONArray();try(Cursor c=getReadableDatabase().rawQuery("SELECT data FROM local_entities WHERE space_id=? AND resource=? AND deleted=0 ORDER BY rowid DESC",new String[]{space,resource})){while(c.moveToNext())result.put(object(c.getString(0)));}return result;}
     public void saveConfirmed(String space,String resource,String id,JSONObject value,long version){
         SQLiteDatabase db=getWritableDatabase();String json=value.toString();ContentValues row=new ContentValues();row.put("space_id",space);row.put("resource",resource);row.put("id",id);row.put("remote_id",id);row.put("data",json);row.put("confirmed",json);row.put("version",version);row.put("sample",value.optBoolean("sample")?1:0);
@@ -71,6 +84,7 @@ public final class LocalDatabase extends SQLiteOpenHelper {
     public String mutate(String space,String resource,String id,String action,JSONObject value,boolean sample){return mutate(space,resource,id,action,value,value,sample);}
     public String mutate(String space,String resource,String id,String action,JSONObject projection,JSONObject payload,boolean sample){
         SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{
+            id=storedId(db,space,resource,id);
             JSONObject previous=entity(space,resource,id);long version=previous==null?0:previous.optLong("version");
             ContentValues row=new ContentValues();row.put("space_id",space);row.put("resource",resource);row.put("id",id);row.put("data",projection.toString());row.put("sample",sample?1:0);row.put("deleted",projection.optBoolean("deleted")?1:0);
             int changed=db.update("local_entities",row,"space_id=? AND resource=? AND id=?",new String[]{space,resource,id});if(changed==0)db.insertOrThrow("local_entities",null,row);
@@ -79,6 +93,37 @@ public final class LocalDatabase extends SQLiteOpenHelper {
             if(!sample){ContentValues operation=new ContentValues();operation.put("operation_id",operationId);operation.put("space_id",space);operation.put("resource",resource);operation.put("submission_role",new LocalSpaceStore(this).info(space).optString("role","USER"));operation.put("entity_id",id);operation.put("action",action);operation.put("payload",payload.toString());operation.put("base_version",version);operation.put("created_at",System.currentTimeMillis());db.insertOrThrow("sync_operations",null,operation);}
             db.setTransactionSuccessful();return operationId;
         }finally{db.endTransaction();}
+    }
+    public void removePurchasedCartItems(String space,java.util.Set<String> productIds){
+        if(productIds.isEmpty())return;
+        SQLiteDatabase db=getWritableDatabase();db.beginTransaction();
+        try{
+            for(String id:productIds){
+                JSONObject current=entity(space,"cart",id);
+                if(current==null||current.optBoolean("deleted"))continue;
+                current.put("deleted",true).put("syncState","PENDING");
+                ContentValues row=new ContentValues();row.put("data",current.toString());row.put("deleted",1);
+                db.update("local_entities",row,"space_id=? AND resource='cart' AND id=?",new String[]{space,id});
+                ContentValues operation=new ContentValues();
+                operation.put("operation_id",java.util.UUID.randomUUID().toString());
+                operation.put("space_id",space);operation.put("resource","cart");
+                operation.put("submission_role",new LocalSpaceStore(this).info(space).optString("role","USER"));
+                operation.put("entity_id",id);operation.put("action","cart.remove");
+                operation.put("payload",new JSONObject().put("productId",id).toString());
+                operation.put("base_version",current.optLong("version"));
+                operation.put("created_at",System.currentTimeMillis());
+                db.insertOrThrow("sync_operations",null,operation);
+            }
+            db.setTransactionSuccessful();
+        }catch(org.json.JSONException e){throw new IllegalStateException(e);}
+        finally{db.endTransaction();}
+    }
+    void updateProjection(String space,String resource,String id,JSONObject value){
+        SQLiteDatabase db=getWritableDatabase();
+        ContentValues row=new ContentValues();
+        row.put("data",value.toString());
+        db.update("local_entities",row,"space_id=? AND resource=? AND id=?",
+            new String[]{space,resource,storedId(db,space,resource,id)});
     }
     public JSONArray pending(String space){return pending(space,null);}
     public JSONArray pending(String space,String role){JSONArray rows=new JSONArray();try(Cursor c=getReadableDatabase().rawQuery("SELECT operation_id,resource,entity_id,action,payload,base_version,state,attempts,next_attempt_at,error,submission_role FROM sync_operations WHERE space_id=? AND state<>'ACKED'"+(role==null?"":" AND submission_role=?")+" ORDER BY created_at,rowid",role==null?new String[]{space}:new String[]{space,role})){while(c.moveToNext())try{rows.put(new JSONObject().put("operationId",c.getString(0)).put("spaceId",space).put("resource",c.getString(1)).put("entityId",c.getString(2)).put("action",c.getString(3)).put("payload",object(c.getString(4))).put("baseVersion",c.getLong(5)).put("state",c.getString(6)).put("attempts",c.getInt(7)).put("nextAttemptAt",c.getLong(8)).put("error",c.getString(9)).put("submissionRole",c.getString(10)));}catch(Exception e){throw new IllegalStateException(e);}}return rows;}
@@ -95,7 +140,8 @@ public final class LocalDatabase extends SQLiteOpenHelper {
             if(op.optString("action").equals("checkout.create")){
                 JSONArray orderIds=result.optJSONObject("data")==null?null:result.optJSONObject("data").optJSONArray("orderIds");
                 JSONArray localOrders=list(space,"buyerOrders");for(int i=0;i<localOrders.length();i++){JSONObject order=localOrders.getJSONObject(i);if(!id.equals(order.optString("checkout_group_id")))continue;
-                    if(orderIds!=null&&orderIds.length()==1){db.execSQL("UPDATE local_entities SET remote_id=?,version=1 WHERE space_id=? AND resource='buyerOrders' AND id=?",new Object[]{orderIds.getString(0),space,order.getString("id")});db.execSQL("UPDATE sync_operations SET base_version=1 WHERE space_id=? AND resource='buyerOrders' AND entity_id=? AND state='PENDING' AND payload_hash='' AND base_version=0",new Object[]{space,order.getString("id")});}
+                    int index=order.optInt("checkout_order_index",orderIds!=null&&orderIds.length()==1?0:-1);
+                    if(orderIds!=null&&index>=0&&index<orderIds.length()){db.execSQL("UPDATE local_entities SET remote_id=?,version=1 WHERE space_id=? AND resource='buyerOrders' AND id=?",new Object[]{orderIds.getString(index),space,order.getString("id")});db.execSQL("UPDATE sync_operations SET base_version=1 WHERE space_id=? AND resource='buyerOrders' AND entity_id=? AND state='PENDING' AND payload_hash='' AND base_version=0",new Object[]{space,order.getString("id")});}
                     else db.execSQL("UPDATE local_entities SET deleted=1 WHERE space_id=? AND resource='buyerOrders' AND id=?",new Object[]{space,order.getString("id")});
                 }
             }
